@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Basket | Sell4Life</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="../assets/css/cart.css" />
+  <link rel="stylesheet" href="../assets/css/layout.css" />
+  <link rel="stylesheet" href="../assets/css/product.css" />
+</head>
+
+<body>
+
+<div id="header"></div>
+
+<section class="cart-page">
+  <h1>Your Basket</h1>
+
+  <div class="cart-table">
+
+    <div class="col product-col">
+      <div class="header">Product</div>
+      <div class="rows" id="col-product"></div>
+    </div>
+
+    <div class="col qty-col">
+      <div class="header">Qty</div>
+      <div class="rows" id="col-qty"></div>
+    </div>
+
+    <div class="col price-col">
+      <div class="header">Price</div>
+      <div class="rows" id="col-price"></div>
+    </div>
+
+    <div class="col subtotal-col">
+      <div class="header">Subtotal</div>
+      <div class="rows" id="col-subtotal"></div>
+    </div>
+
+    <div class="col remove-col">
+      <div class="header">Remove</div>
+      <div class="rows" id="col-remove"></div>
+    </div>
+
+  </div>
+
+  <div class="cart-total-line">
+    <span>Total:</span>
+    <strong id="cart-total">£0.00</strong>
+  </div>
+
+  <div class="cart-actions">
+    <button id="clear-cart" class="btn-clear">Clear Cart</button>
+    <button class="btn-buy">Checkout</button>
+  </div>
+
+
+  <div class="clear-cart-modal">
+  <div class="clear-cart-box">
+    <h3>Clear Cart?</h3>
+    <p>This action will remove all items.</p>
+
+    <div class="clear-cart-buttons">
+      <button class="confirm-clear">Clear</button>
+      <button class="cancel-clear">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+</section>
+
+<div id="footer"></div>
+
+<script>
+async function loadPart(id, path) {
+    const res = await fetch(path, { cache: "no-store" });
+    document.getElementById(id).innerHTML = await res.text();
+    document.dispatchEvent(new Event(id + "Loaded"));
+}
+
+(async () => {
+
+    /* Load header & footer */
+    await loadPart("header", "../includes/header.html");
+    await loadPart("footer", "../includes/footer.html");
+
+    /* Load cart script ONCE globally */
+    if (!window.__cartScriptLoaded) {
+        const s = document.createElement("script");
+        s.src = "../assets/js/cart.js?v=9999";
+        document.body.appendChild(s);
+        window.__cartScriptLoaded = true;
+    }
+
+})();
+</script>
+
+
+</body>
+</html>

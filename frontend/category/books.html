@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Books</title>
+  <link rel="stylesheet" href="/assets/css/category.css">
+  <link rel="stylesheet" href="/assets/css/layout.css">
+  <link rel="stylesheet" href="/assets/css/books.css">
+</head>
+
+<body>
+
+<div id="header"></div>
+
+<!-- HERO SLIDER -->
+<div class="s4l-hero-slider">
+  <div class="s4l-slider-track">
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/book_1.png'); background-color: #F5D9B6;"></div>
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/book_2.png'); background-color: #D8B4A0;"></div>
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/book_3.png'); background-color: #C5A880;"></div>
+  </div>
+
+  <div class="s4l-slider-text">
+    <h1>Explore Books</h1>
+    <p>Fiction, nonfiction, bestsellers, and classics</p>
+  </div>
+</div>
+
+
+<!-- CATEGORY BANNER -->
+<section class="category-banner" 
+         style="background-image: url('/assets/images/category/books/banner.jpg')  no-repeat center center / cover; background-color: #9C7A56;">
+          
+    <div class="banner-content">
+        <h2>Discover the World of Books</h2>
+        <p>Dive into stories, knowledge, and timeless classics</p>
+        <a href="/shop/shop.html?category=books" class="btn-shop-now">Shop Now</a>
+    </div>
+
+</section>
+
+
+
+<!-- UNIVERSAL CATEGORY PAGE SECTIONS -->
+<section class="category-hero"></section>
+
+<div class="s4l-container">
+
+
+<section class="category-featured">
+  <h2>Featured Picks</h2>
+  <div id="featured-list"></div>
+</section>
+
+<section class="category-subcats">
+  <h2>Shop by Type</h2>
+  <div id="subcategory-cards"></div>
+</section>
+
+<section class="category-products">
+  <h2>All Books</h2>
+  <div id="category-product-grid"></div>
+</section>
+
+<a href="/shop/shop.html?category=books" class="btn-shop-all">
+  Shop All Books
+</a>
+
+</div>
+
+<script src="/assets/js/category-page.js"></script>
+<script src="/assets/js/layout.js"></script>
+
+<div id="footer"></div>
+
+<script>
+async function loadPart(id, path) {
+  const res = await fetch(path, { cache: "no-store" });
+  const html = await res.text();
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = html;
+  document.dispatchEvent(new Event(id + "Loaded"));
+}
+
+(async () => {
+  await loadPart("header", "../includes/header.html");
+
+  if (!window.__cartScriptLoaded) {
+    const s = document.createElement("script");
+    s.src = "/assets/js/cart.js?v=3";
+    document.body.appendChild(s);
+    window.__cartScriptLoaded = true;
+  }
+
+  loadPart("footer", "../includes/footer.html");
+})();
+</script>
+
+</body>
+</html>

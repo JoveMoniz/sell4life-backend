@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sell4Life | Home</title>
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./assets/css/style.css">
+  <link rel="stylesheet" href="./assets/css/layout.css">
+</head>
+
+<body>
+
+  <div id="header"></div>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <img src="./assets/images/hero/dolar-tag.png" alt="Sell4Life Logo" />
+    <h1>sell4life</h1>
+    <h2>Sell smarter. Buy better.</h2>
+    <p>An innovative platform for selling and buying with ease.</p>
+    <a href="#" class="btn-cta">Get started</a>
+  </section>
+
+  <!-- Categories Section -->
+  <section class="category-grid" id="s4l-categories"></section>
+
+  <!-- Featured Products Section -->
+  <section class="featured-products">
+    <h2>Featured Products</h2>
+    <div class="featured-products-grid"></div>
+  </section>
+
+  <script>
+    async function loadPart(id, path) {
+      const res = await fetch(path, { cache: "no-store" });
+      const html = await res.text();
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = html;
+        document.dispatchEvent(new Event(id + "Loaded"));
+      }
+    }
+
+    (async () => {
+      const hasHeader = !!document.getElementById("header");
+      const hasFooter = !!document.getElementById("footer");
+
+      // Home page already has a static header, so skip loading it.
+      if (!hasHeader && !document.querySelector(".s4l-header")) {
+await loadPart("header", "/frontend/includes/header.html");
+      } else {
+        document.dispatchEvent(new Event("headerLoaded"));
+      }
+
+      // Always load cart.js so basket stays in sync
+      if (!window.__cartScriptLoaded) {
+        const s = document.createElement("script");
+        s.src = "./assets/js/cart.js?v=3";
+        document.body.appendChild(s);
+        window.__cartScriptLoaded = true;
+      }
+
+      if (hasFooter) await loadPart("footer", "/frontend/includes/footer.html");
+
+    })();
+  </script>
+
+  <!-- JS (always last) -->
+  <script src="./assets/js/cart.js"></script>
+  <script src="./assets/js/home.js"></script>
+  <script src="./assets/js/layout.js"></script>
+
+  <div id="footer"></div>
+
+</body>
+</html>

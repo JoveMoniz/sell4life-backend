@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home & Garden</title>
+
+  <link rel="stylesheet" href="/assets/css/layout.css">
+  <link rel="stylesheet" href="/assets/css/home-garden.css">
+  <link rel="stylesheet" href="/assets/css/category.css">
+
+</head>
+
+<body>
+
+<div id="header"></div>
+
+<!-- HERO SLIDER -->
+<div class="s4l-hero-slider">
+  <div class="s4l-slider-track">
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/home1.png'); background-color: #E8E4D8;"></div>
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/garden1.png'); background-color: #D6D2C4;"></div>
+    <div class="s4l-slide" style="background-image: url('/assets/images/hero/interior1.png'); background-color: #C9C5B8;"></div>
+  </div>
+
+  <div class="s4l-slider-text">
+    <h1>Home & Garden</h1>
+    <p>Décor, furniture, and outdoor living essentials</p>
+  </div>
+</div>
+
+<!-- CATEGORY BANNER -->
+<section class="category-banner" style="background: url('/assets/images/hero/home-garden-banner.png') no-repeat center center / cover; background-color: #9A8C73;">
+  <div class="banner-content">
+    <h2>Make Your Space Shine</h2>
+    <p>Shop curated picks for every room and garden</p>
+    <a href="/shop" class="btn-shop-now">Shop Now</a>
+  </div>
+</section>
+
+<!-- UNIVERSAL CATEGORY CONTENT -->
+<section class="category-hero"></section>
+
+<div class="s4l-container">
+
+<section class="category-featured">
+  <h2>Featured Picks</h2>
+  <div id="featured-list"></div>
+</section>
+
+<section class="category-subcats">
+  <h2>Shop by Type</h2>
+  <div id="subcategory-cards"></div>
+</section>
+
+<section class="category-products">
+  <h2>All Products</h2>
+  <div id="category-product-grid"></div>
+</section>
+
+<a href="/shop/shop.html?category=home-garden" class="btn-shop-all">
+  Shop All Home & Garden
+</a>
+
+</div>
+
+<script src="/assets/js/category-page.js"></script>
+<script src="/assets/js/layout.js"></script>
+
+<div id="footer"></div>
+
+<script>
+async function loadPart(id, path) {
+  const res = await fetch(path, { cache: "no-store" });
+  const html = await res.text();
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = html;
+  document.dispatchEvent(new Event(id + "Loaded"));
+}
+
+(async () => {
+  await loadPart("header", "../includes/header.html");
+
+  if (!window.__cartScriptLoaded) {
+    const s = document.createElement("script");
+    s.src = "/assets/js/cart.js?v=3";
+    document.body.appendChild(s);
+    window.__cartScriptLoaded = true;
+  }
+
+  loadPart("footer", "../includes/footer.html");
+})();
+</script>
+
+</body>
+</html>

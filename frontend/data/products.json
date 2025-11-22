@@ -1,0 +1,49 @@
+[
+  {
+    "id": "wireless-earbuds",
+    "name": "Wireless Earbuds",
+    "category": "electronics",
+    "subcategory": "audio",
+    "brand":"umbranded",
+    "price": 35.0,
+    "currency": "£",
+    "description": "High-quality Bluetooth earbuds with charging case. Crisp sound, long battery life, and comfort for daily use.",
+    "images": [
+       "electronics.png",
+    "dress.png",
+    "fashion-pic.png"
+    ]
+  },
+  {
+    "id": "mens",
+    "name": "Men's Classic Suit",
+    "category": "fashion",
+    "subcategory": "men",
+    "brand":"umbranded",
+    "price": 120.0,
+    "currency": "£",
+    "description": "Tailored men's suit crafted with high-quality fabric for comfort and style. Perfect for business or special occasions.",
+    "images": [
+      "dress.png",
+  "electronics.png",    
+    "fashion-pic.png"
+    ]
+  },
+  {
+    "id": "audio",
+    "name": "Smart Home Speaker",
+    "category": "electronics",
+    "subcategory": "audio",
+    "brand": "Sony",
+    "price": 59.99,
+    "currency": "£",
+    "description": "Voice-controlled smart speaker with Wi-Fi and Bluetooth support. Delivers deep sound and integrates with your smart home system.",
+    "images": [
+ "fashion-pic.png",
+    "dress.png",    
+   "electronics.png"
+    ]
+  }
+
+  
+]

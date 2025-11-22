@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sell4Life | Product</title>
+
+  <!-- Shared global styles -->
+  <link rel="stylesheet" href="../assets/css/layout.css" />
+  <link rel="stylesheet" href="../assets/css/product.css" />
+  <link rel="stylesheet" href="../assets/css/gallery-slider.css" />
+</head>
+
+<body>
+
+<div id="header"></div>
+
+<section class="product-page">
+
+  <!-- LEFT: IMAGE GALLERY -->
+  <div class="product-gallery">
+    <div class="custom-gallery side-layout">
+      <div id="thumbnailGallery" class="thumbnail-gallery"></div>
+
+      <div class="main-image-wrapper">
+        <div class="slider-wrapper">
+          <div id="sliderTrack" class="slider-track"></div>
+          <div id="main-prev">&#10094;</div>
+          <div id="main-next">&#10095;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden loaded images (dynamic) -->
+    <div id="hidden-gallery" style="display:none;"></div>
+  </div>
+
+  <!-- RIGHT: PRODUCT INFORMATION -->
+  <div class="product-info">
+
+    <h1 class="product-title"></h1>
+    <p class="product-category"></p>
+    <p class="product-price"></p>
+    <p class="product-desc"></p>
+
+    <div class="product-actions">
+      <button class="btn-add">Add to Basket</button>
+      <button class="btn-buy">Buy Now</button>
+    </div>
+
+  </div>
+
+</section>
+
+<!-- SCRIPTS -->
+<script src="../assets/js/gallery-slider.js"></script>
+<script src="../assets/js/product.js"></script>
+
+<script>
+  async function loadPart(id, path) {
+    const res = await fetch(path, { cache: "no-store" });
+    document.getElementById(id).innerHTML = await res.text();
+    document.dispatchEvent(new Event(id + "Loaded"));
+  }
+
+ (async () => {
+  await loadPart("header", "../includes/header.html");
+
+  if (!window.__cartScriptLoaded) {
+    const s = document.createElement("script");
+    s.src = "../assets/js/cart.js?v=3";
+    document.body.appendChild(s);
+    window.__cartScriptLoaded = true;
+  }
+
+  await loadPart("footer", "../includes/footer.html");
+})();
+
+</script>
+
+<div id="footer"></div>
+
+</body>
+</html>

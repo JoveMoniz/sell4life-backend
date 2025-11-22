@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shop | Sell4Life</title>
+
+  <!-- External CSS -->
+  <link rel="stylesheet" href="../assets/css/layout.css">
+  <link rel="stylesheet" href="../assets/css/product.css">
+  <link rel="stylesheet" href="../assets/css/shop.css">
+</head>
+
+<body>
+
+  <div id="header"></div>
+
+  <h1 class="shop-title">Our Products</h1>
+  <div id="product-list" class="product-grid"></div>
+
+  <div id="footer"></div>
+
+  <!-- Load header/footer and cart -->
+  <script>
+    async function loadPart(id, path) {
+      const res = await fetch(path, { cache: "no-store" });
+      document.getElementById(id).innerHTML = await res.text();
+    }
+
+    (async () => {
+      await loadPart("header", "../includes/header.html");
+      await loadPart("footer", "../includes/footer.html");
+
+      if (!window.__cartScriptLoaded) {
+        const s = document.createElement("script");
+        s.src = "../assets/js/cart.js?v=3";
+        document.body.appendChild(s);
+        window.__cartScriptLoaded = true;
+      }
+    })();
+  </script>
+
+  <!-- External JS -->
+  <script src="../assets/js/shop.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+[
+  {
+    "id": "books",
+    "name": "Books",
+    "image": "/assets/images/category/books/books.png",
+    "subcategories": [
+      { "id": "fiction", "name": "Fiction", "image": "/assets/images/category/books/fiction.png" },
+      { "id": "non-fiction", "name": "Non-Fiction", "image": "/assets/images/category/books/non-fiction.png" },
+      { "id": "children", "name": "Children", "image": "/assets/images/category/books/children.png" },
+      { "id": "education", "name": "Education", "image": "/assets/images/category/books/education.png" }
+    ]
+  },
+
+  {
+    "id": "fashion",
+    "name": "Fashion",
+    "image": "/assets/images/category/fashions/fashion.png",
+    "subcategories": [
+      { "id": "tops", "name": "Tops", "image": "/assets/images/category/fashions/tops.png" },
+      { "id": "bottoms", "name": "Bottoms", "image": "/assets/images/category/fashions/bottoms.png" },
+      { "id": "footwear", "name": "Footwear", "image": "/assets/images/category/fashions/footwear.png" },
+      { "id": "accessories", "name": "Accessories", "image": "/assets/images/category/fashions/accessories.png" }
+    ]
+  },
+
+  {
+    "id": "electronics",
+    "name": "Electronics",
+    "image": "/assets/images/category/electronics/electronics.png",
+    "subcategories": [
+      { "id": "audio", "name": "Audio", "image": "/assets/images/category/electronics/audio.png" },
+      { "id": "computers", "name": "Computers", "image": "/assets/images/category/electronics/computer.png" },
+      { "id": "mobiles", "name": "Mobiles", "image": "/assets/images/category/electronics/mobile.png" },
+      { "id": "gaming", "name": "Gaming", "image": "/assets/images/category/electronics/gaming.png" }
+    ]
+  },
+
+  {
+    "id": "toys",
+    "name": "Toys & Games",
+    "image": "/assets/images/category/toys/toys.png",
+    "subcategories": [
+      { "id": "educational", "name": "Educational", "image": "/assets/images/category/toys/educational.png" },
+      { "id": "action", "name": "Action Figures", "image": "/assets/images/category/toys/action.png" },
+      { "id": "puzzles", "name": "Puzzles", "image": "/assets/images/category/toys/puzzles.png" },
+      { "id": "outdoor", "name": "Outdoor Play", "image": "/assets/images/category/toys/outdoor.png" }
+    ]
+  },
+
+  {
+    "id": "home-garden",
+    "name": "Home & Garden",
+    "image": "/assets/images/category/home-garden/home-garden.png",
+    "subcategories": [
+      { "id": "kitchen", "name": "Kitchen", "image": "/assets/images/category/home-garden/kitchen.png" },
+      { "id": "decor", "name": "Decor", "image": "/assets/images/category/home-garden/decor.png" },
+      { "id": "furniture", "name": "Furniture", "image": "/assets/images/category/home-garden/furniture.png" },
+      { "id": "garden", "name": "Garden Tools", "image": "/assets/images/category/home-garden/garden.png" }
+    ]
+  },
+
+  {
+    "id": "health-beauty",
+    "name": "Health & Beauty",
+    "image": "/assets/images/category/health-beauty/health-beauty.png",
+    "subcategories": [
+      { "id": "skincare", "name": "Skincare", "image": "/assets/images/category/health-beauty/skincare.png" },
+      { "id": "haircare", "name": "Haircare", "image": "/assets/images/category/health-beauty/haircare.png" },
+      { "id": "supplements", "name": "Supplements", "image": "/assets/images/category/health-beauty/supplements.png" },
+      { "id": "grooming", "name": "Grooming", "image": "/assets/images/category/health-beauty/grooming.png" }
+    ]
+  }
+]
