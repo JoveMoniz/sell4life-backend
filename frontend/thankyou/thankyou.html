@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Complete | Sell4Life</title>
+
+  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+  <link rel="stylesheet" href="/assets/css/layout.css">
+  <link rel="stylesheet" href="/assets/css/thankyou.css">
+</head>
+
+<body>
+
+
+
+<div class="thankyou-container">
+
+  <div class="thankyou-card">
+    <img src="/assets/images/icons/check.png" class="ty-icon" alt="Success">
+
+    <h1>Thank You for Your Order!</h1>
+    <p>Your order has been placed successfully. A confirmation has been sent to your email.</p>
+
+    <div class="ty-details">
+      <strong>Order Number:</strong>
+      <span id="order-id">#000000</span>
+    </div>
+
+    <div class="ty-details">
+      <strong>Order Date:</strong>
+      <span id="order-date">--</span>
+    </div>
+
+    <!-- ITEMS LIST -->
+    <div id="order-items" class="ty-items"></div>
+
+    <!-- TOTAL (this was missing) -->
+    <div class="ty-details">
+      <strong>Total:</strong>
+      <span id="order-total">£0.00</span>
+    </div>
+
+    <!-- BUTTON -->
+    <a href="/" class="ty-btn">Back to Home</a>
+  </div>
+
+</div>
+
+
+
+<!-- Page scripts LAST -->
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/thankyou.js"></script>
+
+</body>
+</html>

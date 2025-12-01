@@ -58,3 +58,73 @@
   color: inherit;
   text-decoration: none;
 }
+
+
+
+
+
+@media (max-width: 1024px) {
+  .product-grid {
+    gap: 30px;
+    padding: 20px;
+  }
+
+  /* Product cards slightly smaller so 3 fit cleanly */
+  .product-card {
+    width: 200px;
+  }
+
+  .product-card img {
+    height: 200px;
+  }
+}
+
+
+
+
+@media (max-width: 768px) {
+
+  .product-grid {
+    gap: 20px;
+    padding: 15px;
+  }
+
+  /* 2 per row */
+  .product-card {
+    width: calc(50% - 20px);
+    max-width: 240px;
+  }
+
+  .product-card img {
+    height: 180px;
+  }
+
+  .shop-title {
+    font-size: 24px;
+  }
+}
+
+
+
+
+
+@media (max-width: 480px) {
+
+  .product-grid {
+    gap: 16px;
+    padding: 10px;
+  }
+
+  .product-card {
+    width: 100%;
+    max-width: none;
+  }
+
+  .product-card img {
+    height: 200px;
+  }
+
+  .product-card h3 {
+    font-size: 16px;
+  }
+}

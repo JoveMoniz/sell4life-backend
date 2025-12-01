@@ -22,29 +22,25 @@ main {
 
 .s4l-hero-slider {
   width: 100%;
-  height: 60vh;       /* good universal height */
-  max-height: 600px;  /* prevent giant screens from stretching */
-  overflow: hidden;
+  height: 60vh;
+  max-height: 600px;
   position: relative;
 }
 
 .s4l-slider-track {
   display: flex;
   height: 100%;
-  transition: transform 0.6s ease;
-  animation: slideHero 18s infinite;
+  animation: slideHero 18s infinite ease-in-out;
 }
 
 .s4l-slide {
   flex: 0 0 100%;
   height: 100%;
-  background-size: cover;     /* best universal setting */
-  background-position: center;
-  background-repeat: no-repeat;
+  background-size: cover;        /* FIXED */
+  background-position: center;    /* FIXED */
 }
 
-
-/* Text overlay */
+/* Text */
 .s4l-slider-text {
   position: absolute;
   inset: 0;
@@ -164,12 +160,9 @@ main {
 
 .s4l-container h2{
   color: #094949;
-
-}
-
-.s4l-container h2{
   text-decoration: none;
 }
+
 
 /* PRODUCT TITLE */
 .product-card h3 {

@@ -43,7 +43,663 @@
     "dress.png",    
    "electronics.png"
     ]
-  }
+  },
 
   
+
+
+
+
+  {
+    "id": "p101",
+    "name": "Classic Yellow Dress",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 19.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p102",
+    "name": "Men's Urban Jacket",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 34.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p103",
+    "name": "Women Accessories Pack",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 14.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p201",
+    "name": "Wireless Headphones",
+    "category": "electronics",
+    "subcategory": "audio",
+    "price": 24.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p202",
+    "name": "Gaming Mouse",
+    "category": "electronics",
+    "subcategory": "computers",
+    "price": 11.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p203",
+    "name": "Smartphone Charger",
+    "category": "electronics",
+    "subcategory": "accessories",
+    "price": 7.99,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p301",
+    "name": "Healthy Skin Lotion",
+    "category": "health-beauty",
+    "subcategory": "skincare",
+    "price": 9.49,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p302",
+    "name": "Vitamins Pack",
+    "category": "health-beauty",
+    "subcategory": "supplements",
+    "price": 5.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p401",
+    "name": "Home Storage Box",
+    "category": "home-garden",
+    "subcategory": "storage",
+    "price": 12.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p402",
+    "name": "Kids Learning Toy",
+    "category": "toys",
+    "subcategory": "educational",
+    "price": 8.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+
+  
+  {
+    "id": "p501",
+    "name": "Slim Fit Shirt",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 17.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p502",
+    "name": "Winter Hoodie",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 24.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p503",
+    "name": "Running Shoes",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 32.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p504",
+    "name": "Leather Belt",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 9.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p505",
+    "name": "Casual Sandals",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 14.49,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+
+  {
+    "id": "p601",
+    "name": "Bluetooth Speaker",
+    "category": "electronics",
+    "subcategory": "audio",
+    "price": 15.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p602",
+    "name": "USB Keyboard",
+    "category": "electronics",
+    "subcategory": "computers",
+    "price": 10.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p603",
+    "name": "LED Desk Lamp",
+    "category": "electronics",
+    "subcategory": "lighting",
+    "price": 12.59,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p604",
+    "name": "HDMI Cable",
+    "category": "electronics",
+    "subcategory": "accessories",
+    "price": 4.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p701",
+    "name": "Romantic Novel",
+    "category": "books",
+    "subcategory": "fiction",
+    "price": 6.49,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p702",
+    "name": "Science Workbook",
+    "category": "books",
+    "subcategory": "education",
+    "price": 7.49,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p703",
+    "name": "Kids Story Book",
+    "category": "books",
+    "subcategory": "kids",
+    "price": 5.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p801",
+    "name": "Face Cleansing Kit",
+    "category": "health-beauty",
+    "subcategory": "skincare",
+    "price": 8.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p802",
+    "name": "Hair Growth Oil",
+    "category": "health-beauty",
+    "subcategory": "haircare",
+    "price": 6.49,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p803",
+    "name": "Makeup Brush Set",
+    "category": "health-beauty",
+    "subcategory": "makeup",
+    "price": 9.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p901",
+    "name": "Clay Flower Pot",
+    "category": "home-garden",
+    "subcategory": "garden",
+    "price": 6.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p902",
+    "name": "Bathroom Organizer",
+    "category": "home-garden",
+    "subcategory": "storage",
+    "price": 11.49,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "p903",
+    "name": "Kitchen Knife Set",
+    "category": "home-garden",
+    "subcategory": "kitchen",
+    "price": 18.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p1001",
+    "name": "RC Car Mini",
+    "category": "toys",
+    "subcategory": "outdoor",
+    "price": 13.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "p1002",
+    "name": "Soft Plush Bear",
+    "category": "toys",
+    "subcategory": "outdoor",
+    "price": 7.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+
+
+
+
+  
+  {
+    "id": "p1101",
+    "name": "Urban Street Jacket",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 27.99,
+    "currency": "£",
+    "images": ["tops.png"]
+  },
+  {
+    "id": "p1102",
+    "name": "Classic Denim Jeans",
+    "category": "fashion",
+    "subcategory": "bottoms",
+    "price": 22.49,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p1103",
+    "name": "Sport Training Shorts",
+    "category": "fashion",
+    "subcategory": "bottoms",
+    "price": 13.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "p1104",
+    "name": "Minimalist Sneakers",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 31.99,
+    "currency": "£",
+    "images": ["tops.png"]
+  },
+  {
+    "id": "p1105",
+    "name": "Casual Canvas Shoes",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 21.49,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p1106",
+    "name": "Wireless Earbuds Lite",
+    "category": "electronics",
+    "subcategory": "audio",
+    "price": 19.99,
+    "currency": "£",
+    "images": ["tops.png"]
+  },
+  {
+    "id": "p1107",
+    "name": "Portable Powerbank",
+    "category": "electronics",
+    "subcategory": "mobile",
+    "price": 14.29,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1108",
+    "name": "Gaming Mouse RGB",
+    "category": "electronics",
+    "subcategory": "computers",
+    "price": 12.89,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1109",
+    "name": "Smart Alarm Clock",
+    "category": "electronics",
+    "subcategory": "home",
+    "price": 16.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p1110",
+    "name": "Notebook Planner",
+    "category": "books",
+    "subcategory": "stationery",
+    "price": 5.99,
+    "currency": "£",
+    "images": ["fashion.png"]
+  },
+  {
+    "id": "p1111",
+    "name": "Cooking Recipes Guide",
+    "category": "books",
+    "subcategory": "cooking",
+    "price": 8.49,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1112",
+    "name": "Daily Motivation Book",
+    "category": "books",
+    "subcategory": "selfhelp",
+    "price": 6.99,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+
+  {
+    "id": "p1113",
+    "name": "Vitamin D3 Boost",
+    "category": "health-beauty",
+    "subcategory": "supplements",
+    "price": 7.49,
+    "currency": "£",
+    "images": ["fashion.png"]
+  },
+  {
+    "id": "p1114",
+    "name": "Aloe Vera Gel",
+    "category": "health-beauty",
+    "subcategory": "skincare",
+    "price": 4.99,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1115",
+    "name": "Herbal Shampoo",
+    "category": "health-beauty",
+    "subcategory": "haircare",
+    "price": 5.49,
+    "currency": "£",
+    "images": ["fashion.png"]
+  },
+
+  {
+    "id": "p1116",
+    "name": "Home Scent Diffuser",
+    "category": "home-garden",
+    "subcategory": "home",
+    "price": 9.79,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1117",
+    "name": "Garden Watering Can",
+    "category": "home-garden",
+    "subcategory": "garden",
+    "price": 11.49,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "p1118",
+    "name": "Metal Storage Rack",
+    "category": "home-garden",
+    "subcategory": "storage",
+    "price": 18.99,
+    "currency": "£",
+    "images": ["fashion.png"]
+  },
+
+  {
+    "id": "p1119",
+    "name": "Puzzle Block Set",
+    "category": "toys",
+    "subcategory": "puzzle",
+    "price": 8.99,
+    "currency": "£",
+    "images": ["fashion_2.png"]
+  },
+  {
+    "id": "p1120",
+    "name": "Kids Foam Ball",
+    "category": "toys",
+    "subcategory": "outdoor",
+    "price": 5.49,
+    "currency": "£",
+    "images": ["fashion.png"]
+  },
+
+
+
+  
+  {
+    "id": "prod-021",
+    "name": "Urban Street Jacket",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 54.99,
+    "currency": "£",
+    "images": ["fashion_2.png"]
+  },
+  {
+    "id": "prod-022",
+    "name": "Classic Slim Trousers",
+    "category": "fashion",
+    "subcategory": "bottoms",
+    "price": 39.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "prod-023",
+    "name": "Executive Black Coat",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 74.99,
+    "currency": "£",
+    "images": ["mensfashion_pic.png"]
+  },
+  {
+    "id": "prod-024",
+    "name": "Women's Red Elegance Dress",
+    "category": "fashion",
+    "subcategory": "dresses",
+    "price": 62.50,
+    "currency": "£",
+    "images": ["dress-red.png"]
+  },
+  {
+    "id": "prod-025",
+    "name": "Modern Casual Accessories Set",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 21.00,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "prod-026",
+    "name": "Premium Leather Wallet",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 29.99,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "prod-027",
+    "name": "Daily Fit Sneakers",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 45.00,
+    "currency": "£",
+    "images": ["footwear.png"]
+  },
+  {
+    "id": "prod-028",
+    "name": "Women Casual Tee",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 19.99,
+    "currency": "£",
+    "images": ["tops.png"]
+  },
+  {
+    "id": "prod-029",
+    "name": "Men’s Outdoor Jacket",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 59.50,
+    "currency": "£",
+    "images": ["fashion-pic.png"]
+  },
+  {
+    "id": "prod-030",
+    "name": "Luxury Gold Watch",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 120.00,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "prod-031",
+    "name": "Heavy-Duty Work Boots",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 68.00,
+    "currency": "£",
+    "images": ["footwear.png"]
+  },
+  {
+    "id": "prod-032",
+    "name": "Summer Floral Dress",
+    "category": "fashion",
+    "subcategory": "dresses",
+    "price": 49.99,
+    "currency": "£",
+    "images": ["dress-yellow.png"]
+  },
+  {
+    "id": "prod-033",
+    "name": "Black Handbag",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 34.95,
+    "currency": "£",
+    "images": ["accessories_1.png"]
+  },
+  {
+    "id": "prod-034",
+    "name": "Basic Cotton Shorts",
+    "category": "fashion",
+    "subcategory": "bottoms",
+    "price": 24.00,
+    "currency": "£",
+    "images": ["bottoms.png"]
+  },
+  {
+    "id": "prod-035",
+    "name": "Women’s Long Cardigan",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 41.20,
+    "currency": "£",
+    "images": ["bottoms.png"]
+  },
+  {
+    "id": "prod-036",
+    "name": "Everyday Running Shoes",
+    "category": "fashion",
+    "subcategory": "footwear",
+    "price": 52.10,
+    "currency": "£",
+    "images": ["fashion_2.png"]
+  },
+  {
+    "id": "prod-037",
+    "name": "Stylish Textured Belt",
+    "category": "fashion",
+    "subcategory": "accessories",
+    "price": 14.50,
+    "currency": "£",
+    "images": ["accessories.png"]
+  },
+  {
+    "id": "prod-038",
+    "name": "High Rise Women Jeans",
+    "category": "fashion",
+    "subcategory": "bottoms",
+    "price": 42.99,
+    "currency": "£",
+    "images": ["bottoms.png"]
+  },
+  {
+    "id": "prod-039",
+    "name": "Men’s Polo Shirt",
+    "category": "fashion",
+    "subcategory": "tops",
+    "price": 27.99,
+    "currency": "£",
+    "images": ["dress-red.png"]
+  },
+  {
+    "id": "prod-040",
+    "name": "Red Party Dress",
+    "category": "fashion",
+    "subcategory": "dresses",
+    "price": 58.00,
+    "currency": "£",
+    "images": ["dress-red.png"]
+  }
 ]

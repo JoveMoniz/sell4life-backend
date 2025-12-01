@@ -1,11 +1,14 @@
 // /frontend/assets/js/shop.js
-(async function () { 
-  const container = document.getElementById("product-list");
 
-  // Always use clean absolute paths in frontend
+(async function () { 
+  console.log("shop.js loaded");
+
+  const container = document.getElementById("product-list");
   const IMAGE_BASE = "/assets/images/products/";
 
+  // ---------------------------------------------------------
   // 1. Load products.json
+  // ---------------------------------------------------------
   let products = [];
   try {
     const res = await fetch("/data/products.json", { cache: "no-store" });
@@ -16,29 +19,64 @@
     return;
   }
 
-  // 2. Read category + subcategory from URL
-  const params = new URLSearchParams(location.search);
-  const selectedCategory = params.get("category");
-  const selectedSub = params.get("subcategory");
+  // ---------------------------------------------------------
+  // 2. Read URL parameters
+  // ---------------------------------------------------------
+  const params = new URLSearchParams(window.location.search);
 
-  // 3. Filter the products
+  const searchTerm = (params.get("q") || "").trim().toLowerCase();
+  const selectedCategory = (params.get("category") || "").trim().toLowerCase();
+  const selectedSub = (params.get("subcategory") || "").trim().toLowerCase();
+
+  console.log("Search term:", searchTerm);
+  console.log("Category:", selectedCategory);
+  console.log("Subcategory:", selectedSub);
+
+  // ---------------------------------------------------------
+  // 3. BASE FILTER
+  // ---------------------------------------------------------
   let filtered = products;
 
+  // CATEGORY (case-insensitive)
   if (selectedCategory) {
-    filtered = filtered.filter(p => p.category === selectedCategory);
+    filtered = filtered.filter(p =>
+      p.category.toLowerCase() === selectedCategory
+    );
   }
 
+  // SUBCATEGORY
   if (selectedSub) {
-    filtered = filtered.filter(p => p.subcategory === selectedSub);
+    filtered = filtered.filter(p =>
+      p.subcategory.toLowerCase() === selectedSub
+    );
   }
 
-  // 4. If no results, give user a message
+  // SEARCH FILTER
+  if (searchTerm) {
+    filtered = filtered.filter(p => {
+      const name = p.name.toLowerCase();
+      const cat  = p.category.toLowerCase();
+      const sub  = p.subcategory.toLowerCase();
+
+      return (
+        name.includes(searchTerm) ||
+        cat.includes(searchTerm) ||
+        sub.includes(searchTerm)
+      );
+    });
+  }
+
+  // ---------------------------------------------------------
+  // 4. HANDLE EMPTY RESULTS
+  // ---------------------------------------------------------
   if (filtered.length === 0) {
-    container.innerHTML = `<p>No products found in this category.</p>`;
+    container.innerHTML = `<p>No products found.</p>`;
     return;
   }
 
-  // 5. Render filtered products
+  // ---------------------------------------------------------
+  // 5. RENDER PRODUCTS
+  // ---------------------------------------------------------
   container.innerHTML = filtered.map(p => `
     <div class="product-card">
       <a href="/product/product.html?id=${p.id}">
@@ -48,4 +86,5 @@
       </a>
     </div>
   `).join("");
+
 })();

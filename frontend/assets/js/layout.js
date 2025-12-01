@@ -1,28 +1,58 @@
-async function loadLayout() {
-  try {
-   const headerRes = await fetch("./includes/header.html");
-   const footerRes = await fetch("./includes/footer.html");
+// /assets/js/layout.js
+(async function loadLayout() {
+
+    // 1. LOAD HEADER
+    try {
+        const headerRes = await fetch("/includes/header.html", { cache: "no-store" });
+        const headerHTML = await headerRes.text();
+        document.body.insertAdjacentHTML("afterbegin", headerHTML);
+
+        // Header is ready → tell the world
+        document.dispatchEvent(new Event("headerLoaded"));
+    } catch (err) {
+        console.error("Failed to load header:", err);
+    }
 
 
-    if (!headerRes.ok || !footerRes.ok) throw new Error("Failed to load layout files");
-
-    const headerHTML = await headerRes.text();
-    const footerHTML = await footerRes.text();
-
-    document.body.insertAdjacentHTML("afterbegin", headerHTML);
-    document.body.insertAdjacentHTML("beforeend", footerHTML);
-
-    // Back to Top functionality
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest(".back-to-top");
-      if (!btn) return;
-      e.preventDefault();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-
-  } catch (err) {
-    console.error("Layout load error:", err);
-  }
+    // 1B. LOAD MOBILE / TABLET HEADER
+try {
+    const mobRes = await fetch("/includes/header-mobile.html", { cache: "no-store" });
+    const mobHTML = await mobRes.text();
+    document.body.insertAdjacentHTML("afterbegin", mobHTML);
+} catch (err) {
+    console.error("Failed to load mobile header:", err);
 }
 
-loadLayout();
+
+
+    // 2. LOAD FOOTER
+    try {
+        const footerRes = await fetch("/includes/footer.html", { cache: "no-store" });
+        const footerHTML = await footerRes.text();
+        document.body.insertAdjacentHTML("beforeend", footerHTML);
+    } catch (err) {
+        console.error("Failed to load footer:", err);
+    }
+
+    // 3. LOAD CART JS ONCE
+    if (!window.__cartScriptLoaded) {
+        const c = document.createElement("script");
+        c.src = "/assets/js/cart.js?v=9999";
+        document.body.appendChild(c);
+        window.__cartScriptLoaded = true;
+    }
+
+})();
+ 
+
+// 4. LOAD SEARCH ONLY AFTER HEADER EXISTS
+document.addEventListener("headerLoaded", () => {
+    console.log("headerLoaded → injecting search.js");
+
+    if (!window.__searchLoaded) {
+        const s = document.createElement("script");
+        s.src = "/assets/js/search.js?v=9999";
+        document.body.appendChild(s);
+        window.__searchLoaded = true;
+    }
+});

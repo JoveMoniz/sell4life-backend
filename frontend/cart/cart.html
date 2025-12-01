@@ -5,15 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Your Basket | Sell4Life</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="../assets/css/cart.css" />
-  <link rel="stylesheet" href="../assets/css/layout.css" />
-  <link rel="stylesheet" href="../assets/css/product.css" />
+  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+  <link rel="stylesheet" href="/assets/css/cart.css" />
+  <link rel="stylesheet" href="/assets/css/layout.css" />
+  <link rel="stylesheet" href="/assets/css/product.css" />
 </head>
 
 <body>
 
-<div id="header"></div>
+<div class="desktop-header-wrapper">
+    <div id="header"></div>
+</div>
+
+<div class="mobile-header-wrapper">
+    <div id="header-mobile"></div>
+</div>
+
 
 <section class="cart-page">
   <h1>Your Basket</h1>
@@ -54,53 +61,30 @@
 
   <div class="cart-actions">
     <button id="clear-cart" class="btn-clear">Clear Cart</button>
-    <button class="btn-buy">Checkout</button>
+    <button id="btn-buy" class="btn-buy">Checkout</button>
   </div>
-
 
   <div class="clear-cart-modal">
-  <div class="clear-cart-box">
-    <h3>Clear Cart?</h3>
-    <p>This action will remove all items.</p>
+    <div class="clear-cart-box">
+      <h3>Clear Cart?</h3>
+      <p>This action will remove all items.</p>
 
-    <div class="clear-cart-buttons">
-      <button class="confirm-clear">Clear</button>
-      <button class="cancel-clear">Cancel</button>
+      <div class="clear-cart-buttons">
+        <button class="confirm-clear">Clear</button>
+        <button class="cancel-clear">Cancel</button>
+      </div>
     </div>
   </div>
-</div>
-
-
-
 
 </section>
 
 <div id="footer"></div>
 
-<script>
-async function loadPart(id, path) {
-    const res = await fetch(path, { cache: "no-store" });
-    document.getElementById(id).innerHTML = await res.text();
-    document.dispatchEvent(new Event(id + "Loaded"));
-}
+<!-- GLOBAL LAYOUT LOADER -->
+<script src="/assets/js/layout.js"></script>
 
-(async () => {
-
-    /* Load header & footer */
-    await loadPart("header", "../includes/header.html");
-    await loadPart("footer", "../includes/footer.html");
-
-    /* Load cart script ONCE globally */
-    if (!window.__cartScriptLoaded) {
-        const s = document.createElement("script");
-        s.src = "../assets/js/cart.js?v=9999";
-        document.body.appendChild(s);
-        window.__cartScriptLoaded = true;
-    }
-
-})();
-</script>
-
+<!-- Load ONLY cart.js (layout.js will do this automatically if set) -->
+<script src="/assets/js/cart.js"></script>
 
 </body>
 </html>

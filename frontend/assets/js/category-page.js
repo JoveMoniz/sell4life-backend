@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (subcatWrap && category && Array.isArray(category.subcategories)) {
     subcatWrap.innerHTML = category.subcategories.map(sub => {
-      const href = `/shop/shop.html?category=${encodeURIComponent(category.id)}&subcategory=${encodeURIComponent(sub.id)}`;
+      const href = `/shop/index.html?category=${encodeURIComponent(category.id)}&subcategory=${encodeURIComponent(sub.id)}`;
 
       const imgSrc = sub.image
         ? sub.image
@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       shopAllBtn.textContent = `Shop All ${category.name}`;
       shopAllBtn.setAttribute(
         "href",
-        `/shop/shop.html?category=${encodeURIComponent(category.id)}`
+        `/shop/index.html?category=${encodeURIComponent(category.id)}`
       );
     }
   }

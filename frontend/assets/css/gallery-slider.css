@@ -1,56 +1,56 @@
+/* =========================================================
+   PRODUCT GALLERY – CLEAN VERSION
+========================================================= */
+
+/* Layout: thumbnails left, main slider right */
 .custom-gallery.side-layout {
   display: flex;
   gap: 16px;
   align-items: flex-start;
   width: 100%;
   max-width: 100%;
-  flex-wrap: wrap;
-	overflow: hidden;
 }
+
+/* ---------------------------------------------------------
+   THUMBNAILS (vertical on desktop)
+--------------------------------------------------------- */
 
 .thumbnail-gallery {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: calc(80px * 5 + 8px * 4 + 4px * 5); /* 5 thumbs + 4 gaps + margin */
+  max-height: 420px;
   overflow-y: auto;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
   scroll-behavior: smooth;
-  scroll-snap-type: y mandatory; /* 👈 Optional for better scroll feel */
 }
 
 .thumbnail-gallery::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
+  display: none;
 }
 
-
 .thumb-img {
-  width: 80px !important;
-  height: 80px !important;
-  object-fit: cover !important;
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
   cursor: pointer;
-	border: 1px solid #222 !important;
-  border-radius: 10px !important;
-  opacity: 1;
-  transition: all 0.2s ease;
-	box-sizing: border-box;	
-  margin: 2px;
-	
+  border: 1px solid #222;
+  border-radius: 10px;
+  transition: 0.25s ease;
+}
+
+.thumb-img:hover {
+  border-color: #666;
+  transform: scale(1.03);
 }
 
 .thumb-img.active-thumb {
-  border: 3px solid #222 !important;
-	border-radius: 10px !important;
-  opacity: 1;
+  border: 3px solid #222;
 }
 
-
-.thumb-img:hover {
- opacity: 1;
-  border: 2.5px solid #666 !important;
-  transform: scale(1.03);	
-	z-index: 2;
-}
+/* ---------------------------------------------------------
+   MAIN IMAGE AREA
+--------------------------------------------------------- */
 
 .main-image-wrapper {
   flex: 1;
@@ -60,354 +60,132 @@
 .slider-wrapper {
   position: relative;
   overflow: hidden;
-  flex: 1;
-  display: flex;
   width: 100%;
   max-width: 650px;
-	max-height: 600px;
-  aspect-ratio: 1 / 1.2;
-  align-items: center; 
-  justify-content: center;
-  border-radius: 12px;
+  max-height: 600px;
   background: #f9f9f9;
-  padding: 0 60px;
-  box-sizing: border-box;
-  height: auto; /* ✅ Fix */
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .slider-track {
   display: flex;
-  flex-wrap: nowrap;
   transition: transform 0.3s ease;
-  padding: 0;
-  margin: 0;
-  gap: 0; /* make sure no gap is set here */
 }
 
 .slide-img {
-  flex: 0 0 100%;
   width: 100%;
   height: auto;
-	max-height: 500px;
+  max-height: 500px;
+  flex: 0 0 100%;
   object-fit: contain;
-	 transition: transform 0.3s ease;
-	display: block;
-  margin: 0;
-  padding: 0;
-  border: none;
 }
 
-
-#main-prev { left: 0; }
-#main-next { right: 0; }
-
-/* Slider nav buttons (prev/next) */
-#main-prev, #main-next {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-	width: 8vw;
-	min-width: 30px;
-  max-width: 60px;
-	height: 100%; /* Match slider-wrapper height */
-  background-color: #e6e6e6; /* slightly darker than white */
-  z-index: 2;
-	font-size: 5vw; /* Scale icon size */
-  max-font-size: 90px;
-  min-font-size: 30px;;
-	color: rgba(200, 200, 200, 0.5); /* Light grey transparent*/
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
+/* ---------------------------------------------------------
+   NAVIGATION ARROWS
+--------------------------------------------------------- */
 
 #main-prev,
 #main-next {
-  background-color: #e6e6e6;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  touch-action: manipulation;
+  position: absolute;
+  border: 0.6px solid #0b6b6929;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  max-width: 60px;
+  background: transparent;
+  color: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  user-select: none;
 }
 
 #main-prev:hover,
 #main-next:hover {
-  background-color: #d9d9d9; /* slightly darker */
+ background: transparent;
 }
 
 #main-prev:active,
 #main-next:active {
+  
   transform: scale(0.96);
-  background-color: #cccccc; /* darkens briefly when pressed */
 }
 
-#main-prev,
-#main-next {
-  outline: none;
-}
+#main-prev { left: 0; }
+#main-next { right: 0; }
 
-#main-prev:focus,
-#main-next:focus {
-  outline: none;
-  box-shadow: none;
-}
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 
-#main-prev,
-#main-next {
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-}
-
-
-
-/* ≤1280px: full-bleed main slider, transparent edge arrows, horizontal thumbs */
+/* Tablet / mobile: stack layout, horizontal thumbnails */
 @media (max-width: 1280px) {
 
-  /* ── Elementor container overrides for the gallery section ── */
-  .slider-breakout { padding-left: 0 !important; padding-right: 0 !important; }
-  /* Columns layout */
-  .slider-breakout > .elementor-container { max-width: 100% !important; padding: 0 !important; }
-  .slider-breakout .elementor-column .elementor-widget-wrap { padding: 0 !important; }
-  /* Containers (Flexbox) layout */
-  .slider-breakout .e-con-boxed > .e-con-inner { max-width: 100% !important; padding: 0 !important; }
-  .slider-breakout .e-con { padding: 0 !important; }
-
-  /* ── Break just the slider to viewport width ── */
-  .slider-breakout .slider-wrapper {
-    width: 100vw !important;
-    margin-left: calc(50% - 50vw) !important;  /* breakout without moving the whole section */
-    padding: 0 !important;
-    background: transparent !important;
-    border-radius: 0 !important;
-    max-width: none !important;
-    overflow: visible !important;              /* allow arrows to overlay */
+  .custom-gallery.side-layout {
+    flex-direction: column;
+    align-items: center;
   }
 
-  .slider-breakout .slide-img {
-    width: 100% !important;
-    height: auto !important;
-    object-fit: contain !important;
-    object-position: center center !important;
+  .thumbnail-gallery {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    width: 100%;
+    justify-content: center;
+    padding: 8px 0;
   }
 
-  /* ── Transparent edge arrows pinned to screen edges ── */
+  .thumb-img {
+    width: 60px;
+    height: 60px;
+    flex: 0 0 auto;
+  }
+
+  /* Make main slider full width */
+  .slider-wrapper {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 0;
+  }
+
+  #main-prev:hover,
+#main-next:hover {
+  background: transparent;
+}
+
+  /* Edge arrows transparent and touching sides */
   #main-prev,
   #main-next {
-    position: absolute !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    height: 100% !important;
-    width: 15vw !important;
-    max-width: 60px !important;
-	font-size: 6vw; 
-	color: #0B6B6A14;
-	border: 0.6px solid #004D4052;  
-	border-radius: 10px;  
-    background: transparent !important;
-    z-index: 2000 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    width: 15vw;
+    background: transparent;
+    color: #0B6B6A33;
   }
-  #main-prev  { left: 0 !important; }
-  #main-next  { right: 0 !important; }
 
-  /* ── Stack layout and horizontal thumbs under the image ── */
-  .custom-gallery.side-layout {
-    flex-direction: column !important;
-    align-items: center !important;
-  }
-  .custom-gallery.side-layout .main-image-wrapper {
-    order: 1 !important;
-    width: 100% !important;
-  }
-/* ≤1280px — stack gallery and keep thumbs below the image */
-@media (max-width: 1280px) {
-  .custom-gallery.side-layout {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-  }
-  .custom-gallery.side-layout .main-image-wrapper {
-    order: 1 !important;
-    width: 100% !important;
-  }
-  .custom-gallery.side-layout .thumbnail-gallery {
-    order: 2 !important;
-    margin-top: 16px !important; /* spacing under image */
-    /* no width/overflow here — the 6-thumb block controls that */
-  }
-}
-  .custom-gallery.side-layout .thumbnail-gallery::-webkit-scrollbar { display: none !important; }
-  .custom-gallery.side-layout .thumbnail-gallery .thumb-img {
-    flex: 0 0 auto !important;
-    width: 60px !important;
-    height: 60px !important;
-  }
+  #main-prev { left: 0; }
+  #main-next { right: 0; }
 }
 
-/* Tablet LANDSCAPE: make the main image larger */
-@media (min-width: 768px) and (max-width: 1280px) and (orientation: landscape) {
-  /* Give the slider a taller stage */
-  .slider-breakout .slider-wrapper{
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: clamp(440px, 82svh, 900px) !important; /* use svh for iOS address bar */
+/* Extra: small phones */
+@media (max-width: 480px) {
+  .thumb-img {
+    width: 52px;
+    height: 52px;
   }
 
-  /* Grow by height, but never overflow width */
-  .slider-breakout .slide-img{
-    width: auto !important;            /* override width:100% */
-    max-width: 100% !important;        /* never exceed viewport width */
-    height: auto !important;
-    max-height: 78svh !important;      /* or try 82svh if you want even bigger */
-    object-fit: contain !important;
-    object-position: center center !important;
+  #main-prev,
+  #main-next {
+    font-size: 32px;
   }
+
+  #main-prev:hover,
+#main-next:hover {
+  background: transparent;
 }
-
-
-
-
-
-
-/* Tablet landscape ONLY: stack; CTA last & pinned to bottom */
-@media (min-width: 768px) and (max-width: 1280px) and (orientation: landscape) {
-  /* This section becomes a vertical stack and fills the viewport height */
-  selector { 
-    display: flex; 
-    flex-direction: column; 
-    min-height: 100vh; 
-  }
-
-  /* Stack the immediate wrapper (Columns or Containers) */
-  selector > .elementor-container,
-  selector > .e-con { 
-    display: flex; 
-    flex-direction: column; 
-    flex: 1 1 auto; 
-  }
-
-  /* Default: all direct children first */
-  selector > .elementor-container > *,
-  selector > .e-con > * { 
-    order: 0; 
-    width: 100%; 
-  }
-
-  /* CTA column/container: add class "cta-bottom" to the CTA COLUMN (not the widget) */
-  selector > .elementor-container > .cta-bottom,
-  selector > .e-con > .cta-bottom {
-    order: 999 !important;
-    margin-top: auto !important; /* pins it to the bottom */
-  }
 }
-
-/* Responsive gutters ONLY for this CTA panel */
-:root {
-  --cta-gutter-tablet: 24px;
-  --cta-gutter-phone: 16px;
-}
-
-/* Tablet & down */
-@media (max-width: 1280px) {
-  /* If this CTA is a Container (Flexbox) */
-  selector { 
-    padding-left: var(--cta-gutter-tablet) !important;
-    padding-right: var(--cta-gutter-tablet) !important;
-  }
-  /* If it's a boxed container, avoid double padding */
-  selector.e-con-boxed > .e-con-inner { 
-    padding-left: 0 !important; 
-    padding-right: 0 !important; 
-  }
-
-  /* If this CTA is inside a legacy Columns section */
-  selector > .elementor-container {
-    padding-left: var(--cta-gutter-tablet) !important;
-    padding-right: var(--cta-gutter-tablet) !important;
-  }
-}
-
-/* Phones */
-@media (max-width: 767px) {
-  selector {
-    padding-left: var(--cta-gutter-phone) !important;
-    padding-right: var(--cta-gutter-phone) !important;
-  }
-  selector > .elementor-container {
-    padding-left: var(--cta-gutter-phone) !important;
-    padding-right: var(--cta-gutter-phone) !important;
-  }
-}
-  
-/* === Thumbnails: center + show 6, scroll for more (tablet & down) === */
-@media (max-width: 1280px) {
-  .slider-breakout .thumbnail-gallery{
-    --thumb: 60px;
-    --gap: 8px;
-
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    justify-content: center !important;     /* center when <= 6 */
-    align-items: center !important;
-    gap: var(--gap) !important;
-
-    /* strip width fits 6 thumbs; auto-centers, but can scroll if more */
-    max-width: calc(6 * var(--thumb) + 5 * var(--gap)) !important;
-    width: 100% !important;
-    margin-inline: auto !important;
-
-    overflow-x: auto !important;            /* enable horizontal scroll */
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-inline: 16px;                   /* small side breathing room */
-  }
-  .slider-breakout .thumbnail-gallery::-webkit-scrollbar{ display:none; }
-
-  /* size every direct child (covers <img> or wrapped items) */
-  .slider-breakout .thumbnail-gallery > *{
-    flex: 0 0 var(--thumb) !important;
-    width: var(--thumb) !important;
-    height: var(--thumb) !important;
-  }
-  /* if your thumbs are <img>, make the img fill its wrapper */
-  .slider-breakout .thumbnail-gallery > * img{
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover;
-  }
-
-  /* undo any previous “hide after 6” rules so scrolling works */
-  .slider-breakout .thumbnail-gallery > :nth-child(n+7){
-    display: block !important;
-  }
-	
-	/* core slider layout */
-#sliderTrack{
-  display: flex;
-  will-change: transform;
-}
-#sliderTrack .slide-img{
-  flex: 0 0 100%;
-  width: 100%;
-  height: auto;
-  object-fit: contain; /* or cover if you prefer */
-}
-
-	/* when there are more than 6 thumbs, left-align instead of centering */
-.slider-breakout .thumbnail-gallery.overflowing{
-  justify-content: flex-start !important;
-}
-
-	
-}
-
-
-
-

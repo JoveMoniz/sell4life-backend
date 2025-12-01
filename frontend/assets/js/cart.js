@@ -1,5 +1,16 @@
-// /assets/js/cart.js v8 – with REMOVE BUTTON support
+// /assets/js/cart.js FIXED + MERGED
 (async function () {
+
+  // Wait a moment for header to load
+  await new Promise(r => setTimeout(r, 50));
+
+  // Skip if header/minicart is not on this page
+  if (!document.querySelector(".mini-cart-items")) {
+      console.log("cart.js skipped on non-cart pages");
+      return;
+  }
+
+  // Prevent double-loading
   if (window.__cartBooted) return;
   window.__cartBooted = true;
 
@@ -11,7 +22,7 @@
     renderCartPage();
   });
 
-  // Wait for header/minicart to load
+  // Wait for header/minicart to load fully
   while (!document.querySelector(".mini-cart-items") || !document.querySelector(".basket-qty")) {
     await new Promise(r => setTimeout(r, 100));
   }
@@ -26,7 +37,7 @@
   const colQty       = document.getElementById("col-qty");
   const colPrice     = document.getElementById("col-price");
   const colSubtotal  = document.getElementById("col-subtotal");
-  const colRemove    = document.getElementById("col-remove");  // NEW COLUMN
+  const colRemove    = document.getElementById("col-remove");
   const totalSpan    = document.getElementById("cart-total");
 
   // Read cart safely
@@ -45,14 +56,14 @@
     localStorage.setItem("cart", JSON.stringify(cart));
   }
 
-  // Badge in header
+  // HEADER BADGE
   function updateBadge() {
     const count = cart.reduce((s, i) => s + (i.quantity || 0), 0);
     badge.textContent = count;
     badge.classList.toggle("hide", count === 0);
   }
 
-  // Mini-cart render
+  // MINI CART RENDER
   function renderMiniCart() {
     miniCartList.innerHTML = "";
 
@@ -75,15 +86,14 @@
       const li = document.createElement("li");
       li.innerHTML = `
   <div class="mini-cart-item">
-    <div class="mini-cart-left">
+    <img src="${item.image || ''}" alt="${item.name}" class="mini-cart-thumb" />
+
+    <div class="mini-cart-info">
       <div class="mini-cart-name">${item.name}</div>
-      <div class="mini-cart-details">£${price.toFixed(2)} × ${qty}</div>
+      <div class="mini-cart-meta">£${price.toFixed(2)} × ${qty}</div>
     </div>
 
-    <div class="mini-cart-right">
-      <div class="mini-cart-qty">Qty: ${qty}</div>
-      <div class="mini-cart-sub">£${sub.toFixed(2)}</div>
-    </div>
+    <div class="mini-cart-sub">£${sub.toFixed(2)}</div>
   </div>
 `;
 
@@ -99,7 +109,7 @@
     `;
   }
 
-  // Cart page render (with REMOVE column)
+  // CART PAGE RENDER
   function renderCartPage() {
     if (!colProduct || !colQty || !colPrice || !colSubtotal || !colRemove || !totalSpan) return;
 
@@ -123,31 +133,26 @@
 
       total += sub;
 
-      // PRODUCT
-  // PRODUCT (thumbnail + name)
-// PRODUCT (thumbnail + name with category link)
-const p = document.createElement("div");
-p.className = "cart-product-info";
+      // PRODUCT CELL
+      const p = document.createElement("div");
+      p.className = "cart-product-info";
 
-const link = document.createElement("a");
-link.href = `/${item.category}/${item.subcategory}/?id=${item.id}`;
-link.className = "cart-product-link";
+      const link = document.createElement("a");
+      link.href = `/${item.category}/${item.subcategory}/?id=${item.id}`;
+      link.className = "cart-product-link";
 
-// Thumbnail
-const img = document.createElement("img");
-img.src = item.image || "";
-img.alt = item.name;
-img.className = "cart-thumb";
+      const img = document.createElement("img");
+      img.src = item.image || "";
+      img.alt = item.name;
+      img.className = "cart-thumb";
 
-// Name
-const name = document.createElement("span");
-name.textContent = item.name;
+      const name = document.createElement("span");
+      name.textContent = item.name;
 
-link.appendChild(img);
-link.appendChild(name);
-p.appendChild(link);
-colProduct.appendChild(p);
-
+      link.appendChild(img);
+      link.appendChild(name);
+      p.appendChild(link);
+      colProduct.appendChild(p);
 
       // QTY
       const qc = document.createElement("div");
@@ -170,7 +175,6 @@ colProduct.appendChild(p);
       qc.appendChild(minus);
       qc.appendChild(value);
       qc.appendChild(plus);
-
       colQty.appendChild(qc);
 
       // PRICE
@@ -183,21 +187,22 @@ colProduct.appendChild(p);
       st.textContent = `£${sub.toFixed(2)}`;
       colSubtotal.appendChild(st);
 
-      // REMOVE BUTTON (NEW)
+      // REMOVE BUTTON
       const rm = document.createElement("button");
       rm.className = "remove-item";
       rm.dataset.index = index;
       rm.textContent = "×";
-const wrap = document.createElement("div");
-wrap.className = "remove-wrap";   // optional
-wrap.appendChild(rm);
-colRemove.appendChild(wrap);
+
+      const wrap = document.createElement("div");
+      wrap.className = "remove-wrap";
+      wrap.appendChild(rm);
+      colRemove.appendChild(wrap);
     });
 
     totalSpan.textContent = total.toFixed(2);
   }
 
-  // Master refresh
+  // FULL REFRESH
   function refreshAll() {
     cart = readCart();
     renderMiniCart();
@@ -205,10 +210,10 @@ colRemove.appendChild(wrap);
     renderCartPage();
   }
 
-  // Button logic
+  // BUTTON LOGIC
   document.addEventListener("click", e => {
 
-    // Increase qty
+    // + qty
     if (e.target.classList.contains("qty-plus")) {
       const i = +e.target.dataset.index;
       cart[i].quantity++;
@@ -217,7 +222,7 @@ colRemove.appendChild(wrap);
       return;
     }
 
-    // Decrease qty
+    // - qty
     if (e.target.classList.contains("qty-minus")) {
       const i = +e.target.dataset.index;
       if (cart[i].quantity > 1) {
@@ -230,7 +235,7 @@ colRemove.appendChild(wrap);
       return;
     }
 
-    // REMOVE ITEM BUTTON
+    // REMOVE ITEM
     if (e.target.classList.contains("remove-item")) {
       const i = +e.target.dataset.index;
       cart.splice(i, 1);
@@ -240,34 +245,38 @@ colRemove.appendChild(wrap);
     }
 
     // CONFIRM CLEAR
-if (e.target.classList.contains("confirm-clear")) {
-  cart = [];
-  saveCart();
-  refreshAll();
-  document.querySelector(".clear-cart-modal").classList.remove("show");
-  return;
-}
+    if (e.target.classList.contains("confirm-clear")) {
+      cart = [];
+      saveCart();
+      refreshAll();
+      document.querySelector(".clear-cart-modal").classList.remove("show");
+      return;
+    }
 
-// CANCEL CLEAR
-if (e.target.classList.contains("cancel-clear")) {
-  document.querySelector(".clear-cart-modal").classList.remove("show");
-  return;
-}
+    // CANCEL CLEAR
+    if (e.target.classList.contains("cancel-clear")) {
+      document.querySelector(".clear-cart-modal").classList.remove("show");
+      return;
+    }
 
-
-    // Clear cart
+    // OPEN CLEAR MODAL
     if (e.target.id === "clear-cart") {
       if (cart.length) {
-  document.querySelector(".clear-cart-modal").classList.add("show");
-}
-
+        document.querySelector(".clear-cart-modal").classList.add("show");
+      }
       return;
     }
   });
 
-  // Initial paint
+  // INITIAL RENDER
   refreshAll();
-})();
+
+})(); // << FULL FILE PROPERLY CLOSED IIFE
 
 
-
+// BUY BUTTON SHORTCUT
+document.addEventListener("click", e => {
+  if (e.target.id === "btn-buy") {
+    window.location.href = "/cart/checkout.html";
+  }
+});
