@@ -1,20 +1,23 @@
 <!-- Global Font -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
 
-<!-- Favicon + Header Styles -->
+<!-- Favicon -->
 <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-<link rel="stylesheet" href="/assets/css/cart.css">
 
-<header class="s4l-header">
+
+<!-- =======================================================
+     DESKTOP HEADER
+======================================================= -->
+<header class="s4l-header-desktop">
   <div class="header-container">
 
-    <!-- Desktop Header -->
     <div class="desktop-header">
 
       <!-- Logo -->
-      <a href="../index.html" class="header-logo">
+      <a href="/index.html" class="header-logo">
         <span style="color:#F28C28;">$</span>
         <span style="color:#FDF4E7;">ell</span>
         <span style="color:#00BFFF;">4</span>
@@ -23,55 +26,139 @@
 
       <!-- Navigation -->
       <nav class="header-nav">
-        <a href="../shop/">Buy</a>
+        <a href="/shop/">Buy</a>
         <a href="#">Sell</a>
         <a href="#">About</a>
       </nav>
 
       <!-- Search Bar -->
-<form id="header-search-form" class="header-search" role="search">
-  <input id="header-search-input" type="text" placeholder="Search products..." autocomplete="off" />
+      <form id="desktop-search-form" class="header-search" role="search">
+  <input id="desktop-search-input" type="text" placeholder="Search products..." autocomplete="off">
   <button type="submit">
-    <img src="/assets/images/hero/search.png" alt="Search">
+    <img src="/assets/images/hero/search.png">
   </button>
-  <div class="search-autocomplete"></div>
+  <div class="search-autocomplete desktop-ac"></div>
 </form>
 
 
 
-
-
       <!-- Basket + Mini Cart -->
-      <div class="basket-wrapper" id="basket-wrapper">
 
-        
-        <div id="basket-shape" class="basket-shell" aria-label="Basket">
+    <div class="header-icons">
+
+      <div class="basket-wrapper">
+
+        <div class="basket-shell" aria-label="Basket">
           <div class="basket-handle"></div>
           <span class="basket-qty hide">0</span>
         </div>
 
-<div id="mini-cart" class="mini-cart">
+        <div class="mini-cart">
+          <ul class="mini-cart-items"></ul>
 
-  <ul class="mini-cart-items">
-    <!-- Items will be injected by cart.js -->
-  </ul>
+          <div class="mini-cart-total">
+            <span class="mini-cart-total-label">Total:</span>
+            <span class="mini-cart-total-value">£0.00</span>
+          </div>
 
-  <div class="mini-cart-total">
-    <span class="mini-cart-total-label">Total:</span>
-    <span class="mini-cart-total-value">£0.00</span>
-  </div>
+          <a href="/cart/cart.html" class="view-cart-btn">View Basket</a>
+        </div>
 
-  <a href="/cart/cart.html" class="view-cart-btn">View Basket</a>
-
-</div>
-
-</div>
-      <!-- User Login -->
-      <div class="header-icons">
-        <a href="#" class="sign-in-link">Sign in</a>
       </div>
 
-    
+      <!-- account -->
+<div class="account-menu">
+  <button id="accountBtn">Account ▾</button>
+
+  <div class="account-dropdown" id="accountDropdown">
+    <a href="/account/signin.html" class="auth" id="dd-login">Sign in</a>
+    <a href="/account/register.html" class="auth" id="dd-register">Register</a>
+
+    <a href="/account/orders.html" class="auth" id="dd-orders">My Orders</a>
+    <button id="dd-logout">Logout</button>
   </div>
+</div>
+
+    </div>
+
+      </div>
+
+    </div>
+  </div>
+</header>
+
+
+
+<!-- =======================================================
+     MOBILE + TABLET HEADER
+======================================================= -->
+<header class="s4l-header-mobile">
+  <div class="mobile-header-container">
+
+    <div class="mobile-header">
+
+      <!-- ROW 1: Logo + basket + signin -->
+      <div class="mobile-top-row">
+
+        <!-- Logo -->
+        <a href="/index.html" class="mobile-logo">
+          <span style="color:#F28C28;">$</span>
+          <span style="color:#FDF4E7;">ell</span>
+          <span style="color:#00BFFF;">4</span>
+          <span style="color:#FDF4E7;">Life</span>
+        </a>
+
+        <div class="mobile-right-icons">
+
+          <!-- Basket (NO minicart here) -->
+          <div class="basket-wrapper mobile-basket">
+            <div class="basket-shell">
+              <div class="basket-handle"></div>
+              <span class="basket-qty hide">0</span>
+            </div>
+          </div>
+
+         <div class="account-menu">
+  <button id="accountBtn">Account ▾</button>
+
+  <div class="account-dropdown" id="accountDropdown">
+    <a href="/account/signin.html" id="dd-login">Sign in</a>
+    <a href="/account/register.html" id="dd-register">Register</a>
+
+    <a href="/account/orders.html" id="dd-orders">My Orders</a>
+    <button id="dd-logout">Logout</button>
+  </div>
+</div>
+
+
+
+        </div>
+
+      </div>
+
+      <!-- ROW 2: Menu + Search -->
+      <div class="mobile-menu-col">
+
+        <nav class="mobile-nav">
+          <a href="/shop/">Buy</a>
+          <a href="#">Sell</a>
+          <a href="#">About</a>
+        </nav>
+
+        <!-- SAME structure as desktop, DIFFERENT styling -->
+        <form id="mobile-search-form" class="mobile-search" role="search">
+  <input id="mobile-search-input" type="text" placeholder="Search products..." autocomplete="off">
+  <button type="submit">
+    <img src="/assets/images/hero/search.png">
+  </button>
+  <div class="search-autocomplete mobile-ac"></div>
+</form>
+
+
+
+      </div>
+
+    </div>
+
   </div>
 </header>

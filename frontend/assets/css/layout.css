@@ -19,6 +19,7 @@ html, body {
 }
 
 
+
 /* =========================================================
    FOOTER
 ========================================================= */
@@ -46,7 +47,7 @@ footer p {
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
   width: 100%;
-  height: 350px;
+  height: auto;
   margin: 3rem auto;
   text-align: left;
   padding-left: 20px;
@@ -118,11 +119,34 @@ footer p {
 .logo-blue   { color: #00bfff; }
 
 
+
+@media (max-width: 1024px) {
+  .footer-columns {
+    grid-template-columns: repeat(2, 1fr);
+    height: auto; /* free the height so wrapping works */
+    padding-left: 20px;
+  }
+}
+
+
+
+
+@media (max-width: 480px) {
+  .footer-columns {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding-left: 20px;
+  }
+
+  
+}
+
+
 /* =========================================================
    HEADER BASE
 ========================================================= */
 
-.s4l-header {
+.s4l-header-desktop {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -164,8 +188,14 @@ footer p {
   font-weight: bold;
   letter-spacing: 3px;
   text-decoration: none;
+  margin: 6px 0;
   padding-left: 20px;
 }
+
+.header-nav {
+  margin: 10px 0;
+}
+
 
 .header-nav a {
   margin: 0 15px;
@@ -192,7 +222,7 @@ footer p {
   overflow: visible;
 }
 
-.header-search input {
+#desktop-search-input {
   border: none;
   outline: none;
   width: 700px;
@@ -216,70 +246,75 @@ footer p {
 }
 
 .header-search button img {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 
 
-/* =========================================================
-   AUTOCOMPLETE
-========================================================= */
+/* Base autocomplete styling (shared by desktop + mobile) */
+.search-autocomplete,
+.desktop-ac,
+.mobile-ac {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 260px;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    overflow-y: auto;
+    z-index: 50000;
 
-.search-autocomplete {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  max-height: 300px;
-  overflow-y: auto;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-top: none;
-  z-index: 999999;
-  display: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease;
 }
 
-.search-autocomplete.show {
-  display: block;
+.search-autocomplete.show,
+.desktop-ac.show,
+.mobile-ac.show {
+    display: block;
+    opacity: 1;
+    visibility: visible;
 }
 
+/* Autocomplete item */
 .ac-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  cursor: pointer;
-  border-bottom: 1px solid #f3f3f3;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
 }
 
 .ac-item:hover {
-  background: #f7f7f7;
+    background: #f5f5f5;
 }
 
 .ac-thumb {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 4px;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    margin-right: 10px;
+    object-fit: cover;
 }
 
 .ac-details {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+    display: flex;
+    flex-direction: column;
 }
 
 .ac-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #094949;
+    font-weight: 600;
+    color: #222;
 }
 
 .ac-cat {
-  font-size: 12px;
-  color: #777;
+    font-size: 13px;
+    color: #777;
 }
 
 
@@ -290,40 +325,228 @@ footer p {
 .header-icons {
   width: 150px;
   display: flex;
+  margin-right: 20px;
   align-items: center;
   gap: 20px;
 }
 
-.sign-in-link {
-  color: #fdf4e7;
-  text-decoration: none;
-  font-weight: 500;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  transition: border-color 0.3s;
+.account-menu {
+  position: relative;
+  margin-bottom:10px ;
+  
 }
 
-.sign-in-link:hover {
-  border-color: #f18c28;
+
+#accountBtn {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
+
+
+.account-dropdown .auth{
+  text-decoration: none;
+} 
+
+
+.account-dropdown {
+  position: absolute;
+  right: 0;
+  top: 110%;
+  background: #167c7c;
+  border-radius: 8px;
+  min-width: 160px;
+  padding: 6px 0;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+  display: none;
+}
+
+.account-dropdown a,
+.account-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: #fff;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.account-dropdown a:hover,
+.account-dropdown button:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+
+
+
+/* === Basket Base === */
+.basket-wrapper {
+  align-items: center;
+  justify-content: center;
+  margin-top: 15px;
+  border: none;
+    position: relative;
+    display: inline-flex;
+    width: auto !important;
+    height: auto !important;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+}
+
+.basket-shell {
+  position: relative;
+  width: 28px;
+  height: 17px;
+  border: 1px solid #fff !important;
+  border-radius: 0 0 7px 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.basket-handle {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 15px;
+  height: 18px;
+  border: 1px solid #fff !important;
+  border-radius: 12px 12px 0 0;
+  border-bottom: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === Quantity Badge === */
+.basket-qty {
+  position: absolute;
+  top: 2px;
+  right: -6px;
+  min-width: 10px;
+  height: 10px;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 12px/1 system-ui, sans-serif;
+  background: #ff7a00;
+  color: white;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.basket-qty.hide {
+  display: none;
+}
+
+.basket-qty.bump {
+  animation: s4l-bump 220ms ease;
+}
+
+@keyframes s4l-bump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+
+
+.basket-wrapper::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 35px; /* invisible hover bridge*/
+  background: transparent;
+}
+
+
+/* =============================================
+   PERFECTLY MATCHED FADE FOR BOTH BASKET PARTS
+   (Shell & Handle fade equally)
+============================================= */
+
+/* First: no full opacity fade */
+.basket-wrapper.empty .basket-shell,
+.basket-wrapper.empty .basket-handle {
+    opacity: 1; /* full opacity, don't fade the element itself */
+}
+
+/* Fade the border colour instead */
+.basket-wrapper.empty .basket-shell,
+.basket-wrapper.empty .basket-handle {
+    border-color: rgba(255,255,255,0.45) !important;
+    transition: border-color 0.25s ease;
+}
+
+/* Badge fades slightly */
+.basket-wrapper.empty .basket-qty {
+    opacity: 0.65;
+}
+
+/* When items exist, restore strong borders */
+.basket-wrapper:not(.empty) .basket-shell,
+.basket-wrapper:not(.empty) .basket-handle {
+    border-color: rgba(255,255,255,1) !important;
+}
+
+
+
+
 
 
 /* =========================================================
    MINI CART
 ========================================================= */
 
-.basket-wrapper:hover .mini-cart,
-.mini-cart:hover {
+/* Only open mini-cart when hovering the BASKET SHELL or the mini-cart itself */
+/* Hide by default */
+.basket-wrapper .mini-cart {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s ease, visibility .2s ease;
+}
+
+/* Only show minicart if basket has items */
+.basket-wrapper.has-items:hover .mini-cart,
+.basket-wrapper.has-items .mini-cart:hover {
   display: block;
   opacity: 1;
   visibility: visible;
 }
 
+
+.basket-wrapper.open .mini-cart {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+}
+
+
+.basket-wrapper.empty {
+  cursor: default;
+}
+
 .mini-cart {
     position: absolute;
     top: 50px;
-    right: 10px;
+    right: -100px;
     width: 380px;
     background: #fff;
     border: 1px solid #ccc;
@@ -332,6 +555,13 @@ footer p {
     padding: 16px;
     display: none;
     opacity: 0;
+     /* Start closed */
+    opacity: 0;
+    transform: translateY(-10px);
+    transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    visibility 0.25s ease;
     visibility: hidden;
     transition: opacity .25s ease, visibility .25s ease;
     z-index: 99999;
@@ -474,94 +704,80 @@ footer p {
 
 /* Default: Desktop ON, Mobile OFF */
 .s4l-header-mobile { display: none; }
-.s4l-header { display: flex; }
+.s4l-header-desktop { display: flex; }
 
-/* Below 1024px: Mobile ON, Desktop OFF */
-@media (max-width: 1280px) {
-  .s4l-header { display: none; }
-  .s4l-header-mobile { display: flex; }
 
 
 /* =========================================================
    MOBILE + TABLET HEADER
-   (Triggers below 1024px)
+   (Triggers below 1280px)
 ========================================================= */
 
 
 
-  /* Overall wrapper */
+@media (max-width: 1280px) {
+  .s4l-header-desktop { display: none; }
+  .s4l-header-mobile { display: flex; }
+
+
+
+/* Base container */
 .s4l-header-mobile {
-  width: 100%;
-  background: #0B6B6A;
-  padding: 10px 0 15px;
-  display: flex;
-  justify-content: center;
-  color: #fff;
-  position: relative;
-  overflow: visible;
-  z-index: 5000;
+    width: 100%;
+    background:#0B6B6A;
+    padding: 10px 0 14px 0;
+    position: relative;
+    z-index: 9999;
 }
 
 .mobile-header-container {
-  width: 100%;
-  max-width: 900px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 0 14px;
+    width: 100%;
+    padding: 0 12px;
 }
-
 
 .mobile-header {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;   /* ← centers the menu section */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.mobile-menu-col {
-  width: 100%;           /* ← full width */
-  max-width: 600px;      /* ← keeps it neat */
-  display: flex;
-  flex-direction: column;
-  align-items: center;   /* ← centers inside container */
-  gap: 10px;
-  margin: 0 auto;        /* ← centers the whole column */
-}
+/* =========================================================
+   ROW 1 — LOGO LEFT | BASKET + SIGN-IN RIGHT
+========================================================= */
 
-
-  /* ----------------------------------------------
-     ROW 1: Logo LEFT  |  Basket + Sign in RIGHT
-  ---------------------------------------------- */
-  .mobile-top-row {
+.mobile-top-row {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
+}
 
-  /* Logo */
-  .mobile-logo {
-  display: flex;
-  align-items: left;
-  font-size: 28px;
-  font-weight: bold;
-  letter-spacing: 3px;
-  text-decoration: none;
-  padding-left: 20px;
-  }
-
-  /* Right side: basket + sign in */
-  .mobile-right-icons {
+/* Logo */
+.mobile-logo {
     display: flex;
-    align-items: left;
-    margin-right: 20px;
-    gap: 16px;
-  }
+    align-items: center;
+    font-size: 28px;
+    font-weight: bold;
+    text-decoration: none;
+    letter-spacing: 2px;
+}
 
-  /* Basket icon */
-  .basket-shell {
-  position: relative;
+/* Right-side icons */
+.mobile-right-icons {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+/* Basket */
+
+.mobile-basket {
+  margin-top: 25px;
+}
+
+
+.mobile-basket .basket-shell {
+      position: relative;
   width: 28px;
   height: 17px;
   border: 1px solid #fff !important;
@@ -572,9 +788,9 @@ footer p {
   align-items: center;
   padding: 0;
   cursor: pointer;
-  }
+}
 
-  #basket-mobile .basket-handle {
+.mobile-basket .basket-handle {
   position: absolute;
   top: -13px;
   left: 50%;
@@ -587,101 +803,287 @@ footer p {
   display: flex;
   align-items: center;
   justify-content: center;
-  }
-
-  #basket-mobile .basket-qty {
-  position: absolute;
-  top: 2px;
-  right: -6px;
-  min-width: 10px;
-  height: 10px;
-  padding: 0 3px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 12px/1 system-ui, sans-serif;
-  background: #ff7a00;
-  color: white;
-  border-radius: 999px;
-  pointer-events: none;
-  }
-
-  .basket-qty.hide {
-  display: none;
 }
-  /* Sign in */
-  .mobile-signin {
-    color: #FFFFFF;
-    text-decoration: none;
-    font-weight: 500;
-  }
 
-  /* ----------------------------------------------
-     ROW 2: NAV MENU
-  ---------------------------------------------- */
+.mobile-basket .basket-qty {
+    position: absolute;
+    bottom: -4px;
+    right: -6px;
+    background: #F28C28;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
 
-
-  .mobile-nav {
-    display: flex;
-    justify-content: center;
-    gap: 28px;
-  }
-
-  .mobile-nav a {
+/* Sign in */
+.mobile-right-icons .sign-in-link {
+    font-size: 14px;
     color: #FDF4E7;
     text-decoration: none;
+}
+
+/* =========================================================
+   ROW 2 — MENU + SEARCH
+========================================================= */
+
+.mobile-menu-col {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 14px;
+}
+
+/* NAV MENU */
+.mobile-nav {
+    display: flex;
+    justify-content: center;
+    gap: 26px;
+}
+
+.mobile-nav a {
     font-size: 16px;
+    color: #FDF4E7;
+    text-decoration: none;
     font-weight: 600;
-  }
+}
 
-  .mobile-nav a:hover {
-    text-decoration: underline 1px #F28C28;
-  }
+/* =========================================================
+   MOBILE SEARCH BAR
+========================================================= */
 
-  /* ----------------------------------------------
-     SEARCH BAR
-  ---------------------------------------------- */
-  .mobile-search {
+.mobile-search {
+    position: relative;
     width: 100%;
     display: flex;
-    align-items: center;
-    position: relative;
-  }
+    background: white;
+    border-radius: 6px;
+    overflow: visible;
+}
 
-  .mobile-search input {
+.mobile-search input {
     width: 100%;
-    height: 38px;
     border: none;
     outline: none;
-    border-radius: 6px 0 0 6px;
-    padding: 0 10px;
+    padding: 10px;
     font-size: 15px;
     color: #094949;
-  }
+    border-radius: 5px 0 0 5px;
+}
 
-  .mobile-search button {
-    width: 42px;
-    height: 38px;
-    background: #F28C28;
+.mobile-search button {
+    width: 40px;
+    background: #F18C28;
     border: none;
-    border-radius: 0 6px 6px 0;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
+    border-radius: 0 5px 5px 0;
+    
+}
 
-  .mobile-search button img {
-    width: 20px;
-    height: 20px;
-    object-fit: contain;
-  }
+.mobile-search button img {
+    width: 22px;
+    height: 22px;
+}
 
-  .mobile-search .search-autocomplete {
+/* =========================================================
+   AUTOCOMPLETE (mobile box)
+========================================================= */
+
+.mobile-ac {
+    position: absolute;
     top: 100%;
     left: 0;
     width: 100%;
-  }
+    max-height: 240px;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    overflow-y: auto;
+    z-index: 20001;
+    display: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease;
+}
+
+.mobile-ac.show {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Items */
+.mobile-ac .ac-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.mobile-ac .ac-item:hover {
+    background: #f5f5f5;
+}
+
+.mobile-ac .ac-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    margin-right: 10px;
+    object-fit: cover;
+}
+
+.mobile-ac .ac-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-ac .ac-name {
+  font-size: 18px;
+    font-weight: 600;
+    color: #222;
+}
+
+.mobile-ac .ac-cat {
+    color: #777;
+    font-size: 13px;
+}
+
+/* ============================
+   MOBILE ATTRACTIVE QTY DRAWER
+============================ */
+
+.qty-wrapper {
+    width: 100%;
+    border: 1px solid #dfecec;
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: #eef7f7;
+    margin-top: 6px;
+    cursor: pointer;
+}
+
+.qty-collapsed {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #0b6b6a;
+    font-size: 17px;
+}
+
+.qty-collapsed .arrow {
+    font-size: 18px;
+    opacity: 0.7;
+}
+
+/* Hidden by default */
+.qty-expanded {
+    display: none;
+    margin-top: 12px;
+    gap: 18px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* When opened */
+.qty-wrapper.opened .qty-expanded {
+    display: flex;
+}
+
+.qty-wrapper.opened .qty-collapsed {
+    display: none;
+}
+
+/* Buttons inside expanded drawer */
+.qty-expanded button {
+    width: 55px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 22px;
+}
+
+.qty-expanded .remove-item {
+    background: #ffe1e1;
+    border: 1px solid #ff9a9a;
+}
+
+  
 }
 
 
+
+/* ===== REMOVE ALL BLUE TOUCH FLASHES (CHROME / ANDROID / TABLET / HYBRID LAPTOPS) ===== */
+
+* {
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+*:focus,
+*:focus-visible,
+*:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+button,
+button:focus,
+button:active {
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+a,
+a:focus,
+a:active {
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+img {
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none;
+}
+
+#s4l-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(40px);
+    background: #0b6b6a;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 999999; /* override EVERYTHING */
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#s4l-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* FINAL OVERRIDE FOR TOAST */
+#s4l-toast {
+    border: 1px solid #ffffff !important;
+    box-shadow: 0 0 15px rgba(0,0,0,0.35) !important;
+}
+
+/* Mobile portrait only — real phones */
+@media (max-width: 480px) {
+  .mobile-nav {
+    pointer-events: none;
+  }
+
+  .mobile-nav a {
+    opacity: 0;
+  }
+}
 

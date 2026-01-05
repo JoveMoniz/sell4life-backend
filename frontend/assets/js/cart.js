@@ -1,282 +1,477 @@
-// /assets/js/cart.js FIXED + MERGED
+// ======================================================================
+// SELL4LIFE CART.JS — CLEAN MERGED VERSION (hybrid-safe)
+// SINGLE TOAST SYSTEM
+// ======================================================================
+
 (async function () {
 
-  // Wait a moment for header to load
-  await new Promise(r => setTimeout(r, 50));
-
-  // Skip if header/minicart is not on this page
-  if (!document.querySelector(".mini-cart-items")) {
-      console.log("cart.js skipped on non-cart pages");
-      return;
-  }
-
-  // Prevent double-loading
-  if (window.__cartBooted) return;
-  window.__cartBooted = true;
-
-  // Listen for product.js updates
-  document.addEventListener("cartUpdated", () => {
-    cart = readCart();
-    renderMiniCart();
-    updateBadge();
-    renderCartPage();
-  });
-
-  // Wait for header/minicart to load fully
-  while (!document.querySelector(".mini-cart-items") || !document.querySelector(".basket-qty")) {
-    await new Promise(r => setTimeout(r, 100));
-  }
-
-  // Header elements
-  const badge         = document.querySelector(".basket-qty");
-  const miniCartList  = document.querySelector(".mini-cart-items");
-  const miniCartTotal = document.querySelector(".mini-cart-total");
-
-  // Cart page columns
-  const colProduct   = document.getElementById("col-product");
-  const colQty       = document.getElementById("col-qty");
-  const colPrice     = document.getElementById("col-price");
-  const colSubtotal  = document.getElementById("col-subtotal");
-  const colRemove    = document.getElementById("col-remove");
-  const totalSpan    = document.getElementById("cart-total");
-
-  // Read cart safely
-  function readCart() {
-    try {
-      const arr = JSON.parse(localStorage.getItem("cart") || "[]");
-      return Array.isArray(arr) ? arr.filter(x => x && x.id) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  let cart = readCart();
-
-  function saveCart() {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }
-
-  // HEADER BADGE
-  function updateBadge() {
-    const count = cart.reduce((s, i) => s + (i.quantity || 0), 0);
-    badge.textContent = count;
-    badge.classList.toggle("hide", count === 0);
-  }
-
-  // MINI CART RENDER
-  function renderMiniCart() {
-    miniCartList.innerHTML = "";
-
-    if (!cart.length) {
-      miniCartList.innerHTML = `
-        <li><div class="mini-cart-empty">No items in basket.</div></li>
-      `;
-      miniCartTotal.textContent = "£0.00";
-      return;
+    // ---------------------------------------------------------
+    // 0. Wait for header + minicart structure to exist
+    // ---------------------------------------------------------
+    let attempts = 0;
+    while (
+        !document.querySelector(".basket-wrapper") ||
+        !document.querySelector(".mini-cart-items")
+    ) {
+        attempts++;
+        if (attempts > 80) {
+            console.warn("Header did not load. Cart.js aborted.");
+            return;
+        }
+        await new Promise(r => setTimeout(r, 50));
     }
 
-    let total = 0;
+    // ---------------------------------------------------------
+    // 1. LocalStorage SAFE read & write
+    // ---------------------------------------------------------
+    function readCart() {
+        try {
+            const arr = JSON.parse(localStorage.getItem("cart") || "[]");
+            return Array.isArray(arr) ? arr.filter(x => x && x.id) : [];
+        } catch {
+            return [];
+        }
+    }
 
-    cart.forEach(item => {
-      const price = Number(item.price);
-      const qty   = Number(item.quantity);
-      const sub   = price * qty;
-      total += sub;
+    function saveCart() {
+        localStorage.setItem("cart", JSON.stringify(cart));
+    }
 
-      const li = document.createElement("li");
-      li.innerHTML = `
-  <div class="mini-cart-item">
-    <img src="${item.image || ''}" alt="${item.name}" class="mini-cart-thumb" />
+    let cart = readCart();
 
-    <div class="mini-cart-info">
-      <div class="mini-cart-name">${item.name}</div>
-      <div class="mini-cart-meta">£${price.toFixed(2)} × ${qty}</div>
-    </div>
+    // ---------------------------------------------------------
+    // 1B. SINGLE TOAST SYSTEM
+    // ---------------------------------------------------------
+    let s4lToast = document.getElementById("s4l-toast");
+    if (!s4lToast) {
+        s4lToast = document.createElement("div");
+        s4lToast.id = "s4l-toast";
+        s4lToast.textContent = "Added to cart";
+        document.body.appendChild(s4lToast);
+    }
 
-    <div class="mini-cart-sub">£${sub.toFixed(2)}</div>
-  </div>
-`;
+    function s4lShowToast(text = "Added to cart") {
+        s4lToast.textContent = text;
+        s4lToast.classList.add("show");
+        setTimeout(() => s4lToast.classList.remove("show"), 1200);
+    }
+
+    // ---------------------------------------------------------
+    // 2. DOM references
+    // ---------------------------------------------------------
+    const miniCartList  = document.querySelector(".mini-cart-items");
+    const miniCartTotal = document.querySelector(".mini-cart-total");
+    const totalSpan     = document.getElementById("cart-total");
+    const cartRows      = document.getElementById("cart-rows");
+
+    // ---------------------------------------------------------
+    // 3. BADGE UPDATER
+    // ---------------------------------------------------------
+    function updateBadge() {
+        const count = cart.reduce((s, i) => s + (i.quantity || 0), 0);
+        document.querySelectorAll(".basket-qty").forEach(b => {
+            b.textContent = count;
+            b.classList.toggle("hide", count === 0);
+        });
+    }
+
+    // ---------------------------------------------------------
+    // 4. UNIVERSAL BASKET STATE
+    // ---------------------------------------------------------
+    function updateBasketState() {
+    const totalQty = cart.reduce((s, i) => s + (i.quantity || 0), 0);
+
+    document.querySelectorAll(".basket-wrapper").forEach(w => {
+        const empty = totalQty === 0;
+
+        w.classList.toggle("empty", empty);
+        w.classList.toggle("has-items", !empty);
+
+        // 🔒 Disable interaction when empty
+        w.style.pointerEvents = empty ? "none" : "auto";
+    });
+}
 
 
-      miniCartList.appendChild(li);
+    // ---------------------------------------------------------
+    // 5. RENDER MINI CART
+    // ---------------------------------------------------------
+    function renderMiniCart() {
+        if (!miniCartList || !miniCartTotal) return;
+
+        miniCartList.innerHTML = "";
+
+        if (!cart.length) {
+            miniCartList.innerHTML =
+                `<li><div class='mini-cart-empty'>No items in basket.</div></li>`;
+            miniCartTotal.innerHTML = `£0.00`;
+            return;
+        }
+
+        let total = 0;
+
+        cart.forEach(item => {
+            const price = Number(item.price);
+            const qty   = Number(item.quantity);
+            const sub   = price * qty;
+            total += sub;
+
+            const li = document.createElement("li");
+            li.innerHTML = `
+                <div class="mini-cart-item">
+                    <img src="${item.image}" class="mini-cart-thumb">
+                    <div class="mini-cart-info">
+                        <div class="mini-cart-name">${item.name}</div>
+                        <div class="mini-cart-meta">£${price.toFixed(2)} × ${qty}</div>
+                    </div>
+                    <div class="mini-cart-sub">£${sub.toFixed(2)}</div>
+                </div>
+            `;
+            miniCartList.appendChild(li);
+        });
+
+        miniCartTotal.innerHTML = `
+            <div class="mini-cart-total-line">
+                <span class="mini-cart-total-label">Total:</span>
+                <span class="mini-cart-total-value">£${total.toFixed(2)}</span>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------
+    // 6. RENDER FULL CART PAGE
+    // ---------------------------------------------------------
+    function renderCartPage() {
+        if (!cartRows) return;
+
+        cartRows.innerHTML = "";
+        if (!cart.length) {
+            totalSpan.textContent = "£0.00";
+            return;
+        }
+
+        let total = 0;
+
+        cart.forEach((item, i) => {
+            const price = Number(item.price);
+            const qty   = Number(item.quantity);
+            const sub   = price * qty;
+            total += sub;
+
+            const row = document.createElement("div");
+            row.classList.add("cart-row");
+
+            row.innerHTML = `
+                <div class="col-product cart-product-info">
+                    <img class="cart-thumb" src="${item.image}">
+                    <a class="cart-product-link"
+                       href="/${item.category}/${item.subcategory}/?id=${item.id}">
+                       ${item.name}
+                    </a>
+                </div>
+
+                <div class="col-qty qty-control">
+                    <button class="qty-minus" data-index="${i}">−</button>
+                    <span>${qty}</span>
+                    <button class="qty-plus" data-index="${i}">+</button>
+                    <button class="remove-item" data-index="${i}">×</button>
+                </div>
+
+                <div class="col-price">£${price.toFixed(2)}</div>
+                <div class="col-subtotal">£${sub.toFixed(2)}</div>
+
+                <div class="m-price-line">
+                    £${price.toFixed(2)} × ${qty} =
+                    <span class="m-subtotal">£${sub.toFixed(2)}</span>
+                </div>
+            `;
+
+            cartRows.appendChild(row);
+        });
+
+        totalSpan.textContent = `£${total.toFixed(2)}`;
+    }
+
+    // ---------------------------------------------------------
+    // 7. MOBILE PRICE LINE
+    // ---------------------------------------------------------
+    function isRealTouchDevice() {
+        return (
+            ("ontouchstart" in window) ||
+            (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+        );
+    }
+
+    function updateMPriceLine() {
+        const width = window.innerWidth;
+        const portrait = window.matchMedia("(orientation: portrait)").matches;
+        const touch = isRealTouchDevice();
+
+        const show = width <= 480 && portrait && touch;
+
+        document.querySelectorAll(".m-price-line").forEach(el => {
+            el.style.display = show ? "flex" : "none";
+        });
+    }
+
+    // ---------------------------------------------------------
+    // 8. FULL REFRESH
+    // ---------------------------------------------------------
+    function refreshAll() {
+        cart = readCart();
+        renderMiniCart();
+        updateBadge();
+        updateBasketState();
+        renderCartPage();
+        updateMPriceLine();
+    }
+
+    refreshAll();
+    document.addEventListener("cartUpdated", refreshAll);
+
+    // =====================================================================
+    // 9. TAP SYSTEM FOR BUTTONS
+    // =====================================================================
+
+    let tapStartX = 0;
+    let tapStartY = 0;
+    const TAP_THRESHOLD = 12;
+
+    document.addEventListener("pointerdown", e => {
+        const btn = e.target.closest(".qty-plus, .qty-minus, .remove-item, .btn-add");
+        if (!btn) return;
+
+        tapStartX = e.clientX;
+        tapStartY = e.clientY;
+
+        btn.classList.add("tapped");
     });
 
-    miniCartTotal.innerHTML = `
-      <div class="mini-cart-total-line">
-        <span class="mini-cart-total-label">Total:</span>
-        <span class="mini-cart-total-value">£${total.toFixed(2)}</span>
-      </div>
-    `;
-  }
+    document.addEventListener("pointermove", e => {
+        const btn = e.target.closest(".qty-plus, .qty-minus, .remove-item, .btn-add");
+        if (!btn) return;
 
-  // CART PAGE RENDER
-  function renderCartPage() {
-    if (!colProduct || !colQty || !colPrice || !colSubtotal || !colRemove || !totalSpan) return;
+        const dx = Math.abs(e.clientX - tapStartX);
+        const dy = Math.abs(e.clientY - tapStartY);
 
-    colProduct.innerHTML  = "";
-    colQty.innerHTML      = "";
-    colPrice.innerHTML    = "";
-    colSubtotal.innerHTML = "";
-    colRemove.innerHTML   = "";
-
-    if (!cart.length) {
-      totalSpan.textContent = "0.00";
-      return;
-    }
-
-    let total = 0;
-
-    cart.forEach((item, index) => {
-      const price = Number(item.price);
-      const qty   = Number(item.quantity);
-      const sub   = price * qty;
-
-      total += sub;
-
-      // PRODUCT CELL
-      const p = document.createElement("div");
-      p.className = "cart-product-info";
-
-      const link = document.createElement("a");
-      link.href = `/${item.category}/${item.subcategory}/?id=${item.id}`;
-      link.className = "cart-product-link";
-
-      const img = document.createElement("img");
-      img.src = item.image || "";
-      img.alt = item.name;
-      img.className = "cart-thumb";
-
-      const name = document.createElement("span");
-      name.textContent = item.name;
-
-      link.appendChild(img);
-      link.appendChild(name);
-      p.appendChild(link);
-      colProduct.appendChild(p);
-
-      // QTY
-      const qc = document.createElement("div");
-      qc.className = "qty-control";
-
-      const minus = document.createElement("button");
-      minus.className = "qty-minus";
-      minus.dataset.index = index;
-      minus.textContent = "−";
-
-      const value = document.createElement("span");
-      value.className = "qty-value";
-      value.textContent = qty;
-
-      const plus = document.createElement("button");
-      plus.className = "qty-plus";
-      plus.dataset.index = index;
-      plus.textContent = "+";
-
-      qc.appendChild(minus);
-      qc.appendChild(value);
-      qc.appendChild(plus);
-      colQty.appendChild(qc);
-
-      // PRICE
-      const pr = document.createElement("div");
-      pr.textContent = `£${price.toFixed(2)}`;
-      colPrice.appendChild(pr);
-
-      // SUBTOTAL
-      const st = document.createElement("div");
-      st.textContent = `£${sub.toFixed(2)}`;
-      colSubtotal.appendChild(st);
-
-      // REMOVE BUTTON
-      const rm = document.createElement("button");
-      rm.className = "remove-item";
-      rm.dataset.index = index;
-      rm.textContent = "×";
-
-      const wrap = document.createElement("div");
-      wrap.className = "remove-wrap";
-      wrap.appendChild(rm);
-      colRemove.appendChild(wrap);
+        if (dx > TAP_THRESHOLD || dy > TAP_THRESHOLD) {
+            btn.classList.remove("tapped");
+        }
     });
 
-    totalSpan.textContent = total.toFixed(2);
-  }
+    document.addEventListener("pointerup", e => {
+        const btn = e.target.closest(".qty-plus, .qty-minus, .remove-item, .btn-add");
+        if (!btn) return;
 
-  // FULL REFRESH
-  function refreshAll() {
-    cart = readCart();
-    renderMiniCart();
-    updateBadge();
-    renderCartPage();
-  }
+        const dx = Math.abs(e.clientX - tapStartX);
+        const dy = Math.abs(e.clientY - tapStartY);
 
-  // BUTTON LOGIC
-  document.addEventListener("click", e => {
+        setTimeout(() => btn.classList.remove("tapped"), 100);
 
-    // + qty
-    if (e.target.classList.contains("qty-plus")) {
-      const i = +e.target.dataset.index;
-      cart[i].quantity++;
-      saveCart();
-      refreshAll();
-      return;
-    }
+        if (dx > TAP_THRESHOLD || dy > TAP_THRESHOLD) return;
 
-    // - qty
-    if (e.target.classList.contains("qty-minus")) {
-      const i = +e.target.dataset.index;
-      if (cart[i].quantity > 1) {
+        if (navigator.vibrate) navigator.vibrate(30);
+
+        if (btn.classList.contains("qty-plus")) {
+            const i = +btn.dataset.index;
+            cart[i].quantity++;
+            saveCart();
+            refreshAll();
+            return;
+        }
+
+        if (btn.classList.contains("qty-minus")) {
+    const i = +btn.dataset.index;
+
+    // Normal decrement
+    if (cart[i].quantity > 1) {
         cart[i].quantity--;
-      } else {
+        saveCart();
+        refreshAll();
+        return;
+    }
+
+    // Quantity will reach zero → attempt animation
+    const row = btn.closest(".cart-row");
+
+    // If row not found (mobile / layout edge cases)
+    if (!row) {
         cart.splice(i, 1);
-      }
-      saveCart();
-      refreshAll();
-      return;
+        saveCart();
+        refreshAll();
+        return;
     }
 
-    // REMOVE ITEM
-    if (e.target.classList.contains("remove-item")) {
-      const i = +e.target.dataset.index;
-      cart.splice(i, 1);
-      saveCart();
-      refreshAll();
-      return;
+    // Lock height before collapse
+    row.style.height = row.offsetHeight + "px";
+
+    requestAnimationFrame(() => {
+        row.classList.add("removing");
+    });
+
+    setTimeout(() => {
+        cart.splice(i, 1);
+        saveCart();
+        refreshAll();
+    }, 350);
+
+    return;
+}
+
+
+        if (btn.classList.contains("remove-item")) {
+    const i = +btn.dataset.index;
+    const row = btn.closest(".cart-row");
+    if (!row) return;
+
+    // Lock height so it can animate
+    row.style.height = row.offsetHeight + "px";
+
+    // Trigger collapse
+    requestAnimationFrame(() => {
+        row.classList.add("removing");
+    });
+
+    // Remove AFTER animation
+    setTimeout(() => {
+        cart.splice(i, 1);
+        saveCart();
+        refreshAll();
+    }, 350);
+
+    return;
+}
+
+
+        if (btn.classList.contains("btn-add")) {
+            const productId = btn.dataset.id;
+            const productName = btn.dataset.name;
+            const productPrice = btn.dataset.price;
+            const productImage = btn.dataset.image;
+            const category = btn.dataset.category;
+            const subcategory = btn.dataset.subcategory;
+
+            let item = cart.find(p => p.id == productId);
+
+            if (item) {
+                item.quantity++;
+            } else {
+                cart.push({
+                    id: productId,
+                    name: productName,
+                    price: productPrice,
+                    image: productImage,
+                    category,
+                    subcategory,
+                    quantity: 1
+                });
+            }
+
+            saveCart();
+            refreshAll();
+            s4lShowToast("Added to cart");
+        }
+    });
+
+    // =====================================================================
+    // 10. MOBILE CLEAR CART MODAL
+    // =====================================================================
+    document.addEventListener("click", e => {
+        if (e.target.id === "clear-cart") {
+            document.querySelector(".clear-cart-modal")?.classList.add("show");
+        }
+
+        if (e.target.classList.contains("confirm-clear")) {
+            cart = [];
+            saveCart();
+            refreshAll();
+            document.querySelector(".clear-cart-modal")?.classList.remove("show");
+        }
+
+        if (e.target.classList.contains("cancel-clear")) {
+            document.querySelector(".clear-cart-modal")?.classList.remove("show");
+        }
+    });
+
+    // =====================================================================
+    // 11. MOBILE BASKET CLICK
+    // =====================================================================
+    document.addEventListener("click", e => {
+        const mobileBasket = document.querySelector(".s4l-header-mobile .basket-shell");
+        if (mobileBasket && mobileBasket.contains(e.target)) {
+            window.location.href = "/cart/cart.html";
+        }
+    });
+
+    // =====================================================================
+    // 12. HYBRID DESKTOP: HOVER + TAP MINICART
+    // =====================================================================
+
+    const desktopWrapper = document.querySelector(".s4l-header-desktop .basket-wrapper");
+    const desktopMini    = document.querySelector(".s4l-header-desktop .mini-cart");
+
+    if (desktopWrapper && desktopMini) {
+
+        // Hover (real mouse only)
+        window.matchMedia("(hover: hover) and (pointer: fine)").addEventListener("change", () => {});
+        
+        if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+            desktopWrapper.addEventListener("mouseenter", () => {
+                if (!cart.length) return;
+                desktopMini.style.display = "block";
+                desktopMini.style.opacity = "1";
+                desktopMini.style.visibility = "visible";
+            });
+
+            desktopWrapper.addEventListener("mouseleave", () => {
+                desktopMini.style.display = "none";
+                desktopMini.style.opacity = "0";
+                desktopMini.style.visibility = "hidden";
+            });
+        }
+
+        // Touch tap toggle (hybrid laptops)
+desktopWrapper.addEventListener("touchstart", e => {
+
+    // Only react if the touch happened EXACTLY on the desktop basket icon
+    const icon = e.target.closest(".basket-shell, .basket-handle");
+    if (!icon) return; // Do NOT block other touches anywhere else
+
+    if (!cart.length) return;
+
+    const open = desktopMini.style.display === "block";
+
+    if (open) {
+        desktopMini.style.display = "none";
+        desktopMini.style.opacity = "0";
+        desktopMini.style.visibility = "hidden";
+    } else {
+        desktopMini.style.display = "block";
+        desktopMini.style.opacity = "1";
+        desktopMini.style.visibility = "visible";
     }
 
-    // CONFIRM CLEAR
-    if (e.target.classList.contains("confirm-clear")) {
-      cart = [];
-      saveCart();
-      refreshAll();
-      document.querySelector(".clear-cart-modal").classList.remove("show");
-      return;
+    e.preventDefault(); // Prevent scroll ONLY for the basket icon
+}, { passive: false });
+
+
     }
 
-    // CANCEL CLEAR
-    if (e.target.classList.contains("cancel-clear")) {
-      document.querySelector(".clear-cart-modal").classList.remove("show");
-      return;
-    }
+    // =====================================================================
+    // 13. SCREEN & ORIENTATION
+    // =====================================================================
+    window.addEventListener("resize", updateMPriceLine);
+    window.matchMedia("(orientation: portrait)").addEventListener("change", updateMPriceLine);
+    window.matchMedia("(orientation: landscape)").addEventListener("change", updateMPriceLine);
 
-    // OPEN CLEAR MODAL
-    if (e.target.id === "clear-cart") {
-      if (cart.length) {
-        document.querySelector(".clear-cart-modal").classList.add("show");
-      }
-      return;
-    }
-  });
-
-  // INITIAL RENDER
-  refreshAll();
-
-})(); // << FULL FILE PROPERLY CLOSED IIFE
+})(); // END wrapper
 
 
-// BUY BUTTON SHORTCUT
+
+// ======================================================================
+// 14. CHECKOUT BUTTON
+// ======================================================================
 document.addEventListener("click", e => {
-  if (e.target.id === "btn-buy") {
-    window.location.href = "/cart/checkout.html";
-  }
+    const btn = e.target.closest("#btn-buy");
+    if (btn) window.location.href = "/cart/checkout.html";
 });

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Orders – Sell4Life</title>
+
+  <link rel="stylesheet" href="/assets/css/layout.css" />
+  <link rel="stylesheet" href="/assets/css/orders.css" />
+</head>
+
+<body>
+
+  <!-- Protect page -->
+  <script src="/assets/js/require-auth.js"></script>
+
+  <!-- Header injected by layout.js -->
+
+  <main class="page-account">
+
+    <div class="page-top">
+      <a href="/" class="auth-back">← Back to Home</a>
+    </div>
+
+    <h1>My Orders</h1>
+
+    <div id="orders-container">
+      <p id="orders-loading">Loading your orders…</p>
+
+      <div id="orders-empty" style="display:none;">
+        <p>You don’t have any orders yet.</p>
+      </div>
+
+      <!-- IMPORTANT: this is a DIV, not UL -->
+      <div id="orders-list"></div>
+    </div>
+
+  </main>
+
+  <script src="/assets/js/layout.js"></script>
+  <script src="/assets/js/orders.js"></script>
+
+</body>
+</html>

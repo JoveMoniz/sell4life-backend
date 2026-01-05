@@ -1,43 +1,28 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const itemsWrap = document.getElementById("order-items");
-    const idEl = document.getElementById("order-id");
-    const dateEl = document.getElementById("order-date");
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get("id");
+
+    const idEl    = document.getElementById("order-id");
+    const dateEl  = document.getElementById("order-date");
+    const itemsEl = document.getElementById("order-items");
     const totalEl = document.getElementById("order-total");
 
-    // Get last order from checkout.js
-    const lastOrder = JSON.parse(localStorage.getItem("sell4life_last_order") || "null");
-
-    if (!lastOrder) return;
-
-    // Display order number and date
-    if (idEl) idEl.textContent = "#" + (lastOrder.id || "000000");
-    if (dateEl) dateEl.textContent = lastOrder.date || "--";
-
-    // Render items + calculate subtotal
-    let subtotal = 0;
-
-    if (itemsWrap) {
-        itemsWrap.innerHTML = lastOrder.items.map(item => {
-            const qty = item.qty || item.quantity || 1;
-            const price = Number(item.price) || 0;
-            const line = qty * price;
-
-            subtotal += line;
-
-            return `
-                <div class="ty-item">
-                    <span>${item.name} (x${qty})</span>
-                    <span>£${line.toFixed(2)}</span>
-                </div>
-            `;
-        }).join("");
+    if (!orderId) {
+        idEl.textContent = "N/A";
+        dateEl.textContent = "-";
+        itemsEl.innerHTML = "<p>Order not found.</p>";
+        totalEl.textContent = "£0.00";
+        return;
     }
 
-    // SHOW TOTAL
-    if (totalEl) {
-        totalEl.textContent = "£" + subtotal.toFixed(2);
-    }
+    // Show confirmed info
+    idEl.textContent = orderId;
+    dateEl.textContent = new Date().toLocaleString();
 
-    // Clear the order
-    localStorage.removeItem("sell4life_last_order");
+    itemsEl.innerHTML = `
+        <p>Your order <strong>${orderId}</strong> has been received.</p>
+        <p>You’ll be able to view full details in your account.</p>
+    `;
+
+    totalEl.textContent = "—";
 });

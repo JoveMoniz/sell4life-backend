@@ -6,54 +6,39 @@
   <title>Your Basket | Sell4Life</title>
 
   <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/cart.css" />
   <link rel="stylesheet" href="/assets/css/layout.css" />
-  <link rel="stylesheet" href="/assets/css/product.css" />
+  <link rel="stylesheet" href="/assets/css/cart.css" />
 </head>
 
 <body>
 
-<div class="desktop-header-wrapper">
-    <div id="header"></div>
-</div>
-
-<div class="mobile-header-wrapper">
-    <div id="header-mobile"></div>
-</div>
-
-
 <section class="cart-page">
+
   <h1>Your Basket</h1>
 
-  <div class="cart-table">
+  <!-- DESKTOP TABLE HEADER -->
 
-    <div class="col product-col">
-      <div class="header">Product</div>
-      <div class="rows" id="col-product"></div>
+<div class="cart-table">
+    
+    <div class="cart-table-header">
+        <span class="cart-h-product">Product</span>
+        <span class="cart-h-qty">Qty</span>
+        <span class="cart-h-price">Price</span>
+        <span class="cart-h-subtotal">Subtotal</span>
+      
     </div>
 
-    <div class="col qty-col">
-      <div class="header">Qty</div>
-      <div class="rows" id="col-qty"></div>
-    </div>
+    <div id="cart-rows" class="cart-rows"></div>
 
-    <div class="col price-col">
-      <div class="header">Price</div>
-      <div class="rows" id="col-price"></div>
-    </div>
+</div>
 
-    <div class="col subtotal-col">
-      <div class="header">Subtotal</div>
-      <div class="rows" id="col-subtotal"></div>
-    </div>
 
-    <div class="col remove-col">
-      <div class="header">Remove</div>
-      <div class="rows" id="col-remove"></div>
-    </div>
 
-  </div>
+  <!-- NEW ROW CONTAINER -->
 
+
+
+  <!-- TOTAL + ACTIONS -->
   <div class="cart-total-line">
     <span>Total:</span>
     <strong id="cart-total">£0.00</strong>
@@ -64,6 +49,7 @@
     <button id="btn-buy" class="btn-buy">Checkout</button>
   </div>
 
+  <!-- CLEAR CART MODAL -->
   <div class="clear-cart-modal">
     <div class="clear-cart-box">
       <h3>Clear Cart?</h3>
@@ -78,12 +64,7 @@
 
 </section>
 
-<div id="footer"></div>
-
-<!-- GLOBAL LAYOUT LOADER -->
 <script src="/assets/js/layout.js"></script>
-
-<!-- Load ONLY cart.js (layout.js will do this automatically if set) -->
 <script src="/assets/js/cart.js"></script>
 
 </body>

@@ -10,29 +10,25 @@ display: flex;
 
   /* --- Stretch gallery fully to the left --- */
   padding-left: 0;
+  padding-right: 0;
 }
 
-.product-gallery {
-  flex: 1 1 60%;
-  max-width: 900px; /* gives more horizontal room */
-  margin-left: 0;
-  padding-left:20px;
-  display: flex;
-  justify-content: flex-start;
-}
+
 
 .product-info {
-  flex: 1 1 400px;
-  max-width: 500px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex: 1 1 45%;
+  max-width: 600px;           /* makes the text block larger */
+  padding: 40px 40px 40px 60px; /* pushes content inward nicely */
+
+
 }
 
+
 .product-title {
-  font-size: 2rem;
+  font-size: 2.4rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin: 10px 0 20px;
+  color: #0b6b6a;
 }
 
 .product-category {
@@ -98,31 +94,12 @@ body {
   padding: 0;
 }
 
-/* Gallery wrapper adjustments */
-.custom-gallery.side-layout {
-  margin-left: 0 !important;
-  padding-left: 0 !important;
-}
 
-.slider-wrapper {
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  border-radius: 0;
-}
-
-#main-prev {
-  left: 0 !important;
-}
-
-/* Responsive layout */
-@media (max-width: 900px) {
+@media (max-width: 1400px) {
   .product-page {
+    align-items: center;
+    margin-top: 20px;
     flex-direction: column;
-    align-items: center;
   }
-  .product-info {
-    text-align: center;
-    align-items: center;
-  }
+
 }

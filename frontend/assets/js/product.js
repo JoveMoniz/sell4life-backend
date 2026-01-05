@@ -86,4 +86,8 @@
 
     console.log("✔ Added to basket:", product.name);
   });
+
+document.dispatchEvent(new Event("productLoaded"));
+
+
 })();

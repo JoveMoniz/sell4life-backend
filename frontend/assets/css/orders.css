@@ -1,0 +1,275 @@
+/* =====================================================
+   ORDERS PAGE – Sell4Life
+   Clean, centered, predictable
+===================================================== */
+
+.page-account {
+  background: #0b6b6a;
+  color: #ffffff;
+  padding: 60px 20px;
+  min-height: 60vh;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top row */
+.page-top {
+  max-width: 900px;
+  margin: 0 auto 24px;
+}
+
+.auth-back {
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.auth-back:hover {
+  text-decoration: underline;
+}
+
+/* Heading */
+.page-account h1 {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 40px;
+}
+
+/* Orders container */
+#orders-container {
+   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 30px;
+}
+
+/* Loading / empty */
+#orders-loading,
+#orders-empty {
+  text-align: center;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+/* Orders list */
+#orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Order card */
+.order-card {
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
+/* Header row */
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+/* Meta */
+.order-meta {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* Price */
+.order-total {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f28c28;
+}
+
+/* =========================================
+   MY ORDERS – LINK CLEANUP
+========================================= */
+
+.page-account a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Keep hover intentional, not browser-default */
+
+.page-account a:hover {
+  opacity: 0.85;
+}
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  #orders-container {
+    padding: 20px;
+  }
+
+  .page-account h1 {
+    font-size: 24px;
+  }
+
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
+
+/*---------------- order details--------------*/
+/* =========================================
+   ORDER DETAILS PAGE ONLY
+   Targets #order-details explicitly
+========================================= */
+
+
+.order-details-container {
+
+   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+
+}
+
+
+#order-details {
+  margin-top: 40px;
+  border-radius: 14px;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.15);
+
+}
+
+/* Header info */
+
+#order-details h2 {
+  margin-bottom: 12px;
+  font-size: 22px;
+}
+
+#order-details p {
+  margin: 6px 0;
+  opacity: 0.9;
+}
+
+/* Items list */
+
+#order-details .order-items {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Single item row */
+
+#order-details .order-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+/* Thumbnail */
+
+.order-details-page .order-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #0b4f4f;
+}
+
+
+
+#order-details .order-info div:first-child {
+  font-weight: 600;
+}
+
+#order-details .order-info div:last-child {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* Line price */
+
+.order-details-page .order-price {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Total aligned with prices */
+#order-details h3 {
+  margin-top: 28px;
+  padding-top: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  justify-content: flex-end;
+}
+
+
+
+
+/* Ensure text hierarchy feels intentional */
+
+#order-details h2 {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+#order-details p,
+#order-details .order-info,
+#order-details .order-line {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* Smaller meta text */
+
+#order-details .order-info div:last-child {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #eaeaea;
+  text-decoration: none;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.back-link:hover {
+  opacity: 1;
+}
+
+
+/* =========================================
+   ORDER DETAILS PAGE – FONT FIX
+========================================= */
+
+.order-details-page {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+               "Helvetica Neue", Arial, sans-serif;
+  color: #ffffff;
+}

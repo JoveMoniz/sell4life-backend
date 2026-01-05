@@ -13,45 +13,47 @@
 </head>
 
 <body>
+  <body>
 
-  <!-- LEFT: IMAGE GALLERY -->
-  <div class="product-gallery">
-    <div class="custom-gallery side-layout">
-      <div id="thumbnailGallery" class="thumbnail-gallery"></div>
+  <section class="product-page">
 
-      <div class="main-image-wrapper">
-        <div class="slider-wrapper">
-          <div id="sliderTrack" class="slider-track"></div>
-          <div id="main-prev">&#10094;</div>
-          <div id="main-next">&#10095;</div>
+    <!-- LEFT: IMAGE GALLERY -->
+    <div class="product-gallery">
+      <div class="custom-gallery side-layout">
+        <div id="thumbnailGallery" class="thumbnail-gallery"></div>
+
+        <div class="main-image-wrapper">
+          <div class="slider-wrapper">
+            <div id="sliderTrack" class="slider-track"></div>
+            <div id="main-prev">&#10094;</div>
+            <div id="main-next">&#10095;</div>
+          </div>
         </div>
+      </div>
+
+      <div id="hidden-gallery" style="display:none;"></div>
+    </div>
+
+    <!-- RIGHT: PRODUCT INFORMATION -->
+    <div class="product-info">
+      <h1 class="product-title"></h1>
+      <p class="product-category"></p>
+      <p class="product-price"></p>
+      <p class="product-desc"></p>
+
+      <div class="product-actions">
+        <button class="btn-add">Add to Basket</button>
+        <button class="btn-buy">Buy Now</button>
       </div>
     </div>
 
-    <!-- Hidden loaded images (dynamic) -->
-    <div id="hidden-gallery" style="display:none;"></div>
-  </div>
+  </section>
 
-  <!-- RIGHT: PRODUCT INFORMATION -->
-  <div class="product-info">
 
-    <h1 class="product-title"></h1>
-    <p class="product-category"></p>
-    <p class="product-price"></p>
-    <p class="product-desc"></p>
-
-    <div class="product-actions">
-      <button class="btn-add">Add to Basket</button>
-      <button class="btn-buy">Buy Now</button>
-    </div>
-
-  </div>
-</section>
-
-<!-- Page scripts LAST -->
-<script src="/assets/js/gallery-slider.js"></script>
-<script src="/assets/js/product.js"></script>
-<script src="/assets/js/layout.js"></script>
+     <!-- Page scripts LAST -->
+     <script src="/assets/js/gallery-slider.js"></script>
+     <script src="/assets/js/product.js"></script>
+     <script src="/assets/js/layout.js"></script>
 
 </body>
 </html>
