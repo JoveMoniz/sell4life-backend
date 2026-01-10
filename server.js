@@ -12,11 +12,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 app.use(cors({
-  origin: 'https://sell4life.com',
+  origin: [
+    'https://sell4life.com',
+    'https://www.sell4life.com'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
 
 app.use(express.json());
 
