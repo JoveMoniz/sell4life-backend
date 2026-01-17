@@ -1,5 +1,24 @@
-// Production CORS configuration for Sell4Life
+import mongoose from "mongoose";
 
+const mongoUri = process.env.MONGODB_URI;
+
+if (!mongoUri) {
+  console.error("MONGODB_URI is not defined");
+  process.exit(1);
+}
+
+mongoose
+  .connect(mongoUri)
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  });
+
+
+
+
+// Production CORS configuration for Sell4Life
 
 import express from "express";
 import path from "path";
@@ -13,7 +32,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
 /**
  * CORS configuration
  * Frontend is hosted separately over HTTPS
