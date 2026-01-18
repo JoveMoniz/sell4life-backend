@@ -36,7 +36,7 @@ mongoose
 // App
 const app = express();
 
-// CORS
+// CORS (frontend hosted separately)
 app.use(
   cors({
     origin: [
@@ -49,10 +49,13 @@ app.use(
   })
 );
 
+// Preflight
 app.options("*", cors());
+
+// Body parser
 app.use(express.json());
 
-// Routes
+// API routes
 app.use("/api/orders", ordersRoute);
 app.use("/api/auth", authRoute);
 
