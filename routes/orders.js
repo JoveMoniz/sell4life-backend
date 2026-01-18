@@ -4,6 +4,18 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+// Helper: normalize Mongo order → frontend-safe object
+function normalizeOrder(order) {
+  return {
+    id: order._id.toString(),
+    user: order.user,
+    items: order.items,
+    total: order.total,
+    status: order.status,
+    createdAt: order.createdAt
+  };
+}
+
 // ---------- CREATE order ----------
 router.post("/", authMiddleware, async (req, res) => {
   try {
@@ -20,7 +32,7 @@ router.post("/", authMiddleware, async (req, res) => {
       status: "Processing"
     });
 
-    res.status(201).json(order);
+    res.status(201).json(normalizeOrder(order));
   } catch (err) {
     console.error("CREATE ORDER ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -33,7 +45,9 @@ router.get("/", authMiddleware, async (req, res) => {
     const orders = await Order.find({ user: req.user.id })
       .sort({ createdAt: -1 });
 
-    res.json({ orders });
+    res.json({
+      orders: orders.map(normalizeOrder)
+    });
   } catch (err) {
     console.error("GET ORDERS ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -52,7 +66,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    res.json(order);
+    res.json(normalizeOrder(order));
   } catch (err) {
     console.error("GET ORDER ERROR:", err);
     res.status(500).json({ error: "Server error" });
