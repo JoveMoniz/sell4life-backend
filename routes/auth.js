@@ -1,99 +1,109 @@
-import authMiddleware from "../middleware/authMiddleware.js";
-import bcrypt from "bcrypt";
-import fs from "fs";
-import path from "path";
-import jwt from "jsonwebtoken";
+
+
+// TODO: migrate users to Mongo
+
+
 import express from "express";
-import { fileURLToPath } from "url";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import authMiddleware from "../middleware/authMiddleware.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const SECRET = process.env.JWT_SECRET || "sell4life-secret-key";
 
-const USERS_FILE = path.join(__dirname, "../data/user.json");
-const SECRET = "sell4life-secret-key";
-
-function loadUsers() {
-    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
-}
-
-function saveUsers(users) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-// REGISTER
+/**
+ * REGISTER
+ */
 router.post("/register", async (req, res) => {
+  try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-    return res.status(400).json({ ok: false, msg: "Missing fields" });
-}
+      return res.status(400).json({ ok: false, msg: "Missing fields" });
+    }
 
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ ok: false, msg: "Email already exists" });
+    }
 
-    const users = loadUsers();
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    if (users.find(u => u.email === email)) {
-    return res.status(409).json({ ok: false, msg: "Email already exists" });
-}
-
-
-    const hashed = await bcrypt.hash(password, 10);
-
-    users.push({
-        id: Date.now(),
-        email,
-        password: hashed
+    const user = new User({
+      email,
+      password: hashedPassword
     });
 
-    saveUsers(users);
-    res.json({ ok: true, msg: "Account created" });
-});
+    await user.save(); // ← THIS IS THE WHOLE POINT
 
-// LOGIN
-router.post("/login", async (req, res) => {
-    const { email, password } = req.body;
-
-    const users = loadUsers();
-    const user = users.find(u => u.email === email);
-
-    if (!user) {
-    return res.status(401).json({ ok: false, msg: "Invalid credentials" });
-}
-
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-    return res.status(401).json({ ok: false, msg: "Invalid credentials" });
-}
-
-
-    const token = jwt.sign(
-        { id: user.id, email: user.email },
-        SECRET,
-        { expiresIn: "3d" }
-    );
-
-    res.json({
-  ok: true,
-  token,
-  user: {
-    id: user.id,
-    email: user.email
+    res.status(201).json({
+      ok: true,
+      msg: "Account created"
+    });
+  } catch (err) {
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ ok: false, msg: "Server error" });
   }
 });
 
+/**
+ * LOGIN
+ */
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ ok: false, msg: "Invalid credentials" });
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ ok: false, msg: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      SECRET,
+      { expiresIn: "3d" }
+    );
+
+    res.json({
+      ok: true,
+      token,
+      user: {
+        id: user._id,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ ok: false, msg: "Server error" });
+  }
 });
 
-// ME (protected)
-router.get("/me", authMiddleware, (req, res) => {
+/**
+ * ME (protected)
+ */
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ ok: false, msg: "User not found" });
+    }
+
     res.json({
-        ok: true,
-        user: {
-            id: req.user.id,
-            email: req.user.email
-        }
+      ok: true,
+      user
     });
+  } catch (err) {
+    console.error("ME ERROR:", err);
+    res.status(500).json({ ok: false, msg: "Server error" });
+  }
 });
 
 export default router;
