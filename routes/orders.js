@@ -25,9 +25,18 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Invalid order data" });
     }
 
+    // 🔒 Normalize items BEFORE saving
+    const normalizedItems = items.map(item => ({
+      productId: item.productId,
+      name: item.name,
+      price: Number(item.price),
+      quantity: Number(item.qty ?? item.quantity ?? 1),
+      image: item.image || "/assets/images/placeholder.png"
+    }));
+
     const order = await Order.create({
       user: req.user.id,
-      items,
+      items: normalizedItems,
       total,
       status: "Processing"
     });
