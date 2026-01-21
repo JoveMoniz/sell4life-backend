@@ -1,3 +1,12 @@
+import express from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import User from "../models/user.js";
+
+const router = express.Router();
+
+const SECRET = process.env.JWT_SECRET || "sell4life-secret-key";
+
 /**
  * REGISTER (with auto-login)
  */
@@ -23,7 +32,7 @@ router.post("/register", async (req, res) => {
 
     await user.save();
 
-    // 🔑 ISSUE TOKEN (this was missing)
+    // 🔑 Issue JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email },
       SECRET,
@@ -46,4 +55,3 @@ router.post("/register", async (req, res) => {
 });
 
 export default router;
-
