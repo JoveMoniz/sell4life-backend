@@ -1,20 +1,5 @@
-
-
-// TODO: migrate users to Mongo
-
-
-import express from "express";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import authMiddleware from "../middleware/authMiddleware.js";
-import User from "../models/user.js";
-
-const router = express.Router();
-
-const SECRET = process.env.JWT_SECRET || "sell4life-secret-key";
-
 /**
- * REGISTER
+ * REGISTER (with auto-login)
  */
 router.post("/register", async (req, res) => {
   try {
@@ -36,42 +21,16 @@ router.post("/register", async (req, res) => {
       password: hashedPassword
     });
 
-    await user.save(); // ← THIS IS THE WHOLE POINT
+    await user.save();
 
-    res.status(201).json({
-      ok: true,
-      msg: "Account created"
-    });
-  } catch (err) {
-    console.error("REGISTER ERROR:", err);
-    res.status(500).json({ ok: false, msg: "Server error" });
-  }
-});
-
-/**
- * LOGIN
- */
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ ok: false, msg: "Invalid credentials" });
-    }
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ ok: false, msg: "Invalid credentials" });
-    }
-
+    // 🔑 ISSUE TOKEN (this was missing)
     const token = jwt.sign(
       { id: user._id, email: user.email },
       SECRET,
       { expiresIn: "3d" }
     );
 
-    res.json({
+    res.status(201).json({
       ok: true,
       token,
       user: {
@@ -79,31 +38,9 @@ router.post("/login", async (req, res) => {
         email: user.email
       }
     });
+
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
+    console.error("REGISTER ERROR:", err);
     res.status(500).json({ ok: false, msg: "Server error" });
   }
 });
-
-/**
- * ME (protected)
- */
-router.get("/me", authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({ ok: false, msg: "User not found" });
-    }
-
-    res.json({
-      ok: true,
-      user
-    });
-  } catch (err) {
-    console.error("ME ERROR:", err);
-    res.status(500).json({ ok: false, msg: "Server error" });
-  }
-});
-
-export default router;
