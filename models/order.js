@@ -7,14 +7,20 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true
     },
-    items: [
-      {
-        productId: String,
-        name: String,
-        price: Number,
-        quantity: Number
-      }
-    ],
+items: [
+  {
+    productId: String,
+    name: String,
+    price: Number,
+    quantity: Number,
+
+    // ✅ RESILIENCE
+    image: {
+      type: String,
+      default: "/assets/images/products/default.png"
+    }
+  }
+],
     total: {
       type: Number,
       required: true
