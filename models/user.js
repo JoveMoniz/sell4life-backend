@@ -1,45 +1,19 @@
 import mongoose from "mongoose";
 
-const orderSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
-
-    items: [
-      {
-        productId: String,
-        name: String,
-        price: Number,
-        quantity: Number,
-        image: {
-          type: String,
-          default: "/assets/images/products/default.png"
-        }
-      }
-    ],
-
-    total: {
-      type: Number,
-      required: true
-    },
-
-    status: {
+    email: {
       type: String,
-      default: "pending"
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true
     },
 
-    statusHistory: [
-      {
-        status: String,
-        date: {
-          type: Date,
-          default: Date.now
-        }
-      }
-    ]
+    password: {
+      type: String,
+      required: true
+    }
   },
   {
     timestamps: true,
@@ -48,9 +22,10 @@ const orderSchema = new mongoose.Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+        delete ret.password;
       }
     }
   }
 );
 
-export default mongoose.model("Order", orderSchema);
+export default mongoose.model("User", userSchema);
