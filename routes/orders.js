@@ -12,9 +12,11 @@ function normalizeOrder(order) {
     items: order.items,
     total: order.total,
     status: order.status,
+    statusHistory: order.statusHistory || [],
     createdAt: order.createdAt
   };
 }
+
 
 // ---------- CREATE order ----------
 router.post("/", authMiddleware, async (req, res) => {
@@ -34,12 +36,20 @@ router.post("/", authMiddleware, async (req, res) => {
       image: item.image || "/assets/images/placeholder.png"
     }));
 
-    const order = await Order.create({
-      user: req.user.id,
-      items: normalizedItems,
-      total,
+const order = await Order.create({
+  user: req.user.id,
+  items: normalizedItems,
+  total,
+  status: "Processing",
+
+  // ✅ INITIAL STATUS SNAPSHOT
+  statusHistory: [
+    {
       status: "Processing"
-    });
+    }
+  ]
+});
+
 
     res.status(201).json(normalizeOrder(order));
   } catch (err) {

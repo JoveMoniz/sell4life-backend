@@ -7,28 +7,39 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true
     },
-items: [
-  {
-    productId: String,
-    name: String,
-    price: Number,
-    quantity: Number,
 
-    // ✅ RESILIENCE
-    image: {
-      type: String,
-      default: "/assets/images/products/default.png"
-    }
-  }
-],
+    items: [
+      {
+        productId: String,
+        name: String,
+        price: Number,
+        quantity: Number,
+        image: {
+          type: String,
+          default: "/assets/images/products/default.png"
+        }
+      }
+    ],
+
     total: {
       type: Number,
       required: true
     },
+
     status: {
       type: String,
       default: "pending"
-    }
+    },
+
+    statusHistory: [
+      {
+        status: String,
+        date: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ]
   },
   {
     timestamps: true,
@@ -42,4 +53,5 @@ items: [
   }
 );
 
-export default mongoose.model("Order", orderSchema);
+export default mongoose.models.Order ||
+  mongoose.model("Order", orderSchema);

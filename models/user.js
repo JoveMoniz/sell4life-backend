@@ -1,20 +1,56 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
+const orderSchema = new mongoose.Schema(
   {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true
-    },
-    password: {
-      type: String,
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true
-    }
+    },
+
+    items: [
+      {
+        productId: String,
+        name: String,
+        price: Number,
+        quantity: Number,
+        image: {
+          type: String,
+          default: "/assets/images/products/default.png"
+        }
+      }
+    ],
+
+    total: {
+      type: Number,
+      required: true
+    },
+
+    status: {
+      type: String,
+      default: "pending"
+    },
+
+    statusHistory: [
+      {
+        status: String,
+        date: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ]
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform(doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+      }
+    }
+  }
 );
 
-export default mongoose.model("User", userSchema);
+export default mongoose.model("Order", orderSchema);
