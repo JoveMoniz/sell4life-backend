@@ -30,7 +30,16 @@ router.patch(
         });
       }
 
-      const order = await Order.findById(req.params.id);
+const order = await Order.findByIdAndUpdate(
+  req.params.id,
+  {
+    status,
+    $push: {
+      statusHistory: { status, date: new Date() }
+    }
+  },
+  { new: true }
+);
 
       if (!order) {
         return res.status(404).json({
