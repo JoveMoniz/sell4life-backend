@@ -12,6 +12,28 @@ const ALLOWED_STATUSES = [
   "Cancelled"
 ];
 
+// ========================================
+// GET: All orders (ADMIN ONLY)
+// ========================================
+router.get(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const orders = await Order.find()
+        .populate("user", "email")
+        .sort({ createdAt: -1 });
+
+      res.json({ orders });
+    } catch (err) {
+      console.error("ADMIN GET ORDERS ERROR:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+
 router.patch(
   "/:id/status",
   authMiddleware,
