@@ -5,7 +5,6 @@ import adminMiddleware from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
-// Allowed statuses (single source of truth)
 const ALLOWED_STATUSES = [
   "Processing",
   "Shipped",
@@ -13,30 +12,6 @@ const ALLOWED_STATUSES = [
   "Cancelled"
 ];
 
-// ========================================
-// GET: All orders (ADMIN ONLY)
-// ========================================
-router.get(
-  "/",
-  authMiddleware,
-  adminMiddleware,
-  async (req, res) => {
-    try {
-      const orders = await Order.find()
-        .populate("user", "email")
-        .sort({ createdAt: -1 });
-
-      res.json({ orders });
-    } catch (err) {
-      console.error("ADMIN ORDERS LIST ERROR:", err);
-      res.status(500).json({ error: "Server error" });
-    }
-  }
-);
-
-// ========================================
-// PATCH: Update order status (ADMIN ONLY)
-// ========================================
 router.patch(
   "/:id/status",
   authMiddleware,
@@ -52,7 +27,7 @@ router.patch(
       const order = await Order.findByIdAndUpdate(
         req.params.id,
         {
-          status,
+          $set: { status },
           $push: {
             statusHistory: {
               status,
