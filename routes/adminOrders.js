@@ -14,6 +14,27 @@ const ALLOWED_STATUSES = [
 ];
 
 // ========================================
+// GET: All orders (ADMIN ONLY)
+// ========================================
+router.get(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const orders = await Order.find()
+        .populate("user", "email")
+        .sort({ createdAt: -1 });
+
+      res.json({ orders });
+    } catch (err) {
+      console.error("ADMIN ORDERS LIST ERROR:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+// ========================================
 // PATCH: Update order status (ADMIN ONLY)
 // ========================================
 router.patch(
@@ -25,41 +46,26 @@ router.patch(
       const { status } = req.body;
 
       if (!ALLOWED_STATUSES.includes(status)) {
-        return res.status(400).json({
-          error: "Invalid order status"
-        });
+        return res.status(400).json({ error: "Invalid order status" });
       }
 
-const order = await Order.findByIdAndUpdate(
-  req.params.id,
-  {
-    status,
-    $push: {
-      statusHistory: { status, date: new Date() }
-    }
-  },
-  { new: true }
-);
+      const order = await Order.findByIdAndUpdate(
+        req.params.id,
+        {
+          status,
+          $push: {
+            statusHistory: {
+              status,
+              date: new Date()
+            }
+          }
+        },
+        { new: true }
+      );
 
       if (!order) {
-        return res.status(404).json({
-          error: "Order not found"
-        });
+        return res.status(404).json({ error: "Order not found" });
       }
-
-      // Initialize history if missing (old orders)
-      if (!Array.isArray(order.statusHistory)) {
-        order.statusHistory = [];
-      }
-
-      // Update status + history
-      order.status = status;
-      order.statusHistory.push({
-        status,
-        date: new Date()
-      });
-
-      await order.save();
 
       res.json({
         success: true,
