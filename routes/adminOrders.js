@@ -5,6 +5,7 @@ import adminMiddleware from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
+// Single source of truth
 const ALLOWED_STATUSES = [
   "Processing",
   "Shipped",
@@ -13,7 +14,7 @@ const ALLOWED_STATUSES = [
 ];
 
 // ========================================
-// GET: All orders (ADMIN ONLY)
+// GET: All orders (ADMIN ONLY, PAGINATED)
 // ========================================
 router.get(
   "/",
@@ -21,11 +22,26 @@ router.get(
   adminMiddleware,
   async (req, res) => {
     try {
-      const orders = await Order.find()
-        .populate("user", "email")
-        .sort({ createdAt: -1 });
+      const page  = parseInt(req.query.page) || 1;
+      const limit = 20;
+      const skip  = (page - 1) * limit;
 
-      res.json({ orders });
+      const [orders, total] = await Promise.all([
+        Order.find()
+          .populate("user", "email")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Order.countDocuments()
+      ]);
+
+      res.json({
+        orders,
+        page,
+        totalPages: Math.ceil(total / limit),
+        totalOrders: total
+      });
+
     } catch (err) {
       console.error("ADMIN GET ORDERS ERROR:", err);
       res.status(500).json({ error: "Server error" });
@@ -33,7 +49,9 @@ router.get(
   }
 );
 
-
+// ========================================
+// PATCH: Update order status (ADMIN ONLY)
+// ========================================
 router.patch(
   "/:id/status",
   authMiddleware,
