@@ -8,6 +8,7 @@ const SECRET = process.env.JWT_SECRET || "sell4life-secret-key";
 
 /**
  * REGISTER (with auto-login)
+ * Default role = "user"
  */
 router.post("/register", async (req, res) => {
   try {
@@ -26,13 +27,14 @@ router.post("/register", async (req, res) => {
 
     const user = new User({
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      role: "user" // 🔹 explicit, even though default exists
     });
 
     await user.save();
 
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { id: user._id, role: user.role },
       SECRET,
       { expiresIn: "3d" }
     );
@@ -42,7 +44,8 @@ router.post("/register", async (req, res) => {
       token,
       user: {
         id: user._id,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
 
@@ -53,7 +56,8 @@ router.post("/register", async (req, res) => {
 });
 
 /**
- * LOGIN (same response shape as register)
+ * LOGIN
+ * Same response shape as register
  */
 router.post("/login", async (req, res) => {
   try {
@@ -74,7 +78,7 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { id: user._id, role: user.role },
       SECRET,
       { expiresIn: "3d" }
     );
@@ -84,7 +88,8 @@ router.post("/login", async (req, res) => {
       token,
       user: {
         id: user._id,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
 
