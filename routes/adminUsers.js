@@ -41,7 +41,16 @@ router.patch(
     }
 
     try {
-      await User.findByIdAndUpdate(req.params.id, { role });
+      const updated = await User.findByIdAndUpdate(
+        req.params.id,
+        { role },
+        { new: true }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error("ROLE UPDATE ERROR:", err);

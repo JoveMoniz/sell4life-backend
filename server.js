@@ -10,8 +10,6 @@ dotenv.config();
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
 
 // ===============================
 // Routes
@@ -19,13 +17,7 @@ import { fileURLToPath } from "url";
 import authRoute from "./routes/auth.js";
 import ordersRoute from "./routes/orders.js";
 import adminOrdersRoute from "./routes/adminOrders.js";
-import adminUsersRoute from "./routes/adminUsers.js"; // ✅ NEW
-
-// ===============================
-// __dirname fix (ESM)
-// ===============================
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import adminUsersRoute from "./routes/adminUsers.js";
 
 // ===============================
 // MongoDB
@@ -67,7 +59,7 @@ app.use(
   })
 );
 
-// Preflight
+// Preflight (important for PATCH)
 app.options("*", cors());
 
 // ===============================
@@ -90,8 +82,10 @@ app.get("/api/health", (req, res) => {
 // ===============================
 app.use("/api/auth", authRoute);
 app.use("/api/orders", ordersRoute);
+
+// 🔐 Admin-only APIssss
 app.use("/api/admin/orders", adminOrdersRoute);
-app.use("/api/admin/users", adminUsersRoute); // ✅ NEW
+app.use("/api/admin/users", adminUsersRoute);
 
 // ===============================
 // Global error fallback
@@ -109,3 +103,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Sell4Life backend running on port ${PORT}`);
 });
+s
