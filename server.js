@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import authRoute from "./routes/auth.js";
 import ordersRoute from "./routes/orders.js";
 import adminOrdersRoute from "./routes/adminOrders.js";
+import adminUsersRoute from "./routes/adminUsers.js"; // ✅ NEW
 
 // ===============================
 // __dirname fix (ESM)
@@ -60,7 +61,7 @@ app.use(
       "http://127.0.0.1:8080",
       "http://localhost:8080"
     ],
-methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
@@ -90,6 +91,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoute);
 app.use("/api/orders", ordersRoute);
 app.use("/api/admin/orders", adminOrdersRoute);
+app.use("/api/admin/users", adminUsersRoute); // ✅ NEW
 
 // ===============================
 // Global error fallback
