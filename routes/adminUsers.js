@@ -34,6 +34,11 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   async (req, res) => {
+       
+    console.log("OWNER_USER_ID:", process.env.OWNER_USER_ID);
+    console.log("LOGGED IN USER:", req.user.id);
+    console.log("TARGET USER:", req.params.id);
+
     const { role } = req.body;
 
     if (!["user", "admin"].includes(role)) {
