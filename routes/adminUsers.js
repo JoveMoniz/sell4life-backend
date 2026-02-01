@@ -34,15 +34,17 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   async (req, res) => {
-       
-    console.log("OWNER_USER_ID:", process.env.OWNER_USER_ID);
-    console.log("LOGGED IN USER:", req.user.id);
-    console.log("TARGET USER:", req.params.id);
-
     const { role } = req.body;
 
     if (!["user", "admin"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
+    }
+
+    // 🔒 ONLY OWNER CAN ASSIGN ADMIN
+    if (role === "admin" && !req.isOwner) {
+      return res.status(403).json({
+        error: "Only the site owner can assign admin role"
+      });
     }
 
     try {
@@ -63,5 +65,6 @@ router.patch(
     }
   }
 );
+
 
 export default router;
