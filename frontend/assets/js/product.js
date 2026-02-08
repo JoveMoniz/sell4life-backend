@@ -1,7 +1,6 @@
 // /frontend/assets/js/product.js
-(async function () { 
+(async function () {
   const $ = sel => document.querySelector(sel);
-
   const IMAGE_BASE = "/assets/images/products/";
 
   const params = new URLSearchParams(location.search);
@@ -12,6 +11,7 @@
     return;
   }
 
+  // ---------- LOAD PRODUCTS ----------
   let products = [];
   try {
     const res = await fetch("/data/products.json", { cache: "no-store" });
@@ -27,18 +27,21 @@
     return;
   }
 
-  if ($(".product-title"))
-    $(".product-title").textContent = product.name;
+  // ---------- RENDER PRODUCT ----------
+  $(".product-title") &&
+    ($(".product-title").textContent = product.name);
 
-  if ($(".product-category"))
-    $(".product-category").textContent = `${product.category} / ${product.subcategory}`;
+  $(".product-category") &&
+    ($(".product-category").textContent =
+      `${product.category} / ${product.subcategory}`);
 
-  if ($(".product-price"))
-    $(".product-price").textContent = "£" + product.price.toFixed(2);
+  $(".product-price") &&
+    ($(".product-price").textContent = `£${product.price.toFixed(2)}`);
 
-  if ($(".product-desc"))
-    $(".product-desc").textContent = product.description;
+  $(".product-desc") &&
+    ($(".product-desc").textContent = product.description);
 
+  // ---------- IMAGES ----------
   const hiddenGallery = document.getElementById("hidden-gallery");
   if (hiddenGallery) {
     hiddenGallery.innerHTML = "";
@@ -51,15 +54,15 @@
     document.dispatchEvent(new Event("productImagesLoaded"));
   }
 
-  const addBtn = document.querySelector(".btn-add");
-  if (!addBtn) return;
-
-  addBtn.addEventListener("click", () => {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]").filter(i => i && i.id);
+  // ---------- CART HELPER ----------
+  function addToCart() {
+    let cart = JSON.parse(localStorage.getItem("cart") || "[]")
+      .filter(i => i && i.id);
 
     const existing = cart.find(i => i.id === product.id);
+
     if (existing) {
-      existing.quantity = (existing.quantity || 0) + 1;
+      existing.quantity = (existing.quantity || 1) + 1;
     } else {
       cart.push({
         id: product.id,
@@ -75,19 +78,69 @@
     localStorage.setItem("cart", JSON.stringify(cart));
     document.dispatchEvent(new Event("cartUpdated"));
 
-    const badge = document.querySelector(".basket-qty");
-    if (badge) {
-      const totalQty = cart.reduce((sum, x) => sum + (x.quantity || 0), 0);
-      badge.textContent = totalQty;
-      badge.classList.remove("hide");
-      badge.classList.add("bump");
-      setTimeout(() => badge.classList.remove("bump"), 220);
-    }
+    return cart;
+  }
 
-    console.log("✔ Added to basket:", product.name);
-  });
+  // ---------- ADD TO BASKET ----------
+  const addBtn = $(".btn-add");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      const cart = addToCart();
 
-document.dispatchEvent(new Event("productLoaded"));
+      const badge = document.querySelector(".basket-qty");
+      if (badge) {
+        const totalQty = cart.reduce(
+          (sum, item) => sum + (item.quantity || 0),
+          0
+        );
+        badge.textContent = totalQty;
+        badge.classList.remove("hide");
+        badge.classList.add("bump");
+        setTimeout(() => badge.classList.remove("bump"), 220);
+      }
 
+      console.log("✔ Added to basket:", product.name);
+    });
+  }
 
+  // ---------- BUY NOW (ISOLATED FLOW) ----------
+  const buyBtn = $(".btn-buy");
+  if (buyBtn) {
+    buyBtn.addEventListener("click", () => {
+
+      // ✅ Backup cart ONLY ONCE
+      if (!localStorage.getItem("cart_backup")) {
+        const existingCart =
+          JSON.parse(localStorage.getItem("cart") || "[]");
+
+        if (existingCart.length) {
+          localStorage.setItem(
+            "cart_backup",
+            JSON.stringify(existingCart)
+          );
+        }
+      }
+
+      // Replace cart with ONLY this product
+      const buyNowCart = [{
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: IMAGE_BASE + (product.images[0] || ""),
+        quantity: 1,
+        category: product.category,
+        subcategory: product.subcategory
+      }];
+
+      localStorage.setItem("cart", JSON.stringify(buyNowCart));
+
+      // Set intent
+      localStorage.setItem("buyNow", "true");
+
+      // Go straight to checkout
+      window.location.href = "/cart/checkout.html";
+    });
+  }
+
+  document.dispatchEvent(new Event("productLoaded"));
 })();

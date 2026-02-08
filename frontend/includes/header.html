@@ -8,6 +8,12 @@
 <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
 
 
+<!-- Early development notice -->
+<div class="site-notice">
+  Sell4Life is in early development. Some features may be unavailable.
+</div>
+
+
 <!-- =======================================================
      DESKTOP HEADER
 ======================================================= -->
@@ -68,14 +74,14 @@
 
       <!-- account -->
 <div class="account-menu">
-  <button id="accountBtn">Account ▾</button>
+  <button id="accountBtnDesktop">Account ▾</button>
 
-  <div class="account-dropdown" id="accountDropdown">
-    <a href="/account/signin.html" class="auth" id="dd-login">Sign in</a>
-    <a href="/account/register.html" class="auth" id="dd-register">Register</a>
+  <div class="account-dropdown" id="accountDropdownDesktop">
+    <a href="/account/signin.html" class="auth dd-login">Sign in</a>
+<a href="/account/register.html" class="auth dd-register">Register</a>
+<a href="/account/orders.html" class="auth dd-orders">My Orders</a>
+<button class="dd-logout">Logout</button>
 
-    <a href="/account/orders.html" class="auth" id="dd-orders">My Orders</a>
-    <button id="dd-logout">Logout</button>
   </div>
 </div>
 
@@ -84,7 +90,6 @@
       </div>
 
     </div>
-  </div>
 </header>
 
 
@@ -118,15 +123,17 @@
             </div>
           </div>
 
+         <!-- Mobile account -->
+
          <div class="account-menu">
-  <button id="accountBtn">Account ▾</button>
+  <button id="accountBtnMobile">Account ▾</button>
 
-  <div class="account-dropdown" id="accountDropdown">
-    <a href="/account/signin.html" id="dd-login">Sign in</a>
-    <a href="/account/register.html" id="dd-register">Register</a>
+<div class="account-dropdown" id="accountDropdownMobile">
+    <a href="/account/signin.html" class="auth dd-login">Sign in</a>
+<a href="/account/register.html" class="auth dd-register">Register</a>
+<a href="/account/orders.html" class="auth dd-orders">My Orders</a>
+<button class="dd-logout">Logout</button>
 
-    <a href="/account/orders.html" id="dd-orders">My Orders</a>
-    <button id="dd-logout">Logout</button>
   </div>
 </div>
 

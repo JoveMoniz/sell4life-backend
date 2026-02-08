@@ -4,20 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Order Complete | Sell4Life</title>
+  
 
   <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/layout.css">
-  <link rel="stylesheet" href="/assets/css/thankyou.css">
+  <link rel="stylesheet" href="/assets/css/thankyou.css?v=20260206-dev">
 </head>
 
 <body>
 
 <div class="thankyou-container">
+  <div class="thankyou-container">
 
   <div class="thankyou-card">
-    <img src="/assets/images/icons/check.png" class="ty-icon" alt="Success">
+    <div class="gallery-item">
+  <span class="check-inline" aria-hidden="true">✓</span>
+  <h1>Thank You for Your Order!</h1>
+</div>
 
-    <h1>Thank You for Your Order!</h1>
     <p>Your order has been placed successfully. A confirmation has been sent to your email.</p>
 
     <div class="ty-details">
@@ -34,10 +37,10 @@
     <div id="order-items" class="ty-items"></div>
 
     <!-- TOTAL (this was missing) -->
-    <div class="ty-details">
-      <strong>Total:</strong>
-      <span id="order-total">£0.00</span>
-    </div>
+  <div class="ty-summary-row ty-summary-total">
+    <span>Total</span>
+    <span id="order-total">£0.00</span>
+  </div>
 
     <!-- BUTTON -->
     <a href="/" class="ty-btn">Back to Home</a>
@@ -46,8 +49,19 @@
 </div>
 
 <!-- Page scripts LAST -->
-<script src="/assets/js/layout.js"></script>
-<script src="/assets/js/thankyou.js"></script>
+<script type="module" src="/assets/js/thankyou.js?v=20260206-dev"></script>
+
+
+<script>
+(function () {
+  window.addEventListener("pageshow", function (event) {
+    // Page restored from back/forward cache
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+})();
+</script>
 
 </body>
 </html>

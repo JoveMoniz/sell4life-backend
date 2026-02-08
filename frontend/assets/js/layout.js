@@ -1,108 +1,109 @@
 // =====================================================
+// layout.js — SINGLE, DEFENSIVE SOURCE OF TRUTH
+// Header / Footer / Auth / Cart / Search
+// Cache-safe, idempotent, boring (the good kind)
+// =====================================================
+
+
+// =====================================================
 // LOGOUT (single source of truth)
 // =====================================================
 function logout() {
   localStorage.removeItem("s4l_token");
   localStorage.removeItem("s4l_user");
-  window.location.href = "/account/signin.html";
+
+  if (location.pathname !== "/account/signin.html") {
+    window.location.href = "/account/signin.html";
+  }
 }
 
 
 // =====================================================
-// 0. GLOBAL CACHE-BUSTER
-// =====================================================
-(function forceFreshAssets() {
-  const stamp = Date.now();
-
-  // Refresh CSS
-  document.querySelectorAll('link[data-bust="true"]').forEach(link => {
-    const clean = link.href.split("?")[0];
-    link.href = clean + "?v=" + stamp;
-  });
-
-  // Refresh static JS (only /assets/js/)
-  document.querySelectorAll('script[src]').forEach(script => {
-    const src = script.getAttribute("src");
-    if (src && src.startsWith("/assets/js/")) {
-      const clean = src.split("?")[0];
-      script.setAttribute("src", clean + "?v=" + stamp);
-    }
-  });
-})();
-
-
-// =====================================================
-// 1. LOAD HEADER + FOOTER (ASYNC, NO CACHE)
+// LOAD HEADER + FOOTER (NO CACHE, DEFENSIVE)
 // =====================================================
 (async function loadLayout() {
 
-  // HEADER
+  // ----- HEADER -----
   try {
-    const res = await fetch("/includes/header.html?v=" + Date.now(), {
-      cache: "no-store"
-    });
-    const html = await res.text();
-    document.body.insertAdjacentHTML("afterbegin", html);
+    // Prevent duplicate header injection
+    if (!document.querySelector(".site-header")) {
+      const res = await fetch("/includes/header.html?v=20260125", {
+        cache: "no-store"
+      });
+
+      if (!res.ok) throw new Error("Header fetch failed");
+
+      const html = await res.text();
+      document.body.insertAdjacentHTML("afterbegin", html);
+    }
+
     document.dispatchEvent(new Event("headerLoaded"));
   } catch (err) {
-    console.error("Failed to load header:", err);
+    console.warn("layout.js: header skipped", err);
   }
 
-  // FOOTER
+  // ----- FOOTER -----
   try {
-    const res = await fetch("/includes/footer.html?v=" + Date.now(), {
-      cache: "no-store"
-    });
-    const html = await res.text();
-    document.body.insertAdjacentHTML("beforeend", html);
+    if (!document.querySelector(".site-footer")) {
+      const res = await fetch("/includes/footer.html?v=20260125", {
+        cache: "no-store"
+      });
+
+      if (!res.ok) throw new Error("Footer fetch failed");
+
+      const html = await res.text();
+      document.body.insertAdjacentHTML("beforeend", html);
+    }
   } catch (err) {
-    console.error("Failed to load footer:", err);
+    console.warn("layout.js: footer skipped", err);
   }
 
 })();
 
 
 // =====================================================
-// 2. LOAD CART.JS AFTER HEADER
+// LOAD CART.JS AFTER HEADER (ONCE)
 // =====================================================
 document.addEventListener("headerLoaded", () => {
   if (window.__cartScriptLoaded) return;
 
-  const c = document.createElement("script");
-  c.src = "/assets/js/cart.js?v=" + Date.now();
-  document.body.appendChild(c);
+  const script = document.createElement("script");
+  script.src = "/assets/js/cart.js?v=20260125";
+  script.defer = true;
 
+  document.body.appendChild(script);
   window.__cartScriptLoaded = true;
 });
 
 
 // =====================================================
-// 3. LOAD SEARCH.JS AFTER HEADER
+// LOAD SEARCH.JS AFTER HEADER (ONCE)
 // =====================================================
 document.addEventListener("headerLoaded", () => {
-  if (window.__searchLoaded) return;
+  if (window.__searchScriptLoaded) return;
 
-  const s = document.createElement("script");
-  s.src = "/assets/js/search.js?v=" + Date.now();
-  document.body.appendChild(s);
+  const script = document.createElement("script");
+  script.src = "/assets/js/search.js?v=20260125";
+  script.defer = true;
 
-  window.__searchLoaded = true;
+  document.body.appendChild(script);
+  window.__searchScriptLoaded = true;
 });
 
 
 // =====================================================
-// 4. MINI-CART (DESKTOP HOVER + MOBILE TAP)
+// MINI CART (DESKTOP HOVER + MOBILE TAP)
 // =====================================================
 let miniCartTimeout;
 
 document.addEventListener("headerLoaded", () => {
 
-  // DESKTOP
+  // ----- DESKTOP -----
   const wrapper  = document.querySelector(".s4l-header-desktop .basket-wrapper");
   const miniCart = document.querySelector(".s4l-header-desktop .mini-cart");
 
   if (wrapper && miniCart) {
-    document.addEventListener("mouseover", e => {
+    document.addEventListener("mouseover", (e) => {
 
       if (!wrapper.classList.contains("has-items")) {
         miniCart.style.display = "none";
@@ -127,7 +128,7 @@ document.addEventListener("headerLoaded", () => {
     });
   }
 
-  // MOBILE → CART PAGE (only if qty > 0)
+  // ----- MOBILE -----
   const mobileBasket =
     document.querySelector(".s4l-header-mobile .mobile-basket");
 
@@ -135,6 +136,7 @@ document.addEventListener("headerLoaded", () => {
     mobileBasket.addEventListener("click", () => {
       const qtyEl = mobileBasket.querySelector(".basket-qty");
       const qty = parseInt(qtyEl?.textContent || "0", 10);
+
       if (qty > 0) {
         window.location.href = "/cart/cart.html";
       }
@@ -145,53 +147,59 @@ document.addEventListener("headerLoaded", () => {
 
 
 // =====================================================
-// 5. ACCOUNT DROPDOWN + AUTH STATE (CLICK-BASED)
+// ACCOUNT DROPDOWN + AUTH STATE (DESKTOP + MOBILE)
 // =====================================================
 document.addEventListener("headerLoaded", () => {
 
-  const btn  = document.getElementById("accountBtn");
-  const menu = document.getElementById("accountDropdown");
+  function setupAccount(btnId, menuId) {
+    const btn  = document.getElementById(btnId);
+    const menu = document.getElementById(menuId);
 
-  if (!btn || !menu) return;
+    if (!btn || !menu) return;
 
-  // Toggle dropdown
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    menu.style.display =
-      menu.style.display === "block" ? "none" : "block";
-  });
+    // Toggle dropdown
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.style.display =
+        menu.style.display === "block" ? "none" : "block";
+    });
 
-  // Close when clicking outside
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".account-menu")) {
-      menu.style.display = "none";
+    // Close when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".account-menu")) {
+        menu.style.display = "none";
+      }
+    });
+
+    // Auth state
+    const token = localStorage.getItem("s4l_token");
+
+    const login     = menu.querySelector(".dd-login");
+    const register  = menu.querySelector(".dd-register");
+    const orders    = menu.querySelector(".dd-orders");
+    const logoutBtn = menu.querySelector(".dd-logout");
+
+    if (token) {
+      login && (login.style.display = "none");
+      register && (register.style.display = "none");
+
+      orders && (orders.style.display = "block");
+      logoutBtn && (logoutBtn.style.display = "block");
+
+      logoutBtn && logoutBtn.addEventListener("click", logout);
+    } else {
+      orders && (orders.style.display = "none");
+      logoutBtn && (logoutBtn.style.display = "none");
+
+      login && (login.style.display = "block");
+      register && (register.style.display = "block");
     }
-  });
-
-  // Auth-based visibility
-  const token = localStorage.getItem("s4l_token");
-
-  const login     = document.getElementById("dd-login");
-  const register  = document.getElementById("dd-register");
-  const orders    = document.getElementById("dd-orders");
-  const logoutBtn = document.getElementById("dd-logout");
-
-  if (token) {
-    // Logged in
-    login && (login.style.display = "none");
-    register && (register.style.display = "none");
-
-    orders && (orders.style.display = "block");
-    logoutBtn && (logoutBtn.style.display = "block");
-
-    logoutBtn && logoutBtn.addEventListener("click", logout);
-  } else {
-    // Logged out
-    orders && (orders.style.display = "none");
-    logoutBtn && (logoutBtn.style.display = "none");
-
-    login && (login.style.display = "block");
-    register && (register.style.display = "block");
   }
+
+  // Desktop
+  setupAccount("accountBtnDesktop", "accountDropdownDesktop");
+
+  // Mobile
+  setupAccount("accountBtnMobile", "accountDropdownMobile");
 
 });

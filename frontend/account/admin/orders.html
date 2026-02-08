@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <title>Admin Orders | Sell4Life</title>
+  
+  <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev">
+
+
+</head>
+<body class="admin admin-orders">
+
+<div class="admin-top">
+   <!-- Logo -->
+<header class="admin-header">
+  <a href="/index.html" class="admin-logo">
+    <span class="logo-dollar">$</span>
+    <span class="logo-text">ell</span>
+    <span class="logo-four">4</span>
+    <span class="logo-text">Life</span>
+  </a>
+</header>
+
+
+<div class="admin-title">
+
+  <a href="/account/admin/index.html" class="admin-back">← back to dashboar</a>
+
+<h1>Admin–Orders</h1>
+
+</div>
+
+<button id="logoutBtn">Log out</button>
+</div>
+
+<div class="admin-table-scroll">
+  <table class="admin-orders-table">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>User</th>
+        <th>Total</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="ordersTable"></tbody>
+  </table>
+</div>
+
+
+<div id="pagination"></div>
+
+
+<script type="module" src="/assets/js/config.js?v=20260206-dev"></script>
+<script type="module" src="/assets/js/admin-orders.js?v=20260206-dev"></script>
+<script type="module" src="/assets/js/admin-logout.js?v=20260206-dev"></script>
+
+
+</body>
+</html>

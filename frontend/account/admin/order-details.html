@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+
+  <title>Admin Order Details | Sell4Life</title>
+
+  <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev">
+</head>
+
+<body class="admin admin-order-details">
+
+  <!-- TOP BAR -->
+  <div class="admin-top">
+    <header class="admin-header">
+      <a href="/index.html" class="admin-logo">
+        <span class="logo-dollar">$</span>
+        <span class="logo-text">ell</span>
+        <span class="logo-four">4</span>
+        <span class="logo-text">Life</span>
+      </a>
+    </header>
+
+<div class="admin-title">
+    <a href="/account/admin/orders.html" class="admin-back">← Back to orders</a>
+    <h1>Order Details</h1>
+  </div>
+
+    <button id="logoutBtn">Log out</button>
+  </div>
+
+  <!-- ORDER SUMMARY -->
+  <section class="order-box">
+    <h3>Order Summary</h3>
+    <p><strong>Order ID:</strong> <span id="orderId">—</span></p>
+    <p><strong>User:</strong> <span id="orderUser">—</span></p>
+    <p><strong>Date:</strong> <span id="orderDate">—</span></p>
+    <p><strong>Total:</strong> £<span id="orderTotal">—</span></p>
+    <p><strong>Status:</strong> <span id="orderStatus">—</span></p>
+  </section>
+
+  <!-- PRODUCTS -->
+  <section class="order-box">
+    <h3>Products</h3>
+
+    <table class="order-products">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Unit</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="productsTable">
+        <!-- rendered by JS -->
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SHIPPING -->
+  <section class="order-box">
+    <h3>Shipping</h3>
+    <div id="shippingInfo">—</div>
+  </section>
+
+  <!-- PAYMENT -->
+  <section class="order-box">
+    <h3>Payment</h3>
+    <p><strong>Method:</strong> <span id="paymentMethod">—</span></p>
+    <p><strong>Status:</strong> <span id="paymentStatus">—</span></p>
+  </section>
+
+  <!-- STATUS CONTROL -->
+  <section class="order-box">
+    <h3>Status</h3>
+
+    <div class="status-controls">
+      <select id="statusSelect">
+        <option value="Processing">Processing</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Delivered">Delivered</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+
+      <button id="updateStatus">Update Status</button>
+    </div>
+
+    <p id="result"></p>
+  </section>
+
+  <!-- STATUS HISTORY -->
+  <section class="order-box">
+    <h3>Status History</h3>
+    <ul id="statusHistory"></ul>
+  </section>
+
+  <!-- SCRIPTS -->
+  <script type="module" src="/assets/js/config.js?v=20260206-dev"></script>
+  <script type="module" src="/assets/js/admin-order-details.js?v=20260206-dev"></script>
+  <script type="module" src="/assets/js/admin-logout.js?v=20260206-dev"></script>
+
+</body>
+
+</html>

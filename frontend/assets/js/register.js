@@ -1,47 +1,69 @@
-if (localStorage.getItem("s4l_token")) {
-  window.location.href = "/account/orders.html";
-}
+// =====================================================
+// REGISTER (auto-login + intent redirect) – FIXED
+// =====================================================
 
+import { API_BASE } from "./config.js";
 
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("registerForm");
+  const msg  = document.getElementById("msg");
 
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  if (!form || !msg) {
+    console.error("Register DOM elements missing");
+    return;
+  }
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const name = document.getElementById("name").value.trim();
-    const email = document.getElementById("email").value.trim();
+    const name     = document.getElementById("name")?.value.trim();
+    const email    = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
-    const msg = document.getElementById("msg");
 
     msg.textContent = "Creating account...";
     msg.style.color = "white";
 
     try {
-        const res = await fetch("http://localhost:3000/api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, email, password })
-        });
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password })
+      });
 
-        const data = await res.json();
+      const data = await res.json();
+      console.log("REGISTER RESPONSE:", data);
 
-        if (!res.ok) {
-            msg.textContent = data.error;
-            msg.style.color = "red";
-            return;
-        }
+      // ❌ Fail if no token
+      if (!res.ok || !data.token) {
+        msg.textContent =
+          data.error ||
+          data.msg ||
+          "Registration failed";
+        msg.style.color = "red";
+        return;
+      }
 
-        msg.textContent = "Account created! Redirecting...";
-        msg.style.color = "lightgreen";
+      // ✅ AUTO-LOGIN
+      localStorage.setItem("s4l_token", data.token);
+      localStorage.setItem("s4l_user", JSON.stringify(data.user));
 
-        // Save user session
-        localStorage.setItem("s4l_user", JSON.stringify(data.user));
+      msg.textContent = "Account created. Logging you in...";
+      msg.style.color = "lightgreen";
 
-        setTimeout(() => {
-            window.location.href = "/account/orders.html";
-        }, 900);
+      // ✅ Redirect back to origin
+      const redirect =
+        localStorage.getItem("postLoginRedirect") || "/";
+
+      localStorage.removeItem("postLoginRedirect");
+
+      setTimeout(() => {
+        window.location.href = redirect;
+      }, 300);
 
     } catch (err) {
-        msg.textContent = "Server error.";
-        msg.style.color = "red";
+      console.error("REGISTER ERROR:", err);
+      msg.textContent = "Server error";
+      msg.style.color = "red";
     }
+  });
 });

@@ -6,8 +6,7 @@
   <title>Checkout | Sell4Life</title>
 
   <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/layout.css">
-  <link rel="stylesheet" href="/assets/css/checkout.css">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=20260125">
 </head>
 
 <body>
@@ -103,8 +102,23 @@
 
 <div id="footer"></div>
 
-<script src="/assets/js/layout.js"></script>
-<script src="/assets/js/checkout.js"></script>
+<script type="module" src="/assets/js/checkout.js?v=20260125"></script>
+
+
+<script>
+(function () {
+  window.addEventListener("pageshow", function (event) {
+    const completed = localStorage.getItem("checkout_completed") === "true";
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+    // Only block BACK navigation after a completed checkout
+    if (completed && cart.length === 0) {
+      window.location.replace("/index.html");
+    }
+  });
+})();
+</script>
+
 
 </body>
 </html>

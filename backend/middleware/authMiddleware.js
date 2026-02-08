@@ -1,25 +1,28 @@
 import jwt from "jsonwebtoken";
+import User from "../models/user.js";
 
-export default function authMiddleware(req, res, next) {
-    const authHeader = req.headers.authorization;
+const SECRET = process.env.JWT_SECRET || "sell4life-secret-key";
 
-    if (!authHeader) {
-        return res.status(401).json({ error: "No token provided" });
+export default async function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, SECRET);
+
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
     }
 
-    const parts = authHeader.split(" ");
-
-    if (parts.length !== 2 || parts[0] !== "Bearer") {
-        return res.status(401).json({ error: "Invalid token format" });
-    }
-
-    const token = parts[1];
-
-    try {
-        const decoded = jwt.verify(token, "sell4life-secret-key");
-        req.user = decoded;
-        next();
-    } catch {
-        return res.status(401).json({ error: "Invalid or expired token" });
-    }
+    req.user = user; // FULL DB USER
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
 }

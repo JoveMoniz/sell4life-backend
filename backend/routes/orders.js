@@ -1,68 +1,95 @@
-import { Router } from "express";
-import fs from "fs";
-import path from "path";
+import express from "express";
+import Order from "../models/order.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
-const router = Router();
-const DATA_FILE = path.join(process.cwd(), "data", "orders.json");
+const router = express.Router();
 
-// ---------- helpers ----------
-function readOrders() {
-    try {
-        return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-    } catch {
-        return [];
+// Helper: normalize Mongo order → frontend-safe object
+function normalizeOrder(order) {
+  return {
+    id: order._id.toString(),
+    user: order.user,
+    items: order.items,
+    total: order.total,
+    status: order.status,
+    statusHistory: order.statusHistory || [],
+    createdAt: order.createdAt
+  };
+}
+
+
+// ---------- CREATE order ----------
+router.post("/", authMiddleware, async (req, res) => {
+  try {
+    const { items, total } = req.body;
+
+    if (!Array.isArray(items) || !items.length || typeof total !== "number") {
+      return res.status(400).json({ error: "Invalid order data" });
     }
-}
 
-function writeOrders(orders) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(orders, null, 2));
-}
+    // 🔒 Normalize items BEFORE saving
+    const normalizedItems = items.map(item => ({
+      productId: item.productId,
+      name: item.name,
+      price: Number(item.price),
+      quantity: Number(item.qty ?? item.quantity ?? 1),
+      image: item.image || "/assets/images/placeholder.png"
+    }));
 
-// ---------- GET all orders ----------
-router.get("/", authMiddleware, (req, res) => {
-    const orders = readOrders();
-    const userOrders = orders.filter(o => o.userId === req.user.id);
-    res.json({ orders: userOrders });
+const order = await Order.create({
+  user: req.user.id,
+  items: normalizedItems,
+  total,
+  status: "Processing",
+
+  // ✅ INITIAL STATUS SNAPSHOT
+  statusHistory: [
+    {
+      status: "Processing"
+    }
+  ]
+});
+
+
+    res.status(201).json(normalizeOrder(order));
+  } catch (err) {
+    console.error("CREATE ORDER ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ---------- GET my orders ----------
+router.get("/", authMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ user: req.user.id })
+      .sort({ createdAt: -1 });
+
+    res.json({
+      orders: orders.map(normalizeOrder)
+    });
+  } catch (err) {
+    console.error("GET ORDERS ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // ---------- GET order by ID ----------
-router.get("/:id", authMiddleware, (req, res) => {
-    const orders = readOrders();
-    const order = orders.find(
-        o => o.id === req.params.id && o.userId === req.user.id
-    );
+router.get("/:id", authMiddleware, async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      user: req.user.id
+    });
 
     if (!order) {
-        return res.status(404).json({ error: "Order not found" });
+      return res.status(404).json({ error: "Order not found" });
     }
 
-    res.json(order);
-});
-
-// ---------- CREATE order ----------
-router.post("/", authMiddleware, (req, res) => {
-    const { items, total } = req.body;
-
-    if (!Array.isArray(items) || !items.length) {
-        return res.status(400).json({ error: "Invalid order items" });
-    }
-
-    const orders = readOrders();
-
-    const newOrder = {
-        id: "A" + Date.now(),
-        userId: req.user.id,
-        items,
-        total,
-        status: "Processing",
-        createdAt: new Date().toISOString()
-    };
-
-    orders.push(newOrder);
-    writeOrders(orders);
-
-    res.status(201).json(newOrder);
+    res.json(normalizeOrder(order));
+  } catch (err) {
+    console.error("GET ORDER ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 export default router;

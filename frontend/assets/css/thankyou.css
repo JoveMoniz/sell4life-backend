@@ -13,11 +13,6 @@
   color: #094949;
 }
 
-.ty-icon {
-  width: 90px;
-  margin-bottom: 20px;
-}
-
 .ty-details {
   text-align: left;
   margin-top: 20px;
@@ -34,11 +29,47 @@
 }
 
 .ty-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 8px 0;
   font-size: 15px;
+  color: #094949;
 }
+
+.ty-item-left {
+  display: flex;
+  gap: 8px;
+}
+
+.ty-item-qty {
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.ty-item-subtotal {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ty-summary-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  padding-right: 20px;
+  border-top: 1px solid #d6ebe8;
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0b6b6a;
+}
+
+.thankyou-card p {
+    text-align: left;
+    justify-content: flex-start;
+}
+
 
 .ty-btn {
   display: block;
@@ -51,8 +82,96 @@
   border-radius: 10px;
   font-size: 16px;
   font-weight: 700;
+  text-align: center;
 }
 
 .ty-btn:hover {
   opacity: 0.9;
 }
+
+
+.ty-details {
+  text-align: left;
+  margin-top: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.ty-details:last-of-type strong {
+  font-weight: 600;
+}
+
+.ty-details:last-of-type span {
+  font-weight: 700;
+  color: #0b6b6a;
+}
+
+
+
+.ty-btn:hover {
+  opacity: 0.9;
+}
+
+
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.check-inline {
+  font-size: 36px;
+  font-weight: 800;
+  color: #2bb673; /* softer green than pure green */
+  line-height: 1;
+}
+
+
+
+@media (max-width: 480px) {
+  .thankyou-card {
+    padding: 28px 22px;
+  }
+
+  .ty-details,
+  .ty-item {
+    font-size: 14px;
+  }
+}
+
+.ty-summary {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.ty-summary-row {
+  display: flex;
+  gap: 20px;
+  font-size: 15px;
+  color: #094949;
+}
+
+.ty-summary-row span:last-child {
+  min-width: 90px;
+  text-align: right;
+}
+
+.ty-summary-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0b6b6a;
+}
+
+ .thankyou-container {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+
+

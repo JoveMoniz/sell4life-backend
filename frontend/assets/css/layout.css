@@ -14,7 +14,9 @@ html, body {
   overflow-x: hidden;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -145,6 +147,20 @@ footer p {
 /* =========================================================
    HEADER BASE
 ========================================================= */
+
+.site-notice {
+  background: #fdf4e7;
+  color: #2f2f2f;
+  font-size: 14px;        /* up from 13px */
+  font-weight: 500;      /* key change */
+  text-align: center;
+  letter-spacing: 0.3px;
+  padding: 8px 12px;     /* a bit more air */
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+
+
 
 .s4l-header-desktop {
   width: 100%;
@@ -331,13 +347,14 @@ footer p {
 }
 
 .account-menu {
-  position: relative;
-  margin-bottom:10px ;
-  
+    position: relative;
+  margin-bottom: 10px;
 }
 
 
-#accountBtn {
+
+#accountBtnDesktop,
+#accountBtnMobile{
   background: rgba(255,255,255,0.15);
   color: #fff;
   border: none;
@@ -364,6 +381,7 @@ footer p {
   padding: 6px 0;
   box-shadow: 0 10px 25px rgba(0,0,0,0.25);
   display: none;
+  z-index: 99999;
 }
 
 .account-dropdown a,
@@ -719,8 +737,6 @@ footer p {
   .s4l-header-desktop { display: none; }
   .s4l-header-mobile { display: flex; }
 
-
-
 /* Base container */
 .s4l-header-mobile {
     width: 100%;
@@ -774,7 +790,6 @@ footer p {
 .mobile-basket {
   margin-top: 25px;
 }
-
 
 .mobile-basket .basket-shell {
       position: relative;
@@ -1009,9 +1024,13 @@ footer p {
     border: 1px solid #ff9a9a;
 }
 
+
+.s4l-header-mobile .account-menu {
+    position: relative;
+    top: 10px;
+  }
   
 }
-
 
 
 /* ===== REMOVE ALL BLUE TOUCH FLASHES (CHROME / ANDROID / TABLET / HYBRID LAPTOPS) ===== */

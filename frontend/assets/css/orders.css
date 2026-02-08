@@ -1,3 +1,14 @@
+
+html, body {
+  margin: 0;
+  padding: 0;
+    width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+
+
 /* =====================================================
    ORDERS PAGE – Sell4Life
    Clean, centered, predictable
@@ -9,9 +20,23 @@
   padding: 60px 20px;
   min-height: 60vh;
 
-  display: flex;
+  display: block;
   flex-direction: column;
+    
 }
+
+.order-page #orders-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.08);
+    border-radius: 14px;
+  padding: 30px;
+  box-sizing: border-box;
+}
+
+
 
 /* Top row */
 .page-top {
@@ -37,22 +62,22 @@
   margin-bottom: 40px;
 }
 
-/* Orders container */
-#orders-container {
-   width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-  background: rgba(255,255,255,0.08);
-  border-radius: 14px;
-  padding: 30px;
+.order-page .order-card {
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.18);
+  width: 100%;
+  box-sizing: border-box;
 }
+
 
 /* Loading / empty */
 #orders-loading,
 #orders-empty {
   text-align: center;
   font-size: 16px;
-  opacity: 0.9;
+  opacity: 1;
 }
 
 /* Orders list */
@@ -62,35 +87,56 @@
   gap: 20px;
 }
 
-/* Order card */
-.order-card {
-  background: rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid rgba(255,255,255,0.18);
+/* Order ID – readable, intentional */
+.order-id {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  opacity: 1;
+  line-height: 1.1;   /* 🔴 THIS is the key */
+  margin: 0;
+
 }
 
-/* Header row */
+
 .order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  font-weight: 500;
-}
-
-/* Meta */
-.order-meta {
-  font-size: 14px;
-  opacity: 0.85;
+  gap: 12px;
 }
 
 /* Price */
 .order-total {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: #f28c28;
+  white-space: nowrap;
+ 
+  padding: 6px 12px;
+  border-radius: 8px;
+
+  /* REMOVE these */
+  margin-left: 0;
+  align-self: auto;
 }
+
+.order-page .order-total {
+     background: rgba(0,0,0,0.3);
+}
+
+
+/* Meta */
+.order-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  margin-top: 0;
+  gap: 2px;
+  font-size: 14.5px;
+  opacity: 1;
+}
+
 
 /* =========================================
    MY ORDERS – LINK CLEANUP
@@ -117,12 +163,26 @@
   .page-account h1 {
     font-size: 24px;
   }
-
-  .order-header {
+  
+   .order-card {
+    padding: 16px;
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .order-card-header {
+    display: flex;
+    flex-direction: column;
     gap: 6px;
   }
+
+  .order-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+ 
 }
 
 
@@ -264,12 +324,57 @@
 
 
 /* =========================================
+   ORDER DETAILS – MOBILE FIX
+   Make it readable with thumbs, not mice
+========================================= */
+
+@media (max-width: 480px) {
+
+  #order-details .order-item {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    grid-template-areas:
+      "thumb info"
+      "lineprice lineprice";
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .order-details-page .order-thumb {
+    grid-area: thumb;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+  }
+
+  #order-details .order-info {
+    grid-area: info;
+  }
+
+  /* 🔴 THIS is the missing link */
+  #order-details .order-line-price {
+    grid-area: lineprice;
+    justify-self: flex-end;
+    margin-top: 6px;
+    font-size: 14.5px;
+    font-weight: 600;
+    opacity: 0.9;
+  }
+}
+
+
+/* =========================================
    ORDER DETAILS PAGE – FONT FIX
 ========================================= */
 
-.order-details-page {
+.order-details-page,
+.order-page {
   font-family: system-ui, -apple-system, BlinkMacSystemFont,
-               "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-               "Helvetica Neue", Arial, sans-serif;
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Only order details needs white text */
+.order-details-page {
   color: #ffffff;
 }

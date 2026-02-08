@@ -1,9 +1,8 @@
+// =====================================================
+// Orders list (API_BASE + readable IDs, no thumbnails)
+// =====================================================
 
-// NOTE: Backend currently only supports GET /api/orders
-// Single-order view filters client-side
-
-
-
+import { API_BASE } from "./config.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("orders.js running");
@@ -12,15 +11,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loading = document.getElementById("orders-loading");
   const list = document.getElementById("orders-list");
 
+  if (!loading || !list) return;
+
   if (!token) {
     loading.textContent = "Please sign in.";
     return;
   }
 
   try {
-    const res = await fetch("/api/orders", {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await fetch(`${API_BASE}/api/orders`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
     });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
 
     const data = await res.json();
     loading.style.display = "none";
@@ -31,29 +38,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     list.innerHTML = data.orders.map(o => {
+      const date = o.createdAt
+        ? new Date(o.createdAt).toLocaleString()
+        : "—";
 
-  const date = o.createdAt
-    ? new Date(o.createdAt).toLocaleString()
-    : "—";
+      // 🔹 Short, readable ID
+      const displayId = o.orderNumber || `S4L-${o.id.slice(0, 10).toUpperCase()}`;
 
-  return `
-    <a href="./orders-details.html?id=${o.id}" class="order-card">
-      <div class="order-header">
-        <span>Order ID: ${o.id}</span>
-        <span class="order-total">£${Number(o.total).toFixed(2)}</span>
-      </div>
 
-      <div class="order-meta">
-        <div>Status: ${o.status}</div>
-        <div class="order-date">${date}</div>
-      </div>
-    </a>
-  `;
-}).join("");
+      // 🔹 Item count instead of thumbnail
+      const itemCount = o.items?.length || 0;
 
+      return `
+        <a href="./orders-details.html?id=${o.id}" class="order-card">
+          <div class="order-header">
+            <span class="order-id">${displayId}</span>
+            <span class="order-total">£${Number(o.total).toFixed(2)}</span>
+          </div>
+
+          <div class="order-meta">
+            <div>${itemCount} item${itemCount === 1 ? "" : "s"} • Status: ${o.status}</div>
+            <div class="order-date">${date}</div>
+          </div>
+        </a>
+      `;
+    }).join("");
 
   } catch (err) {
-    console.error(err);
+    console.error("ORDERS LOAD ERROR:", err);
     loading.textContent = "Failed to load orders.";
   }
 });
