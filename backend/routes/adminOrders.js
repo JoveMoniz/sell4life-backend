@@ -5,7 +5,7 @@ import adminMiddleware from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
-// Single source of truth
+// Single source of truth for statuses
 const ALLOWED_STATUSES = [
   "Processing",
   "Shipped",
@@ -14,7 +14,8 @@ const ALLOWED_STATUSES = [
 ];
 
 // ========================================
-// GET: All orders (ADMIN ONLY, PAGINATED)
+// GET: All orders (ADMIN ONLY)
+// Supports: pagination + search + status
 // ========================================
 router.get(
   "/",
@@ -26,13 +27,30 @@ router.get(
       const limit = 20;
       const skip  = (page - 1) * limit;
 
+      const { q, status } = req.query;
+
+      let filter = {};
+
+      // Search by orderId OR user email
+      if (q) {
+        filter.$or = [
+          { orderId: { $regex: q, $options: "i" } },
+          { "user.email": { $regex: q, $options: "i" } }
+        ];
+      }
+
+      // Filter by status
+      if (status && status !== "all") {
+        filter.status = status;
+      }
+
       const [orders, total] = await Promise.all([
-        Order.find()
+        Order.find(filter)
           .populate("user", "email")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit),
-        Order.countDocuments()
+        Order.countDocuments(filter)
       ]);
 
       res.json({
@@ -50,7 +68,7 @@ router.get(
 );
 
 // ========================================
-// GET: Single order (ADMIN ONLY)  ✅ ADDED
+// GET: Single order (ADMIN ONLY)
 // ========================================
 router.get(
   "/:id",

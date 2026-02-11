@@ -1,11 +1,18 @@
 /* =====================================================
    ADMIN BASE (ALL PAGES)
    ===================================================== */
-html,
-body {
-  max-width: 100%;
-  overflow-x: hidden;
+html {
+html, body {
+  overflow: visible;
 }
+
+}
+
+
+body {
+  overflow-y: visible;
+}
+
 
 
 
@@ -20,7 +27,7 @@ body {
   background: #f5f6f8;
   color: #1f2933;
   margin: 0;
-  padding: 40px 20px;
+  padding: 0;
 }
 
 h1 {
@@ -61,7 +68,7 @@ button {
   padding: 16px 20px;
   margin-bottom: 24px;
 
-    position: sticky;
+  position: sticky;
   top: 0;
   z-index: 1000;
 
@@ -194,9 +201,6 @@ button {
    ===================================================== */
 
 @media (max-width: 768px) {
-  body {
-    padding: 16px;
-  }
 
   h1 {
     font-size: 20px;
@@ -218,6 +222,21 @@ button {
   
   }
 }
+
+
+
+.admin-page {
+  padding: 0 20px;
+}
+
+@media (max-width: 768px) {
+  .admin-page {
+    padding: 16px;
+  }
+}
+
+
+
 
 /* Mobile: make ALL admin tables horizontally scroll when needed */
 @media (max-width: 480px) and (orientation: portrait) {
@@ -365,10 +384,6 @@ button {
    ADMIN ORDERS – INLINE DETAILS
 ===================================================== */
 
-.order-details-row {
-  display: none;
-}
-
 .order-details-row td {
   padding: 20px 24px;
   background: #f9fafb;
@@ -381,6 +396,7 @@ button {
   grid-template-columns: 1fr 1fr;
   gap: 32px;
   font-size: 14px;
+ 
 }
 
 /* Subtle hierarchy for metadata column */
@@ -430,12 +446,125 @@ button {
 }
 
 
+
 /* Action spacing */
 .inline-order-grid a {
   display: inline-block;
   margin-top: 8px;
 }
 
+.inline-order-wrapper {
+  width: fit-content;
+  margin-left: auto;
+  overflow: hidden;
+  padding-left: 20px;
+
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4x) scale(0.98);
+
+transition:
+  max-height 420ms cubic-bezier(.25,.8,.25,1) 90ms,
+  opacity 180ms ease,
+  transform 260ms cubic-bezier(.22,.61,.36,1);
+
+  pointer-events: none;
+}
+
+
+.order-details-row td {
+  padding: 0;
+  background: transparent;
+}
+
+
+/* open state */
+.order-details-row.open .inline-order-wrapper {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  max-height: 1000px;
+}
+
+ 
+  .inline-order-grid {
+    gap: 10px;
+    
+  }
+
+
+  /* prevent table constraints */
+  .order-details-row td {
+    padding: 0;
+    background: transparent;
+    
+  }
+
+  .status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Processing – neutral / waiting */
+.status-processing {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+/* Shipped – action / in motion */
+.status-shipped {
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+/* Delivered – final / success */
+.status-delivered {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Cancelled – final / warning */
+.status-cancelled {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+
+.status-delivered,
+.status-cancelled {
+  opacity: 0.85;
+}
+
+.inline-status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.status-delivered {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+
+
+
+@media (max-width: 480px) {
+  .inline-order-wrapper {
+    width: 370px;
+  }
+}
+
+@media (max-width: 380px) {
+  .inline-order-wrapper {
+    width: 330px;
+  }
+}
 
 
 /* =====================================================
@@ -996,13 +1125,6 @@ button {
 
 @media (max-width: 768px) {
 
-  body {
-    padding: 16px;
-  }
-
-  .admin-top {
-    margin-bottom: 16px;
-  }
 
   .admin-signin .signin-wrapper,
   .admin-dashboard .dashboard-wrapper {
@@ -1017,3 +1139,25 @@ button {
     padding: 20px;
   }
 }
+
+
+
+
+/* =====================================================
+   ADMIN Search
+   ===================================================== */
+
+
+.admin-search-bar {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.admin-search-bar input,
+.admin-search-bar select {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+

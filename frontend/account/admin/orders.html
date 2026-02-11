@@ -15,6 +15,8 @@
 </head>
 <body class="admin admin-orders">
 
+  <div class="admin-page"></div>
+
 <div class="admin-top">
    <!-- Logo -->
 <header class="admin-header">
@@ -38,6 +40,26 @@
 <button id="logoutBtn">Log out</button>
 </div>
 
+<div class="admin-search-bar">
+  <input
+    type="text"
+    id="orderSearch"
+    placeholder="Search Order ID or email"
+  />
+
+  <select id="statusFilter">
+    <option value="all">All</option>
+    <option value="pending">Pending</option>
+    <option value="delivered">Delivered</option>
+    <option value="cancelled">Cancelled</option>
+  </select>
+
+  <button id="searchBtn">Search</button>
+</div>
+
+
+
+
 <div class="admin-table-scroll">
   <table class="admin-orders-table">
     <thead>
@@ -52,10 +74,13 @@
     </thead>
     <tbody id="ordersTable"></tbody>
   </table>
+
+
 </div>
 
 
 <div id="pagination"></div>
+</div>
 
 
 <script type="module" src="/assets/js/config.js?v=20260206-dev"></script>

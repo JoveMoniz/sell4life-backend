@@ -1,3 +1,6 @@
+
+const FINAL_STATES = ["delivered", "cancelled"];
+
 import { API_BASE } from "./config.js";
 
 /* ================================
@@ -15,7 +18,7 @@ if (!token || role !== "admin") {
 ================================ */
 async function updateOrderStatus(orderId, status) {
   const res = await fetch(
-    `${API_BASE}/api/admin/orders/${orderId}/status`,
+    `${API_BASE}/admin/orders/${orderId}/status`,
     {
       method: "PATCH",
       headers: {
@@ -43,7 +46,7 @@ const STATUS_FLOW = ["Processing", "Shipped", "Delivered"];
    LOAD ORDERS
 ================================ */
 async function loadOrders(page = 1) {
-  const res = await fetch(`${API_BASE}/api/admin/orders?page=${page}`, {
+  const res = await fetch(`${API_BASE}/admin/orders?page=${page}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 
@@ -123,14 +126,14 @@ document.getElementById("ordersTable").addEventListener("click", async (e) => {
     // Normalized for logic
     const currentStatus = backendStatus.toLowerCase();
 
-    const FINAL_STATES = ["delivered", "cancelled"];
+    
     const isFinal = FINAL_STATES.includes(currentStatus);
 
     // Toggle same row
     let detailsRow = row.nextElementSibling;
     if (detailsRow && detailsRow.classList.contains("order-details-row")) {
-      detailsRow.style.display =
-        detailsRow.style.display === "table-row" ? "none" : "table-row";
+      detailsRow.classList.toggle("open");
+
       return;
     }
 
@@ -156,13 +159,14 @@ document.getElementById("ordersTable").addEventListener("click", async (e) => {
 
     /* -------- BUILD ROW -------- */
     detailsRow = document.createElement("tr");
-    detailsRow.className = "order-details-row";
-    detailsRow.style.display = "table-row";
+    detailsRow.className = "order-details-row open";
+
 
     const cell = document.createElement("td");
     cell.colSpan = 6;
 
     cell.innerHTML = `
+    <div class="inline-order-wrapper">
       <div class="inline-order-grid">
         <div>
           <strong>Order ID:</strong>
@@ -199,7 +203,7 @@ document.getElementById("ordersTable").addEventListener("click", async (e) => {
 
           ${
             isFinal
-              ? `<em style="opacity:.6">Final state – no further changes</em>`
+              ? `<em style="opacity:.6">Final state <br> no further changes</em>`
               : `<button class="inline-update" data-id="${orderId}">
                    Update status
                  </button>`
@@ -212,6 +216,7 @@ document.getElementById("ordersTable").addEventListener("click", async (e) => {
           </a>
         </div>
       </div>
+     </div> 
     `;
 
     detailsRow.appendChild(cell);
@@ -237,24 +242,71 @@ document.getElementById("ordersTable").addEventListener("click", async (e) => {
   saveBtn.disabled = true;
   saveBtn.textContent = "Saving…";
 
-try {
-  await updateOrderStatus(orderId, newStatus);
+  try {
+    await updateOrderStatus(orderId, newStatus);
 
-  const detailsRow = saveBtn.closest("tr");
-  const mainRow = detailsRow.previousElementSibling;
-  const statusCell = mainRow.children[3];
+    const detailsRow = saveBtn.closest("tr");
+    const mainRow = detailsRow.previousElementSibling;
+    const statusCell = mainRow.children[3];
 
-  statusCell.textContent = newStatus;
-  statusCell.className = `status status-${newStatus.toLowerCase()}`;
+    statusCell.innerHTML = `
+  <span class="status status-${newStatus.toLowerCase()}">
+    ${newStatus}
+  </span>
+`;
 
-  // 🔴 THIS IS THE FIX
-  detailsRow.remove();
+    const normalized = newStatus.toLowerCase();
+const isFinalNow = FINAL_STATES.includes(normalized);
 
-} catch (err) {
-  console.error(err);
-  saveBtn.textContent = "Error";
+const TRANSITIONS = {
+  processing: ["Processing", "Shipped", "Cancelled"],
+  shipped: ["Shipped", "Delivered"],
+  delivered: ["Delivered"],
+  cancelled: ["Cancelled"]
+};
+
+if (isFinalNow) {
+  const select = detailsRow.querySelector(".inline-status");
+  const btn = detailsRow.querySelector(".inline-update");
+
+  if (select) {
+    select.outerHTML = `
+      <span class="status status-${normalized}">
+        ${newStatus}
+      </span>
+    `;
+  }
+
+  if (btn) {
+    btn.outerHTML = `
+      <em style="opacity:.6">Final state <br> no further changes</em>
+    `;
+  }
+
+} else {
+  // 🔧 REBUILD DROPDOWN FOR NON-FINAL STATES (THIS IS THE FIX)
+  const select = detailsRow.querySelector(".inline-status");
+  if (select) {
+    const allowed = TRANSITIONS[normalized] || [newStatus];
+
+    select.innerHTML = allowed
+      .map(
+        s =>
+          `<option value="${s}" ${
+            s === newStatus ? "selected" : ""
+          }>${s}</option>`
+      )
+      .join("");
+  }
 }
 
+
+
+    saveBtn.textContent = "Saved";
+  } catch (err) {
+    console.error(err);
+    saveBtn.textContent = "Error";
+  }
 
   setTimeout(() => {
     saveBtn.textContent = "Update status";
@@ -263,8 +315,83 @@ try {
 });
 
 
-
 /* ================================
    INIT
 ================================ */
-loadOrders(currentPage);
+loadOrders();
+
+
+document.addEventListener("click", (e) => {
+  const openRow = document.querySelector(".order-details-row.open");
+  if (!openRow) return;
+
+  const clickedInsideDropdown =
+    e.target.closest(".inline-order-wrapper") ||
+    e.target.closest(".view-order");
+
+  if (!clickedInsideDropdown) {
+    openRow.classList.remove("open");
+  }
+});
+
+
+
+/* ================================
+   Order Search 
+================================ */
+
+
+const searchInput = document.getElementById("orderSearch");
+const statusSelect = document.getElementById("statusFilter");
+const searchBtn = document.getElementById("searchBtn");
+
+searchBtn.addEventListener("click", fetchOrders);
+searchInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") fetchOrders();
+});
+
+async function fetchOrders() {
+  const q = searchInput.value.trim();
+  const status = statusSelect.value;
+
+  currentPage = 1;
+
+  let url = `${API_BASE}/api/admin/orders?page=1`;
+
+  if (q) url += `&q=${encodeURIComponent(q)}`;
+  if (status !== "all") url += `&status=${status}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) return;
+
+  const data = await res.json();
+
+  const tbody = document.getElementById("ordersTable");
+  tbody.innerHTML = "";
+
+  data.orders.forEach(order => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>S4L-${order._id.slice(0, 10).toUpperCase()}</td>
+      <td>${order.user?.email || "-"}</td>
+      <td>£${Number(order.total || 0).toFixed(2)}</td>
+      <td>
+        <span class="status status-${order.status.toLowerCase()}">
+          ${order.status}
+        </span>
+      </td>
+      <td>${new Date(order.createdAt).toLocaleString()}</td>
+      <td>
+        <button class="view-order" data-id="${order._id}">View</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  renderPagination(1, data.totalPages);
+}
+
+
