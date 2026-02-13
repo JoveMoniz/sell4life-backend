@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const token = localStorage.getItem("s4l_token");
 
-    const res = await fetch(`${API_BASE}/api/orders/${orderId}`, {
+    const res = await fetch(`${API_BASE}/orders/${orderId}`, {
       headers: {
         Authorization: `Bearer ${token}`
       }

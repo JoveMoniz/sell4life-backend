@@ -8,8 +8,10 @@
   <meta http-equiv="Expires" content="0">
 
   <title>Admin Orders | Sell4Life</title>
-  
-  <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev">
+
+  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+
+  <link rel="stylesheet" href="/assets/css/admin.css?v=?v=20260211b">
 
 
 </head>
@@ -31,6 +33,7 @@
 
 <div class="admin-title">
 
+
   <a href="/account/admin/index.html" class="admin-back">← back to dashboar</a>
 
 <h1>Admin–Orders</h1>
@@ -44,15 +47,16 @@
   <input
     type="text"
     id="orderSearch"
-    placeholder="Search Order ID or email"
-  />
+    placeholder="Search Order ID or email"/>
 
   <select id="statusFilter">
-    <option value="all">All</option>
-    <option value="pending">Pending</option>
-    <option value="delivered">Delivered</option>
-    <option value="cancelled">Cancelled</option>
-  </select>
+  <option value="all">All</option>
+  <option value="Processing">Processing</option>
+  <option value="Shipped">Shipped</option>
+  <option value="Delivered">Delivered</option>
+  <option value="Cancelled">Cancelled</option>
+</select>
+
 
   <button id="searchBtn">Search</button>
 </div>
@@ -83,9 +87,14 @@
 </div>
 
 
-<script type="module" src="/assets/js/config.js?v=20260206-dev"></script>
-<script type="module" src="/assets/js/admin-orders.js?v=20260206-dev"></script>
-<script type="module" src="/assets/js/admin-logout.js?v=20260206-dev"></script>
+
+   <script>
+  window.__pageScripts = [
+        "/assets/js/config.js",
+        "/assets/js/admin-orders.js"   
+
+  ];
+</script>
 
 
 </body>

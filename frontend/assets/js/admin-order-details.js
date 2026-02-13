@@ -52,7 +52,7 @@ const FINAL_STATES = ["delivered", "cancelled"];
 async function loadOrder() {
   try {
     const res = await fetch(
-      `${API_BASE}/api/admin/orders/${orderId}`,
+      `${API_BASE}/admin/orders/${orderId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -168,17 +168,17 @@ updateBtn.addEventListener("click", async () => {
   result.textContent = "";
 
   try {
+    const newStatus = statusSelect.value;
+
     const res = await fetch(
-      `${API_BASE}/api/admin/orders/${orderId}/status`,
+      `${API_BASE}/admin/orders/${orderId}/status`,
       {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          status: statusSelect.value   // BACKEND ENUM
-        })
+        body: JSON.stringify({ status: newStatus })
       }
     );
 
@@ -186,8 +186,12 @@ updateBtn.addEventListener("click", async () => {
 
     await loadOrder();
 
-    result.textContent = "Status updated";
-    result.className = "success";
+    const normalized = newStatus.toLowerCase();
+
+    if (!FINAL_STATES.includes(normalized)) {
+      result.textContent = "Status updated";
+      result.className = "success";
+    }
 
   } catch (err) {
     console.error(err);
@@ -197,6 +201,7 @@ updateBtn.addEventListener("click", async () => {
     updateBtn.textContent = "Update Status";
   }
 });
+
 
 /* ================================
    INIT

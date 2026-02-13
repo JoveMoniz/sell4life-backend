@@ -8,6 +8,9 @@
   <meta http-equiv="Expires" content="0">
 
   <title>Order Details – Sell4Life</title>
+
+  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+
   <link rel="stylesheet" href="/assets/css/orders.css?v=20260206-dev" />
 </head>
 
@@ -35,7 +38,12 @@
 
 </main>
 
-<script type="module" src="/assets/js/require-auth.js?v=20260206-dev"></script>
-<script type="module" src="/assets/js/orders-details.js?v=20260206-dev"></script>
+   <script>
+  window.__pageScripts = [
+    "/assets/js/require-auth.js", 
+        "/assets/js/orders-details.js"  
+
+  ];
+</script>
 </body>
 </html>

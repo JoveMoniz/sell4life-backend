@@ -21,7 +21,7 @@ form.addEventListener("submit", async (e) => {
   btn.textContent = "Checking credentials…";
 
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

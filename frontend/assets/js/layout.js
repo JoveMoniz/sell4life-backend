@@ -27,7 +27,7 @@ function logout() {
   try {
     // Prevent duplicate header injection
     if (!document.querySelector(".site-header")) {
-      const res = await fetch("/includes/header.html?v=20260125", {
+      const res = await fetch("/includes/header.html", {
         cache: "no-store"
       });
 
@@ -45,7 +45,7 @@ function logout() {
   // ----- FOOTER -----
   try {
     if (!document.querySelector(".site-footer")) {
-      const res = await fetch("/includes/footer.html?v=20260125", {
+      const res = await fetch("/includes/footer.html", {
         cache: "no-store"
       });
 
@@ -62,32 +62,47 @@ function logout() {
 
 
 // =====================================================
-// LOAD CART.JS AFTER HEADER (ONCE)
+// GLOBAL VERSIONED SCRIPT LOADER
 // =====================================================
-document.addEventListener("headerLoaded", () => {
-  if (window.__cartScriptLoaded) return;
+document.addEventListener("headerLoaded", async () => {
 
-  const script = document.createElement("script");
-  script.src = "/assets/js/cart.js?v=20260125";
-  script.defer = true;
+  if (window.__layoutInitialized) return;
 
-  document.body.appendChild(script);
-  window.__cartScriptLoaded = true;
-});
+  let version;
 
+  try {
+   const res = await fetch(`${API_BASE}/api/version`);
 
-// =====================================================
-// LOAD SEARCH.JS AFTER HEADER (ONCE)
-// =====================================================
-document.addEventListener("headerLoaded", () => {
-  if (window.__searchScriptLoaded) return;
+    const data = await res.json();
+    version = data.version;
+  } catch {
+    version = Date.now();
+  }
 
-  const script = document.createElement("script");
-  script.src = "/assets/js/search.js?v=20260125";
-  script.defer = true;
+  // Core shared scripts
+  const coreScripts = [
+    "/assets/js/cart.js",
+    "/assets/js/search.js"
+  ];
 
-  document.body.appendChild(script);
-  window.__searchScriptLoaded = true;
+  coreScripts.forEach(path => {
+    const script = document.createElement("script");
+    script.src = `${path}?v=${version}`;
+    script.defer = true;
+    document.body.appendChild(script);
+  });
+
+  // Page-specific scripts (declared per page)
+  if (window.__pageScripts && Array.isArray(window.__pageScripts)) {
+    window.__pageScripts.forEach(path => {
+      const script = document.createElement("script");
+      script.src = `${path}?v=${version}`;
+      script.defer = true;
+      document.body.appendChild(script);
+    });
+  }
+
+  window.__layoutInitialized = true;
 });
 
 

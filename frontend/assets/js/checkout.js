@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
     try {
-      const res = await fetch(`${API_BASE}/api/orders`, {
+      const res = await fetch(`${API_BASE}/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

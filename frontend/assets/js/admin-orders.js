@@ -17,23 +17,23 @@ if (!token || role !== "admin") {
    HELPERS
 ================================ */
 async function updateOrderStatus(orderId, status) {
-  const res = await fetch(
-    `${API_BASE}/admin/orders/${orderId}/status`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ status })
-    }
-  );
+  const url = `${API_BASE}/admin/orders/${orderId}/status`;
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ status })
+  });
 
   if (!res.ok) {
     const msg = await res.text();
     throw new Error(msg || "Status update failed");
   }
 }
+
 
 /* ================================
    STATE
@@ -45,10 +45,17 @@ const STATUS_FLOW = ["Processing", "Shipped", "Delivered"];
 /* ================================
    LOAD ORDERS
 ================================ */
-async function loadOrders(page = 1) {
-  const res = await fetch(`${API_BASE}/admin/orders?page=${page}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+async function loadOrders(page = 1, q = "", status = "all")
+ {
+  let url = `${API_BASE}/admin/orders?page=${page}`;
+
+if (q) url += `&q=${encodeURIComponent(q)}`;
+if (status !== "all") url += `&status=${status}`;
+
+const res = await fetch(url, {
+  headers: { Authorization: `Bearer ${token}` }
+});
+
 
   if (res.status === 401 || res.status === 403) {
     window.location.href = "/account/admin/signin.html";
@@ -337,61 +344,42 @@ document.addEventListener("click", (e) => {
 
 
 /* ================================
-   Order Search 
+   ADMIN SEARCH (FINAL)
 ================================ */
 
+let currentQuery = "";
+let currentStatus = "all";
 
-const searchInput = document.getElementById("orderSearch");
-const statusSelect = document.getElementById("statusFilter");
-const searchBtn = document.getElementById("searchBtn");
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput  = document.getElementById("orderSearch");
+  const statusSelect = document.getElementById("statusFilter");
+  const searchBtn    = document.getElementById("searchBtn");
 
-searchBtn.addEventListener("click", fetchOrders);
-searchInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") fetchOrders();
-});
+  if (!searchInput || !statusSelect || !searchBtn) return;
 
-async function fetchOrders() {
-  const q = searchInput.value.trim();
-  const status = statusSelect.value;
+  function runSearch() {
+let q = searchInput.value.trim();
 
-  currentPage = 1;
-
-  let url = `${API_BASE}/api/admin/orders?page=1`;
-
-  if (q) url += `&q=${encodeURIComponent(q)}`;
-  if (status !== "all") url += `&status=${status}`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  if (!res.ok) return;
-
-  const data = await res.json();
-
-  const tbody = document.getElementById("ordersTable");
-  tbody.innerHTML = "";
-
-  data.orders.forEach(order => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>S4L-${order._id.slice(0, 10).toUpperCase()}</td>
-      <td>${order.user?.email || "-"}</td>
-      <td>£${Number(order.total || 0).toFixed(2)}</td>
-      <td>
-        <span class="status status-${order.status.toLowerCase()}">
-          ${order.status}
-        </span>
-      </td>
-      <td>${new Date(order.createdAt).toLocaleString()}</td>
-      <td>
-        <button class="view-order" data-id="${order._id}">View</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  renderPagination(1, data.totalPages);
+/* remove S4L- prefix */
+if (q.toUpperCase().startsWith("S4L-")) {
+  q = q.slice(4);
 }
 
+/* allow only 10-char hex OR email */
+if (!/^[0-9A-Fa-f]{10}$/.test(q) && !q.includes("@")) {
+  q = "__invalid__";
+}
 
+currentQuery = q;
+    currentStatus = statusSelect.value;
+    currentPage   = 1;
+
+    loadOrders(1, currentQuery, currentStatus);
+  }
+
+  searchBtn.addEventListener("click", runSearch);
+
+  searchInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") runSearch();
+  });
+});

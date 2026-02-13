@@ -10,6 +10,8 @@
 
   <title>Admin Order Details | Sell4Life</title>
 
+ <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+
   <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev">
 </head>
 
@@ -106,9 +108,15 @@
   </section>
 </div>
   <!-- SCRIPTS -->
-  <script type="module" src="/assets/js/config.js?v=20260206-dev"></script>
-  <script type="module" src="/assets/js/admin-order-details.js?v=20260206-dev"></script>
-  <script type="module" src="/assets/js/admin-logout.js?v=20260206-dev"></script>
+
+   <script>
+  window.__pageScripts = [
+        "/assets/js/config.js",
+        "/assets/js/admin-order-details.js",
+        "/assets/js/admin-logout.js"  
+
+  ];
+</script>
 
 </body>
 

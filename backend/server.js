@@ -1,3 +1,7 @@
+
+
+
+
 // ===============================
 // Load env FIRST
 // ===============================
@@ -18,6 +22,25 @@ import authRoute from "./routes/auth.js";
 import ordersRoute from "./routes/orders.js";
 import adminOrdersRoute from "./routes/adminOrders.js";
 import adminUsersRoute from "./routes/adminUsers.js";
+
+
+
+// ===============================
+// GLOBAL APP VERSION (AUTO)
+// Changes every backend restart
+// ===============================
+const APP_VERSION = Date.now();
+
+
+
+// ===============================
+// VERSION ENDPOINT
+// ===============================
+app.get("/api/version", (req, res) => {
+  res.json({ version: APP_VERSION });
+});
+
+
 
 // ===============================
 // MongoDB
@@ -77,7 +100,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ===============================
+// ==============================
 // API Routes
 // ===============================
 app.use("/api/auth", authRoute);

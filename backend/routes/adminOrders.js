@@ -1,7 +1,12 @@
+
+import mongoose from "mongoose";
+import User from "../models/user.js";
 import express from "express";
 import Order from "../models/order.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import adminMiddleware from "../middleware/adminMiddleware.js";
+
+
 
 const router = express.Router();
 
@@ -31,13 +36,49 @@ router.get(
 
       let filter = {};
 
-      // Search by orderId OR user email
-      if (q) {
-        filter.$or = [
-          { orderId: { $regex: q, $options: "i" } },
-          { "user.email": { $regex: q, $options: "i" } }
-        ];
+  // Search by Mongo _id (if valid) OR user email
+// Search by Mongo _id (full OR short) OR user email
+if (q) {
+
+  const users = await User.find({
+    email: { $regex: q, $options: "i" }
+  }).select("_id");
+
+  const userIds = users.map(u => u._id);
+
+  const isFullObjectId = mongoose.Types.ObjectId.isValid(q);
+  const shortIdMatch = /^[0-9A-Fa-f]{10}$/.test(q);
+
+  let orConditions = [];
+
+  if (isFullObjectId) {
+    orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
+  }
+
+  if (shortIdMatch) {
+    orConditions.push({
+      $expr: {
+        $regexMatch: {
+          input: { $toString: "$_id" },
+          regex: new RegExp("^" + q, "i")
+        }
       }
+    });
+  }
+
+  if (userIds.length) {
+    orConditions.push({ user: { $in: userIds } });
+  }
+
+  if (orConditions.length) {
+    filter.$or = orConditions;
+  }
+}
+
+
+
+
+
 
       // Filter by status
       if (status && status !== "all") {

@@ -9,6 +9,8 @@
 
   <title>Admin – Users</title>
 
+  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+
   <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev">
 </head>
 
@@ -53,8 +55,14 @@
   </div>
 
   <!-- Scripts -->
-  <script type="module" src="/assets/js/admin-users.js?v=20260206-dev"></script>
-  <script type="module" src="/assets/js/admin-logout.js?v=20260206-dev"></script>
+
+   <script>
+  window.__pageScripts = [
+    "/assets/js/admin-users.js", 
+        "/assets/js/admin-logout.js"  
+
+  ];
+</script>
 
 </body>
 </html>

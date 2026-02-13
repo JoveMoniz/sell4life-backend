@@ -13,7 +13,7 @@ if (!token) {
    LOAD USERS (ADMIN ENFORCED BY API)
 ================================ */
 async function loadUsers() {
-  const res = await fetch(`${API_BASE}/api/admin/users`, {
+  const res = await fetch(`${API_BASE}/admin/users`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
