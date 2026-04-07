@@ -1,74 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your Basket | Sell4Life</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Basket | Sell4Life</title>
 
-  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=20260125" />
-  <link rel="stylesheet" href="/assets/css/cart.css?v=20260125"/>
-</head>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/layout.css?v=20260125" />
+    <link rel="stylesheet" href="/assets/css/cart.css?v=20260125" />
+  </head>
 
-<body>
+  <body>
+    <section class="cart-page">
+      <h1>Your Basket</h1>
 
-<section class="cart-page">
+      <!-- DESKTOP TABLE HEADER -->
 
-  <h1>Your Basket</h1>
+      <div class="cart-table">
+        <div class="cart-table-header">
+          <span class="cart-h-product">Product</span>
+          <span class="cart-h-qty">Qty</span>
+          <span class="cart-h-price">Price</span>
+          <span class="cart-h-subtotal">Subtotal</span>
+        </div>
 
-  <!-- DESKTOP TABLE HEADER -->
-
-<div class="cart-table">
-    
-    <div class="cart-table-header">
-        <span class="cart-h-product">Product</span>
-        <span class="cart-h-qty">Qty</span>
-        <span class="cart-h-price">Price</span>
-        <span class="cart-h-subtotal">Subtotal</span>
-      
-    </div>
-
-    <div id="cart-rows" class="cart-rows"></div>
-
-</div>
-
-
-
-  <!-- NEW ROW CONTAINER -->
-
-
-
-  <!-- TOTAL + ACTIONS -->
-  <div class="cart-total-line">
-    <span>Total:</span>
-    <strong id="cart-total">£0.00</strong>
-  </div>
-
-  <div class="cart-actions">
-    <button id="clear-cart" class="btn-clear">Clear Cart</button>
-    <button id="btn-buy" class="btn-buy">Checkout</button>
-  </div>
-
-  <!-- CLEAR CART MODAL -->
-  <div class="clear-cart-modal">
-    <div class="clear-cart-box">
-      <h3>Clear Cart?</h3>
-      <p>This action will remove all items.</p>
-
-      <div class="clear-cart-buttons">
-        <button class="confirm-clear">Clear</button>
-        <button class="cancel-clear">Cancel</button>
+        <div id="cart-rows" class="cart-rows"></div>
       </div>
-    </div>
-  </div>
 
-</section>
+      <!-- NEW ROW CONTAINER -->
 
-   <script>
-  window.__pageScripts = [
-    "/assets/js/cart.js"  
-  ];
-</script> 
+      <!-- TOTAL + ACTIONS -->
+      <div class="cart-total-line">
+        <span>Total:</span>
+        <strong id="cart-total">£0.00</strong>
+      </div>
 
-</body>
+      <div class="cart-actions">
+        <div class="cart-actions-left">
+          <button id="clear-cart" class="btn-clear">Clear Cart</button>
+          <div class="cart-exit">
+            <a href="/" class="btn-back">← Back to Home</a>
+            <a href="/shop/index.html" class="btn-shop">Continue Shopping →</a>
+          </div>
+        </div>
+        <div class="cart-actions-right">
+          <button id="btn-buy" class="btn-buy">Checkout</button>
+        </div>
+      </div>
+
+      <!-- CLEAR CART MODAL -->
+      <div class="clear-cart-modal">
+        <div class="clear-cart-box">
+          <h3>Clear Cart?</h3>
+          <p>This action will remove all items.</p>
+
+          <div class="clear-cart-buttons">
+            <button class="confirm-clear">Clear</button>
+            <button class="cancel-clear">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/layout.js"></script>
+
+    <script>
+      window.__pageScripts = ['/assets/js/cart.js'];
+    </script>
+  </body>
 </html>

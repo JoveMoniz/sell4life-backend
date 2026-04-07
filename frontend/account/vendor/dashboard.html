@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Vendor Dashboard | Sell4Life</title>
+
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
+  </head>
+
+  <body>
+    <div class="vendor-layout">
+      <!-- Sidebar loads here -->
+      <div id="vendor-sidebar"></div>
+
+      <!-- Main dashboard area -->
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/index.html" class="vendor-back-link">← Back to home</a>
+
+          <h1 class="vendor-title">Vendor Dashboard</h1>
+
+          <div class="vendor-stats">
+            <div class="stat-card">
+              <h3 id="stat-products">0</h3>
+              <p>Products</p>
+            </div>
+
+            <div class="stat-card">
+              <h3 id="stat-orders">0</h3>
+              <p>Orders</p>
+            </div>
+
+            <div class="stat-card">
+              <h3 id="stat-revenue">£0</h3>
+              <p>Revenue</p>
+            </div>
+          </div>
+
+          <section class="vendor-orders-preview">
+            <h2>Recent Orders</h2>
+
+            <div id="recent-orders" class="orders-list">
+              <p class="orders-loading">Loading orders...</p>
+            </div>
+          </section>
+
+          <div class="vendor-grid">
+            <a href="/account/vendor/add-product.html" class="vendor-card">
+              <h3>Add Product</h3>
+              <p>Create a new product for your store</p>
+            </a>
+
+            <a href="/account/vendor/products.html" class="vendor-card">
+              <h3>My Products</h3>
+              <p>Manage your products</p>
+            </a>
+
+            <a href="/account/vendor/orders.html" class="vendor-card">
+              <h3>Orders</h3>
+              <p>View orders containing your products</p>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/vendor-dashboard.js"></script>
+  </body>
+</html>

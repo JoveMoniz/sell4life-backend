@@ -1,20 +1,398 @@
 import { Router } from 'express';
-import { fetchProducts, fetchProduct, fetchCategories } from '../utils/woo-api.js';
+import mongoose from 'mongoose';
+
+import Product from '../models/product.js';
+import Vendor from '../models/vendor.js';
+import Order from '../models/order.js'; // 🔥 needed for hard delete
+
+import authMiddleware from '../middleware/authMiddleware.js';
+import adminMiddleware from '../middleware/adminMiddleware.js'; // 🔥 THIS WAS MISSING
+
 const router = Router();
 
-router.get('/', async (req, res) => {
-  try{ const data = await fetchProducts(req.query); res.json(data); }
-  catch(err){ res.status(500).json({ error: 'Failed to fetch products', detail: err.message }); }
+/* ======================================================
+   🔥 SLUG GENERATOR (NEW)
+====================================================== */
+
+function generateSlug(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+/* ======================================================
+   CREATE PRODUCT
+====================================================== */
+
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'vendor') {
+      return res.status(403).json({ error: 'Only vendors can create products' });
+    }
+
+    const vendor = await Vendor.findOne({ userId: req.user._id });
+
+    if (!vendor) {
+      return res.status(403).json({ error: 'Vendor profile not found' });
+    }
+
+    const { name, description, price, images, stock, category, subcategory, tags } = req.body;
+
+    /* ======================================================
+       🔥 SLUG CREATION + UNIQUE CHECK (NEW)
+    ====================================================== */
+
+    let baseSlug = generateSlug(name);
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+
+    while (await Product.findOne({ slug: uniqueSlug })) {
+      uniqueSlug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    /* ======================================================
+       CREATE PRODUCT
+    ====================================================== */
+
+    const product = await Product.create({
+      name,
+      description,
+      price,
+      images,
+      stock,
+      category,
+      subcategory,
+      tags,
+      slug: uniqueSlug, // ✅ BACKEND CONTROLLED
+      vendor: vendor._id,
+    });
+
+    res.status(201).json(product);
+  } catch (err) {
+    console.error('CREATE PRODUCT ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to create product',
+    });
+  }
 });
 
-router.get('/:id', async (req, res) => {
-  try{ const data = await fetchProduct(req.params.id); res.json(data); }
-  catch(err){ res.status(500).json({ error: 'Failed to fetch product', detail: err.message }); }
+/* ======================================================
+   🔥 GET PRODUCT BY SLUG (NEW - FUTURE READY)
+====================================================== */
+
+router.get('/slug/:slug', async (req, res) => {
+  try {
+    const product = await Product.findOne({ slug: req.params.slug }).populate({
+      path: 'vendor',
+      select: 'storeName storeLogo',
+      populate: {
+        path: 'userId',
+        select: 'username email',
+      },
+    });
+
+    if (!product || !product.active || product.archived) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error('GET PRODUCT BY SLUG ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to fetch product',
+    });
+  }
 });
+
+/* ======================================================
+   GET CATEGORY LIST
+====================================================== */
 
 router.get('/category/list', async (req, res) => {
-  try{ const data = await fetchCategories(req.query); res.json(data); }
-  catch(err){ res.status(500).json({ error: 'Failed to fetch categories', detail: err.message }); }
+  try {
+    const categories = await Product.distinct('category');
+
+    res.json(categories);
+  } catch (err) {
+    console.error('CATEGORY LIST ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to fetch categories',
+    });
+  }
+});
+
+/* ======================================================
+   GET SINGLE PRODUCT BY ID
+====================================================== */
+
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: 'Invalid product ID',
+      });
+    }
+
+    const product = await Product.findById(id).populate({
+      path: 'vendor',
+      select: 'storeName storeLogo',
+      populate: {
+        path: 'userId',
+        select: 'username email',
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error('GET PRODUCT BY ID ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to fetch product',
+    });
+  }
+});
+
+/* ======================================================
+   GET ALL PRODUCTS
+====================================================== */
+
+router.get('/', async (req, res) => {
+  try {
+    const { category, subcategory, vendor, search, q, page = 1, limit = 20 } = req.query;
+
+    const searchTerm = search || q;
+
+    const query = {
+      active: true,
+      archived: { $ne: true },
+    };
+
+    if (category) query.category = category;
+    if (subcategory) query.subcategory = subcategory;
+
+    if (vendor && mongoose.Types.ObjectId.isValid(vendor)) {
+      query.vendor = new mongoose.Types.ObjectId(vendor);
+    }
+
+    /* 🔥 FIXED SEARCH (q + search support) */
+    if (searchTerm) {
+      query.$or = [
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { category: { $regex: searchTerm, $options: 'i' } },
+        { subcategory: { $regex: searchTerm, $options: 'i' } },
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const rawProducts = await Product.find(query)
+      .populate({
+        path: 'vendor',
+        select: 'storeName storeLogo',
+        populate: {
+          path: 'userId',
+          select: 'username email',
+        },
+      })
+      /* 🔥 SMART SORT (text relevance OR newest) */
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const products = rawProducts.map((p) => {
+      const obj = p.toObject();
+
+      return {
+        ...obj,
+        image:
+          Array.isArray(obj.images) && obj.images.length
+            ? obj.images[0]
+            : '/assets/images/products/sell4life-placeholder.png',
+      };
+    });
+
+    const total = await Product.countDocuments(query);
+
+    res.json({
+      products,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error('GET PRODUCTS ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to fetch products',
+    });
+  }
+});
+
+/* ======================================================
+   UPDATE PRODUCT
+====================================================== */
+
+router.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    const vendor = await Vendor.findOne({ userId: req.user._id });
+
+    if (!vendor) {
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
+
+    if (product.vendor.toString() !== vendor._id.toString()) {
+      return res.status(403).json({
+        error: 'Not allowed',
+      });
+    }
+
+    const updates = req.body;
+
+    /* ======================================================
+       🔥 REGENERATE SLUG IF NAME CHANGED (NEW)
+    ====================================================== */
+
+    if (updates.name && updates.name !== product.name) {
+      let baseSlug = generateSlug(updates.name);
+      let uniqueSlug = baseSlug;
+      let counter = 1;
+
+      while (await Product.findOne({ slug: uniqueSlug })) {
+        uniqueSlug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      updates.slug = uniqueSlug;
+    }
+
+    Object.keys(updates).forEach((key) => {
+      product[key] = updates[key];
+    });
+
+    await product.save();
+
+    res.json(product);
+  } catch (err) {
+    console.error('UPDATE PRODUCT ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to update product',
+    });
+  }
+});
+
+/* ======================================================
+   ARCHIVE PRODUCT
+====================================================== */
+
+router.patch('/:id/archive', authMiddleware, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    const vendor = await Vendor.findOne({ userId: req.user._id });
+
+    if (!vendor) {
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
+
+    if (product.vendor.toString() !== vendor._id.toString()) {
+      return res.status(403).json({
+        error: 'Not allowed',
+      });
+    }
+
+    // ✅ Correct archive behavior
+    product.archived = true;
+    product.active = false;
+
+    await product.save();
+
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    console.error('ARCHIVE PRODUCT ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to archive product',
+    });
+  }
+});
+
+/* ======================================================
+   HARD DELETE PRODUCT (ADMIN ONLY)
+====================================================== */
+
+router.delete('/:id/hard', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    // 🚫 Prevent deleting products used in orders
+    const hasOrders = await Order.findOne({
+      'items.productId': product._id,
+    });
+
+    if (hasOrders) {
+      return res.status(400).json({
+        error: 'Cannot delete product used in orders',
+      });
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    console.error('HARD DELETE ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to delete product',
+    });
+  }
 });
 
 export default router;

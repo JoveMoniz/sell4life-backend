@@ -1,0 +1,222 @@
+// ======================================================
+// SELL4LIFE – STRIPE WEBHOOK (HARDENED VERSION)
+// ======================================================
+
+import express from 'express';
+import stripe from '../config/stripe.js';
+import Order from '../models/order.js';
+import Product from '../models/product.js';
+
+const router = express.Router();
+
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+if (!WEBHOOK_SECRET) {
+  console.warn('⚠ STRIPE_WEBHOOK_SECRET is missing (dev mode)');
+}
+
+/* ======================================================
+   STRIPE WEBHOOK
+====================================================== */
+
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    if (WEBHOOK_SECRET) {
+      event = stripe.webhooks.constructEvent(req.body, signature, WEBHOOK_SECRET);
+    } else {
+      event = JSON.parse(req.body.toString());
+    }
+  } catch (err) {
+    console.error('❌ Webhook verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    console.log('🔥 Stripe event:', event.type);
+
+    /* ======================================================
+       PAYMENT SUCCESS
+    ====================================================== */
+
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+
+      console.log('📦 FULL METADATA:', paymentIntent.metadata);
+
+      // -----------------------------
+      // SAFE METADATA PARSING
+      // -----------------------------
+      let rawItems = [];
+
+      try {
+        rawItems = JSON.parse(paymentIntent.metadata.items || '[]');
+      } catch (e) {
+        console.error('❌ Invalid metadata JSON:', paymentIntent.metadata.items);
+        throw new Error('Invalid metadata format');
+      }
+
+      const userId = paymentIntent.metadata.userId;
+
+      if (!userId) {
+        throw new Error('Missing userId in metadata');
+      }
+
+      if (!rawItems.length) {
+        console.error('❌ CRITICAL: No items in metadata');
+        throw new Error('Missing items metadata');
+      }
+
+      const items = [];
+
+      // -----------------------------
+      // BUILD ITEMS FROM DATABASE
+      // -----------------------------
+      for (const raw of rawItems) {
+        const product = await Product.findById(raw.productId);
+
+        if (!product) {
+          throw new Error(`Product not found: ${raw.productId}`);
+        }
+
+        const quantity = Number(raw.quantity);
+        const price = Number(product.price);
+        const subtotal = price * quantity;
+
+        items.push({
+          productId: product._id,
+          vendorId: product.vendor,
+          name: product.name || 'Unknown Product',
+          price,
+          quantity,
+          subtotal,
+          image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+        });
+      }
+
+      // -----------------------------
+      // PREVENT DUPLICATES
+      // -----------------------------
+      const existingOrder = await Order.findOne({
+        paymentIntentId: paymentIntent.id,
+      });
+
+      if (existingOrder) {
+        console.log('⚠ Order already exists:', existingOrder._id);
+        return res.json({ received: true });
+      }
+
+      // -----------------------------
+      // UPDATE INVENTORY
+      // -----------------------------
+      for (const item of items) {
+        const product = await Product.findById(item.productId);
+
+        if (product.trackInventory) {
+          if (product.stock < item.quantity) {
+            throw new Error(`${product.name} out of stock`);
+          }
+          product.stock -= item.quantity;
+        }
+
+        product.salesCount = (product.salesCount || 0) + item.quantity;
+        await product.save();
+      }
+
+      // -----------------------------
+      // VENDOR SPLIT
+      // -----------------------------
+      const vendorMap = {};
+
+      for (const item of items) {
+        const v = item.vendorId.toString();
+        if (!vendorMap[v]) vendorMap[v] = [];
+        vendorMap[v].push(item);
+      }
+
+      const vendorOrders = Object.keys(vendorMap).map((vendorId) => {
+        const list = vendorMap[vendorId];
+        const subtotal = list.reduce((s, i) => s + i.subtotal, 0);
+
+        return {
+          vendorId,
+          items: list,
+          subtotal,
+          shipping: 0,
+          tax: 0,
+          total: subtotal,
+          status: 'Pending',
+        };
+      });
+
+      // -----------------------------
+      // CREATE ORDER
+      // -----------------------------
+      const order = await Order.create({
+        user: userId,
+        items,
+        vendorOrders,
+        subtotal: items.reduce((s, i) => s + i.subtotal, 0),
+        total: paymentIntent.amount / 100,
+        status: 'Pending',
+        paymentStatus: 'paid',
+        paymentIntentId: paymentIntent.id,
+        statusHistory: [
+          {
+            status: 'Pending',
+            note: 'Payment successful',
+            date: new Date(),
+          },
+        ],
+      });
+
+      console.log('🎉 Order created:', order._id);
+    }
+
+    /* ======================================================
+       REFUND EVENT
+    ====================================================== */
+
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object;
+
+      console.log('💰 Refund event:', charge.payment_intent);
+
+      const order = await Order.findOne({
+        paymentIntentId: charge.payment_intent,
+      });
+
+      if (!order) {
+        console.log('⚠ No order found for refund');
+        return res.json({ received: true });
+      }
+
+      // MONEY STATE
+      order.paymentStatus = 'refunded';
+
+      // SYSTEM STATE
+      order.status = 'Cancelled';
+
+      // HISTORY
+      order.statusHistory.push({
+        status: 'Cancelled',
+        note: 'Refund confirmed by Stripe',
+        date: new Date(),
+      });
+
+      await order.save();
+
+      console.log('↩ Order refunded:', order._id);
+    }
+  } catch (err) {
+    console.error('❌ Webhook error:', err);
+    return res.status(500).json({ error: 'Webhook failed' });
+  }
+
+  res.json({ received: true });
+});
+
+export default router;

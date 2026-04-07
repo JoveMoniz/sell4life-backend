@@ -1,20 +1,42 @@
-// backend/middleware/adminMiddleware.js
+/* ======================================================
+   ADMIN AUTHORIZATION MIDDLEWARE
+   Ensures user is authenticated AND admin
+====================================================== */
 
 export default function adminMiddleware(req, res, next) {
-  // authMiddleware MUST run first
+  /* ======================================================
+     AUTHENTICATION CHECK
+     authMiddleware must run before this
+  ====================================================== */
+
   if (!req.user) {
-    return res.status(401).json({ error: "Not authenticated" });
+    return res.status(401).json({
+      error: 'Authentication required',
+    });
   }
 
-  // Must be admin
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin only" });
+  /* ======================================================
+     ROLE CHECK
+  ====================================================== */
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Admin access required',
+    });
   }
 
-  // Owner check (strict, string-to-string)
-  req.isOwner =
-    Boolean(process.env.OWNER_USER_ID) &&
-    String(req.user.id) === String(process.env.OWNER_USER_ID);
+  /* ======================================================
+     OWNER CHECK
+     Optional super-admin protection
+  ====================================================== */
+
+  const ownerId = process.env.OWNER_USER_ID;
+
+  req.isOwner = Boolean(ownerId) && String(req.user.id) === String(ownerId);
+
+  /* ======================================================
+     CONTINUE
+  ====================================================== */
 
   next();
 }

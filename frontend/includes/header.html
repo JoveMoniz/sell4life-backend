@@ -1,33 +1,29 @@
 <!-- Global Font -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+/>
 
 <!-- Favicon -->
-<link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-
+<link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
 
 <!-- Early development notice -->
-<div class="site-notice">
-  Sell4Life is in early development. Some features may be unavailable.
-</div>
-
+<div class="site-notice">Sell4Life is in early development. Some features may be unavailable.</div>
 
 <!-- =======================================================
      DESKTOP HEADER
 ======================================================= -->
 <header class="s4l-header-desktop">
   <div class="header-container">
-
     <div class="desktop-header">
-
       <!-- Logo -->
-      <a href="/index.html" class="header-logo">
-        <span style="color:#F28C28;">$</span>
-        <span style="color:#FDF4E7;">ell</span>
-        <span style="color:#00BFFF;">4</span>
-        <span style="color:#FDF4E7;">Life</span>
+      <a href="/" class="header-logo">
+        <span style="color: #f28c28">$</span>
+        <span style="color: #fdf4e7">ell</span>
+        <span style="color: #00bfff">4</span>
+        <span style="color: #fdf4e7">Life</span>
       </a>
 
       <!-- Navigation -->
@@ -39,82 +35,72 @@
 
       <!-- Search Bar -->
       <form id="desktop-search-form" class="header-search" role="search">
-  <input id="desktop-search-input" type="text" placeholder="Search products..." autocomplete="off">
-  <button type="submit">
-    <img src="/assets/images/hero/search.png">
-  </button>
-  <div class="search-autocomplete desktop-ac"></div>
-</form>
-
-
+        <input
+          id="desktop-search-input"
+          type="text"
+          placeholder="Search products..."
+          autocomplete="off"
+        />
+        <button type="submit">
+          <img src="/assets/images/hero/search.png" />
+        </button>
+        <div class="search-autocomplete desktop-ac"></div>
+      </form>
 
       <!-- Basket + Mini Cart -->
 
-    <div class="header-icons">
-
-      <div class="basket-wrapper">
-
-        <div class="basket-shell" aria-label="Basket">
-          <div class="basket-handle"></div>
-          <span class="basket-qty hide">0</span>
-        </div>
-
-        <div class="mini-cart">
-          <ul class="mini-cart-items"></ul>
-
-          <div class="mini-cart-total">
-            <span class="mini-cart-total-label">Total:</span>
-            <span class="mini-cart-total-value">£0.00</span>
+      <div class="header-icons">
+        <div class="basket-wrapper">
+          <div class="basket-shell" aria-label="Basket">
+            <div class="basket-handle"></div>
+            <span class="basket-qty hide">0</span>
           </div>
 
-          <a href="/cart/cart.html" class="view-cart-btn">View Basket</a>
+          <div class="mini-cart">
+            <ul class="mini-cart-items"></ul>
+
+            <div class="mini-cart-total">
+              <span class="mini-cart-total-label">Total:</span>
+              <span class="mini-cart-total-value">£0.00</span>
+            </div>
+
+            <a href="/cart/cart.html" class="view-cart-btn">View Basket</a>
+          </div>
         </div>
 
+        <!-- account -->
+        <div class="account-menu">
+          <button id="accountBtnDesktop">Account ▾</button>
+
+          <div class="account-dropdown" id="accountDropdownDesktop">
+            <a href="/account/signin.html" class="auth dd-login">Sign in</a>
+            <a href="/account/register.html" class="auth dd-register">Register</a>
+            <a href="/account/orders.html" class="auth dd-orders">My Orders</a>
+            <button class="dd-logout">Logout</button>
+          </div>
+        </div>
       </div>
-
-      <!-- account -->
-<div class="account-menu">
-  <button id="accountBtnDesktop">Account ▾</button>
-
-  <div class="account-dropdown" id="accountDropdownDesktop">
-    <a href="/account/signin.html" class="auth dd-login">Sign in</a>
-<a href="/account/register.html" class="auth dd-register">Register</a>
-<a href="/account/orders.html" class="auth dd-orders">My Orders</a>
-<button class="dd-logout">Logout</button>
-
+    </div>
   </div>
-</div>
-
-    </div>
-
-      </div>
-
-    </div>
 </header>
-
-
 
 <!-- =======================================================
      MOBILE + TABLET HEADER
 ======================================================= -->
 <header class="s4l-header-mobile">
   <div class="mobile-header-container">
-
     <div class="mobile-header">
-
       <!-- ROW 1: Logo + basket + signin -->
       <div class="mobile-top-row">
-
         <!-- Logo -->
         <a href="/index.html" class="mobile-logo">
-          <span style="color:#F28C28;">$</span>
-          <span style="color:#FDF4E7;">ell</span>
-          <span style="color:#00BFFF;">4</span>
-          <span style="color:#FDF4E7;">Life</span>
+          <span style="color: #f28c28">$</span>
+          <span style="color: #fdf4e7">ell</span>
+          <span style="color: #00bfff">4</span>
+          <span style="color: #fdf4e7">Life</span>
         </a>
 
         <div class="mobile-right-icons">
-
           <!-- Basket (NO minicart here) -->
           <div class="basket-wrapper mobile-basket">
             <div class="basket-shell">
@@ -123,29 +109,23 @@
             </div>
           </div>
 
-         <!-- Mobile account -->
+          <!-- Mobile account -->
 
-         <div class="account-menu">
-  <button id="accountBtnMobile">Account ▾</button>
+          <div class="account-menu">
+            <button id="accountBtnMobile">Account ▾</button>
 
-<div class="account-dropdown" id="accountDropdownMobile">
-    <a href="/account/signin.html" class="auth dd-login">Sign in</a>
-<a href="/account/register.html" class="auth dd-register">Register</a>
-<a href="/account/orders.html" class="auth dd-orders">My Orders</a>
-<button class="dd-logout">Logout</button>
-
-  </div>
-</div>
-
-
-
+            <div class="account-dropdown" id="accountDropdownMobile">
+              <a href="/account/signin.html" class="auth dd-login">Sign in</a>
+              <a href="/account/register.html" class="auth dd-register">Register</a>
+              <a href="/account/orders.html" class="auth dd-orders">My Orders</a>
+              <button class="dd-logout">Logout</button>
+            </div>
+          </div>
         </div>
-
       </div>
 
       <!-- ROW 2: Menu + Search -->
       <div class="mobile-menu-col">
-
         <nav class="mobile-nav">
           <a href="/shop/">Buy</a>
           <a href="#">Sell</a>
@@ -154,18 +134,18 @@
 
         <!-- SAME structure as desktop, DIFFERENT styling -->
         <form id="mobile-search-form" class="mobile-search" role="search">
-  <input id="mobile-search-input" type="text" placeholder="Search products..." autocomplete="off">
-  <button type="submit">
-    <img src="/assets/images/hero/search.png">
-  </button>
-  <div class="search-autocomplete mobile-ac"></div>
-</form>
-
-
-
+          <input
+            id="mobile-search-input"
+            type="text"
+            placeholder="Search products..."
+            autocomplete="off"
+          />
+          <button type="submit">
+            <img src="/assets/images/hero/search.png" />
+          </button>
+          <div class="search-autocomplete mobile-ac"></div>
+        </form>
       </div>
-
     </div>
-
   </div>
 </header>

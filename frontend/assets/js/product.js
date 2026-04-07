@@ -1,146 +1,242 @@
-// /frontend/assets/js/product.js
-(async function () {
-  const $ = sel => document.querySelector(sel);
-  const IMAGE_BASE = "/assets/images/products/";
+// ======================================================
+// SELL4LIFE – PRODUCT PAGE
+// Loads product data and handles cart actions
+// ======================================================
 
-  const params = new URLSearchParams(location.search);
-  const productId = params.get("id");
+console.log('product.js loaded');
+
+(async function () {
+  const $ = (sel) => document.querySelector(sel);
+
+  const API = window.API_BASE || '';
+  const IMAGE_BASE = '/assets/images/products/';
+
+  // ======================================================
+  // GET PRODUCT ID FROM URL
+  // ======================================================
+
+  const params = new URLSearchParams(window.location.search);
+  const productId = params.get('id');
 
   if (!productId) {
-    console.warn("No ?id=... in URL, cannot load product.");
+    console.warn('No ?id=... in URL');
     return;
   }
 
-  // ---------- LOAD PRODUCTS ----------
-  let products = [];
+  // ======================================================
+  // LOAD PRODUCT FROM API
+  // ======================================================
+
+  let product = null;
+
   try {
-    const res = await fetch("/data/products.json", { cache: "no-store" });
-    products = await res.json();
+    const res = await fetch(`${API}/products/${productId}`);
+
+    if (res.ok) {
+      product = await res.json();
+      console.log('Loaded API product');
+    }
   } catch (err) {
-    console.error("Failed to load /data/products.json", err);
-    return;
+    console.log('API product load failed');
   }
 
-  const product = products.find(p => p.id === productId);
+  // ======================================================
+  // FALLBACK JSON CATALOGUE
+  // ======================================================
+
   if (!product) {
-    console.error("Product not found:", productId);
+    try {
+      const res = await fetch('/data/products.json', { cache: 'no-store' });
+
+      const products = await res.json();
+
+      product = products.find((p) => p.id === productId);
+
+      console.log('Loaded JSON product');
+    } catch (err) {
+      console.error('JSON fallback failed', err);
+    }
+  }
+
+  if (!product) {
+    console.error('Product not found:', productId);
     return;
   }
 
-  // ---------- RENDER PRODUCT ----------
-  $(".product-title") &&
-    ($(".product-title").textContent = product.name);
+  // ======================================================
+  // NORMALIZE PRODUCT ID
+  // ======================================================
 
-  $(".product-category") &&
-    ($(".product-category").textContent =
-      `${product.category} / ${product.subcategory}`);
+  const pid = product._id || product.id;
 
-  $(".product-price") &&
-    ($(".product-price").textContent = `£${product.price.toFixed(2)}`);
+  // ======================================================
+  // IMAGE HELPER
+  // ======================================================
 
-  $(".product-desc") &&
-    ($(".product-desc").textContent = product.description);
+  const firstImage = product.images?.[0] || '';
 
-  // ---------- IMAGES ----------
-  const hiddenGallery = document.getElementById("hidden-gallery");
-  if (hiddenGallery) {
-    hiddenGallery.innerHTML = "";
-    product.images.forEach(imgFile => {
-      const img = document.createElement("img");
-      img.src = IMAGE_BASE + imgFile;
+  const productImage = firstImage.startsWith('http') ? firstImage : IMAGE_BASE + firstImage;
+
+  // ======================================================
+  // RENDER PRODUCT INFO
+  // ======================================================
+
+  if ($('.product-title')) $('.product-title').textContent = product.name;
+
+  if ($('.product-category')) {
+    const category = product.category || '';
+    const sub = product.subcategory || '';
+
+    $('.product-category').textContent = sub ? `${category} / ${sub}` : category;
+  }
+
+  if ($('.product-price')) $('.product-price').textContent = `£${Number(product.price).toFixed(2)}`;
+
+  if ($('.product-desc')) $('.product-desc').textContent = product.description;
+
+  // ======================================================
+  // RENDER PRODUCT IMAGES
+  // ======================================================
+
+  const hiddenGallery = document.getElementById('hidden-gallery');
+
+  if (hiddenGallery && Array.isArray(product.images)) {
+    hiddenGallery.innerHTML = '';
+
+    product.images.forEach((imgFile) => {
+      const img = document.createElement('img');
+
+      img.src = imgFile.startsWith('http') ? imgFile : IMAGE_BASE + imgFile;
+
       img.alt = product.name;
+
       hiddenGallery.appendChild(img);
     });
-    document.dispatchEvent(new Event("productImagesLoaded"));
+
+    document.dispatchEvent(new Event('productImagesLoaded'));
   }
 
-  // ---------- CART HELPER ----------
-  function addToCart() {
-    let cart = JSON.parse(localStorage.getItem("cart") || "[]")
-      .filter(i => i && i.id);
+  // ======================================================
+  // STOCK CHECK
+  // ======================================================
 
-    const existing = cart.find(i => i.id === product.id);
+  const addBtns = document.querySelectorAll('.btn-add');
+  const buyBtn = $('.btn-buy');
+
+  if (product.stock !== undefined && product.stock <= 0) {
+    addBtns.forEach((btn) => {
+      btn.disabled = true;
+      btn.textContent = 'Out of stock';
+    });
+
+    if (buyBtn) {
+      buyBtn.disabled = true;
+      buyBtn.textContent = 'Out of stock';
+    }
+  }
+
+  // ======================================================
+  // ADD TO CART
+  // ======================================================
+
+  function addToCart() {
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]').filter(
+      (i) => i && (i.productId || i.id)
+    );
+
+    const existing = cart.find((i) => (i.productId || i.id) === pid);
 
     if (existing) {
+      if (product.trackInventory && existing.quantity >= product.stock) {
+        if (window.showToast) {
+          window.showToast(`${product.name}: only ${product.stock} left`);
+        }
+        return { cart, added: false };
+      }
+
       existing.quantity = (existing.quantity || 1) + 1;
     } else {
       cart.push({
-        id: product.id,
+        productId: pid,
+        _id: pid,
         name: product.name,
         price: product.price,
-        image: IMAGE_BASE + (product.images[0] || ""),
+        image: productImage,
         quantity: 1,
         category: product.category,
-        subcategory: product.subcategory
+        subcategory: product.subcategory,
+        vendor: product.vendor,
       });
     }
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    document.dispatchEvent(new Event("cartUpdated"));
+    localStorage.setItem('cart', JSON.stringify(cart));
+    document.dispatchEvent(new Event('cartUpdated'));
 
-    return cart;
+    return { cart, added: true };
   }
 
-  // ---------- ADD TO BASKET ----------
-  const addBtn = $(".btn-add");
-  if (addBtn) {
-    addBtn.addEventListener("click", () => {
-      const cart = addToCart();
+  // ======================================================
+  // ADD TO CART BUTTON
+  // ======================================================
 
-      const badge = document.querySelector(".basket-qty");
+  addBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (product.stock !== undefined && product.stock <= 0) {
+        if (window.showToast) {
+          window.showToast('Out of stock');
+        }
+        return;
+      }
+      const result = addToCart();
+
+      const badge = document.querySelector('.basket-qty');
+
       if (badge) {
-        const totalQty = cart.reduce(
-          (sum, item) => sum + (item.quantity || 0),
-          0
-        );
+        const cart = result.cart;
+        const totalQty = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
         badge.textContent = totalQty;
-        badge.classList.remove("hide");
-        badge.classList.add("bump");
-        setTimeout(() => badge.classList.remove("bump"), 220);
+        badge.classList.remove('hide');
       }
 
-      console.log("✔ Added to basket:", product.name);
+      console.log('Added to basket:', product.name);
+
+      if (result.added && window.showToast) {
+        window.showToast('Added to cart');
+      }
     });
-  }
+  });
 
-  // ---------- BUY NOW (ISOLATED FLOW) ----------
-  const buyBtn = $(".btn-buy");
+  // ======================================================
+  // BUY NOW
+  // ======================================================
+
   if (buyBtn) {
-    buyBtn.addEventListener("click", () => {
-
-      // ✅ Backup cart ONLY ONCE
-      if (!localStorage.getItem("cart_backup")) {
-        const existingCart =
-          JSON.parse(localStorage.getItem("cart") || "[]");
+    buyBtn.addEventListener('click', () => {
+      if (!localStorage.getItem('cart_backup')) {
+        const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
 
         if (existingCart.length) {
-          localStorage.setItem(
-            "cart_backup",
-            JSON.stringify(existingCart)
-          );
+          localStorage.setItem('cart_backup', JSON.stringify(existingCart));
         }
       }
 
-      // Replace cart with ONLY this product
-      const buyNowCart = [{
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image: IMAGE_BASE + (product.images[0] || ""),
-        quantity: 1,
-        category: product.category,
-        subcategory: product.subcategory
-      }];
+      const buyNowCart = [
+        {
+          productId: pid,
+          name: product.name,
+          price: product.price,
+          image: productImage,
+          quantity: 1,
+        },
+      ];
 
-      localStorage.setItem("cart", JSON.stringify(buyNowCart));
+      localStorage.setItem('cart', JSON.stringify(buyNowCart));
+      localStorage.setItem('buyNow', 'true');
 
-      // Set intent
-      localStorage.setItem("buyNow", "true");
-
-      // Go straight to checkout
-      window.location.href = "/cart/checkout.html";
+      window.location.href = '/cart/checkout.html';
     });
   }
 
-  document.dispatchEvent(new Event("productLoaded"));
+  document.dispatchEvent(new Event('productLoaded'));
 })();

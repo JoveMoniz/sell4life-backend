@@ -1,101 +1,92 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 
-  <title>Admin Orders | Sell4Life</title>
+    <title>Admin Orders | Sell4Life</title>
 
-  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260211c" />
+  </head>
 
-  <link rel="stylesheet" href="/assets/css/admin.css?v=?v=20260211b">
+  <body class="admin admin-orders">
+    <!-- STICKY STACK (Header + Search/Filters) -->
+    <div class="admin-sticky">
+      <div class="admin-top">
+        <header class="admin-header">
+          <a href="/index.html" class="admin-logo">
+            <span class="logo-dollar">$</span>
+            <span class="logo-text">ell</span>
+            <span class="logo-four">4</span>
+            <span class="logo-text">Life</span>
+          </a>
+        </header>
 
+        <div class="admin-title">
+          <a href="/account/admin/index.html" class="admin-back">← back to dashboard</a>
+          <h1>Admin – Orders</h1>
+        </div>
 
-</head>
-<body class="admin admin-orders">
+        <button id="logoutBtn">Log out</button>
+      </div>
 
-  <div class="admin-page"></div>
+      <!-- SEARCH + FILTERS -->
+      <div class="admin-search-bar">
+        <div class="autocomplete-wrapper">
+          <input
+            type="text"
+            id="orderSearch"
+            placeholder="Search Order ID or email"
+            autocomplete="off"
+          />
+          <div id="autocompleteResults" class="autocomplete-results"></div>
+        </div>
 
-<div class="admin-top">
-   <!-- Logo -->
-<header class="admin-header">
-  <a href="/index.html" class="admin-logo">
-    <span class="logo-dollar">$</span>
-    <span class="logo-text">ell</span>
-    <span class="logo-four">4</span>
-    <span class="logo-text">Life</span>
-  </a>
-</header>
+        <div class="admin-status-filters">
+          <button class="filter-btn active" data-status="all">All</button>
 
+          <!-- ACTION REQUIRED (the real battlefield) -->
+          <button class="filter-btn" data-status="Pending">Pending</button>
+          <button class="filter-btn" data-status="Processing">Processing</button>
+          <button class="filter-btn danger" data-status="Cancel Requested">Cancel Req</button>
+          <button class="filter-btn danger" data-status="Refund Requested">Refund Req</button>
 
-<div class="admin-title">
+          <!-- LOWER PRIORITY -->
+          <button class="filter-btn" data-status="Shipped">Shipped</button>
+          <button class="filter-btn" data-status="Delivered">Delivered</button>
+          <button class="filter-btn" data-status="Cancelled">Cancelled</button>
+        </div>
+      </div>
+    </div>
 
+    <!-- PAGE CONTENT -->
+    <div class="admin-page">
+      <div class="admin-table-scroll">
+        <table class="admin-orders-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>User</th>
+              <th>Total</th>
+              <th>Fulfillment</th>
+              <th>Payment</th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTable"></tbody>
+        </table>
+      </div>
 
-  <a href="/account/admin/index.html" class="admin-back">← back to dashboar</a>
+      <div id="pagination"></div>
+    </div>
 
-<h1>Admin–Orders</h1>
-
-</div>
-
-<button id="logoutBtn">Log out</button>
-</div>
-
-<div class="admin-search-bar">
-  <input
-    type="text"
-    id="orderSearch"
-    placeholder="Search Order ID or email"/>
-
-  <select id="statusFilter">
-  <option value="all">All</option>
-  <option value="Processing">Processing</option>
-  <option value="Shipped">Shipped</option>
-  <option value="Delivered">Delivered</option>
-  <option value="Cancelled">Cancelled</option>
-</select>
-
-
-  <button id="searchBtn">Search</button>
-</div>
-
-
-
-
-<div class="admin-table-scroll">
-  <table class="admin-orders-table">
-    <thead>
-      <tr>
-        <th>Order ID</th>
-        <th>User</th>
-        <th>Total</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="ordersTable"></tbody>
-  </table>
-
-
-</div>
-
-
-<div id="pagination"></div>
-</div>
-
-
-
-   <script>
-  window.__pageScripts = [
-        "/assets/js/config.js",
-        "/assets/js/admin-orders.js"   
-
-  ];
-</script>
-
-
-</body>
+    <script type="module" src="/assets/js/config.js?v=20260211"></script>
+    <script type="module" src="/assets/js/admin-orders.js?v=20260211"></script>
+    <script type="module" src="/assets/js/admin-logout.js"></script>
+  </body>
 </html>

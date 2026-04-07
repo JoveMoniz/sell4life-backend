@@ -1,38 +1,45 @@
 /* =====================================================
-   ADMIN BASE (ALL PAGES)
-   ===================================================== */
-html {
-html, body {
-  overflow: visible;
-}
+   ADMIN.CSS (CLEAN + CONSOLIDATED)
+   - No duplicates
+   - Single sticky stack (header + search/filters)
+   - Keeps your existing layouts/styles
+===================================================== */
 
-}
-
-
+/* ===============================
+   BASE RESET
+=============================== */
+/*html,
 body {
-  overflow-y: visible;
+  overflow-x: hidden;
 }
-
-
-
-
+*/
+body {
+  margin: 0;
+  padding: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  background: #f5f6f8;
+  color: #1f2933;
+}
 
 * {
   box-sizing: border-box;
 }
 
-
-body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: #f5f6f8;
-  color: #1f2933;
-  margin: 0;
-  padding: 0;
-}
-
+/* ===============================
+   GLOBAL TYPE + BUTTONS
+=============================== */
 h1 {
   font-size: 22px;
-  margin-bottom: 20px;
+  margin: 0 0 20px;
+}
+
+h3 {
+  margin: 0 0 12px;
 }
 
 button {
@@ -43,110 +50,50 @@ button {
   cursor: pointer;
 }
 
+/* Logout button */
 #logoutBtn {
   background: #dc2626;
   color: #fff;
-  margin-bottom: 20px;
 }
 
 #logoutBtn:hover {
   background: #b91c1c;
 }
 
+/* ===============================
+   STICKY STACK (HEADER + SEARCH)
+   IMPORTANT: children are NOT sticky
+=============================== */
+.admin-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5000;
+  background: #f5f6f8;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
 
-/* =====================================================
+/* ===============================
    ADMIN TOP BAR
-   ===================================================== */
-
+=============================== */
 .admin-top {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 16px;
-  letter-spacing: 0.2px;
 
   padding: 16px 20px;
-  margin-bottom: 24px;
-
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-
   background: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-}
+  border-bottom: 1px solid #e5e7eb;
 
-
-/* Center the page title properly */
-.admin-top h1 {
-  margin-top: 4px;
-  text-align: center;
-  font-size: 20px;
-  line-height: 1.2;
-}
-
-/* Keep logout tidy */
-.admin-top #logoutBtn {
   margin: 0;
-  white-space: nowrap;
+  position: static; /* not sticky */
 }
 
-.admin-title {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.admin-back {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  text-decoration: none;
-   opacity: 0.85;
-}
-
-.admin-back:hover {
-  text-decoration: underline;
-}
-
-
-
-@media (max-width: 480px) {
-  .admin-back {
-    font-size: 15px;
-  }
-}
-
-
-@media (max-width: 768px) {
-  .admin-top #logoutBtn {
-    width: auto;          /* override global */
-    padding: 8px 14px;
-    font-size: 14px;
-  }
-}
-
-/* =====================================================
-   ADMIN TOP BAR – LOGO ONLY ADJUSTMENT
-   ===================================================== */
-
-.admin-top:has(.admin-header):not(:has(h1)):not(:has(#logoutBtn)) {
-  grid-template-columns: auto;
-  justify-content: flex-start;
-}
-
-
-/* =====================================================
-   ADMIN LOGO
-   ===================================================== */
-
+/* Logo */
 .admin-header {
-  position: static; /* let grid handle it */
   display: flex;
   align-items: center;
 }
-
 
 .admin-logo {
   display: inline-flex;
@@ -154,26 +101,24 @@ button {
   gap: 1px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: #111827; /* deep neutral dark */
+  background: #111827;
   font-size: 18px;
   font-weight: 700;
   text-decoration: none;
   line-height: 1;
 }
 
-/* Individual colors */
 .admin-logo .logo-dollar {
-  color: #F28C28;
+  color: #f28c28;
 }
-
 .admin-logo .logo-text {
-  color: #FDF4E7;
+  color: #fdf4e7;
 }
-
 .admin-logo .logo-four {
-  color: #00BFFF;
+  color: #00bfff;
 }
 
+/* Title */
 .admin-title {
   display: flex;
   flex-direction: column;
@@ -181,52 +126,202 @@ button {
   gap: 4px;
 }
 
+.admin-top h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 20px;
+  line-height: 1.2;
+}
 
 .admin-back {
   display: inline-block;
-  margin-bottom: 12px;
   font-size: 14px;
+  margin: 5px;
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #37415100;
   font-weight: 600;
   color: #374151;
   text-decoration: none;
+  opacity: 0.85;
 }
 
 .admin-back:hover {
   text-decoration: underline;
+  border: 1px solid #374151;
 }
 
-
-/* =====================================================
-   GLOBAL MOBILE BASE (ALL ADMIN PAGES)
-   ===================================================== */
-
-@media (max-width: 768px) {
-
-  h1 {
-    font-size: 20px;
-  }
-
-  h3 {
-    font-size: 16px;
-  }
-
-  button {
-    font-size: 16px;
-    padding: 14px;
-  }
-
-  #logoutBtn {
-    width: 100%;
-      padding: 12px;
-    font-size: 16px;
-  
-  }
+/* Special: logo-only pages */
+.admin-top:has(.admin-header):not(:has(h1)):not(:has(#logoutBtn)) {
+  grid-template-columns: auto;
+  justify-content: flex-start;
 }
 
+/* ===============================
+   SEARCH + FILTER BAR
+=============================== */
+.admin-search-bar {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
 
+  padding: 12px 20px;
+  margin: 0; /* IMPORTANT inside sticky stack */
+  background: #f5f6f8;
+  border-bottom: 1px solid #e5e7eb;
 
+  position: static; /* not sticky */
+}
+
+.admin-search-bar input,
+.admin-search-bar select {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+/* Quick search links (Order ID + Email) */
+.quick-search-id,
+.quick-search-email {
+  background: none;
+  border: none;
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+
+  font: inherit;
+  font-weight: 600;
+  color: #111827;
+
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.quick-search-id:hover,
+.quick-search-email:hover {
+  text-decoration: underline;
+  transform: scale(1.08);
+  text-decoration: underline;
+}
+
+.quick-search-id {
+  font-weight: 700;
+}
+
+.row-active {
+  background: #eef2ff;
+}
+
+/* Autocomplete */
+.autocomplete-wrapper {
+  position: relative;
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.autocomplete-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+
+  z-index: 6000;
+}
+
+.autocomplete-results div {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #111827;
+  transition: background 0.15s ease;
+}
+
+.autocomplete-results div:hover {
+  background: #f3f4f6;
+}
+
+.autocomplete-results div.active {
+  background: #e5e7eb;
+}
+
+/* Filters */
+.admin-status-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+}
+
+.filter-btn.active {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.filter-btn.active[data-status='all'] {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.filter-btn.active[data-status='Processing'] {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.filter-btn.active[data-status='Shipped'] {
+  background: #ecfeff;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
+.filter-btn.active[data-status='Delivered'] {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.filter-btn.active[data-status='Cancelled'] {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+/* ===============================
+   PAGE WRAPPER
+=============================== */
 .admin-page {
-  padding: 0 20px;
+  padding: 0 20px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 @media (max-width: 768px) {
@@ -235,131 +330,9 @@ button {
   }
 }
 
-
-
-
-/* Mobile: make ALL admin tables horizontally scroll when needed */
-@media (max-width: 480px) and (orientation: portrait) {
-  .admin-table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .admin-table-scroll table {
-    min-width: 520px; /* users table baseline */
-    table-layout: auto;
-  }
-
-  .admin th, .admin td {
-    font-size: 15px;
-    padding: 10px;
-    white-space: nowrap;
-  }
-}
-
-
-
-
-/* =====================================================
-   ADMIN DASHBOARD
-   ===================================================== */
-
-.admin-dashboard {
-  min-height: 100vh;
-}
-
-
-.admin-dashboard .dashboard-wrapper {
-  width: 100%;
-  max-width: 420px;
-  background: #ffffff;
-  padding: 32px;
-  border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-  text-align: center;
-
-  margin: 82px auto 0;
-}
-
-.admin-dashboard h1 {
-  margin-bottom: 24px;
-}
-
-.admin-dashboard .dashboard-nav {
-  list-style: none;
-  padding: 0;
-  margin-bottom: 24px;
-}
-
-.admin-dashboard .dashboard-nav li + li {
-  margin-top: 12px;
-}
-
-.admin-dashboard .dashboard-nav a {
-  display: block;
-  padding: 14px;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #1f2933;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.admin-dashboard .dashboard-nav a:hover {
-  background: #e5e7eb;
-}
-
-
-
-  .admin-dashboard .dashboard-wrapper {
-    min-height: 75vh;
-    width: 100%;
-    max-width: none;
-    padding: 24px;
-    border-radius: 0;
-    box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .admin-dashboard .dashboard-nav a {
-    font-size: 18px;
-    padding: 18px;
-  }
-
-
-
-@media (max-width: 480px) {
-  .admin-dashboard {
-    padding: 0;
-  }
-
-  .admin-dashboard h1 {
-    font-size: 20px;
-  }
-
-  .admin-dashboard .dashboard-nav a {
-    font-size: 15px;
-  }
-
-  .admin-dashboard .dashboard-nav li + li {
-    margin-top: 8px;
-  }
-}
-
-
-
-
-
-
-
-
-
-/* =====================================================
-   ADMIN TABLES (ORDERS + USERS)
-   ===================================================== */
-
+/* ===============================
+   TABLES (GENERAL)
+=============================== */
 .admin table {
   width: 100%;
   border-collapse: collapse;
@@ -379,198 +352,15 @@ button {
   font-weight: 600;
 }
 
-
-/* =====================================================
-   ADMIN ORDERS – INLINE DETAILS
-===================================================== */
-
-.order-details-row td {
-  padding: 20px 24px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+/* horizontal scroll wrapper */
+.admin-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Main inline layout */
-.inline-order-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  font-size: 14px;
- 
-}
-
-/* Subtle hierarchy for metadata column */
-.inline-order-grid > div:first-child {
-  padding-left: 12px;
-  border-left: 3px solid #e5e7eb;
-}
-
-/* Labels */
-.inline-order-grid strong {
-  color: #111827;
-  font-weight: 600;
-}
-
-/* Controls */
-.inline-order-grid select {
-  padding: 6px 8px;
-  font-size: 14px;
-}
-
-/* Inline Order ID emphasis */
-.inline-order-id {
-  display: inline-block;
-  font-weight: 600;
-  color: #111827;
-  margin-left: 6px;
-}
-
-
-/* Inline update status button – match Order Details */
-.inline-update {
-  background: #0f766e;      /* teal green */
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-weight: 600;
-}
-
-.inline-update:hover {
-  background: #0d5f59;
-}
-
-.inline-update:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-
-
-/* Action spacing */
-.inline-order-grid a {
-  display: inline-block;
-  margin-top: 8px;
-}
-
-.inline-order-wrapper {
-  width: fit-content;
-  margin-left: auto;
-  overflow: hidden;
-  padding-left: 20px;
-
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-4x) scale(0.98);
-
-transition:
-  max-height 420ms cubic-bezier(.25,.8,.25,1) 90ms,
-  opacity 180ms ease,
-  transform 260ms cubic-bezier(.22,.61,.36,1);
-
-  pointer-events: none;
-}
-
-
-.order-details-row td {
-  padding: 0;
-  background: transparent;
-}
-
-
-/* open state */
-.order-details-row.open .inline-order-wrapper {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-  max-height: 1000px;
-}
-
- 
-  .inline-order-grid {
-    gap: 10px;
-    
-  }
-
-
-  /* prevent table constraints */
-  .order-details-row td {
-    padding: 0;
-    background: transparent;
-    
-  }
-
-  .status {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-/* Processing – neutral / waiting */
-.status-processing {
-  background: #eef2ff;
-  color: #3730a3;
-}
-
-/* Shipped – action / in motion */
-.status-shipped {
-  background: #ecfeff;
-  color: #0f766e;
-}
-
-/* Delivered – final / success */
-.status-delivered {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-/* Cancelled – final / warning */
-.status-cancelled {
-  background: #fef2f2;
-  color: #991b1b;
-}
-
-
-.status-delivered,
-.status-cancelled {
-  opacity: 0.85;
-}
-
-.inline-status {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: 600;
-}
-
-.status-delivered {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-
-
-
-@media (max-width: 480px) {
-  .inline-order-wrapper {
-    width: 370px;
-  }
-}
-
-@media (max-width: 380px) {
-  .inline-order-wrapper {
-    width: 330px;
-  }
-}
-
-
-/* =====================================================
-   ADMIN ORDERS
-   ===================================================== */
-
+/* ===============================
+   ADMIN ORDERS (table + links)
+=============================== */
 .admin-orders td:last-child a {
   color: #0f766e;
   font-weight: 600;
@@ -581,70 +371,107 @@ transition:
   text-decoration: underline;
 }
 
-
-/* =====================================================
-   ADMIN ORDERS – MOBILE SWIPE (CLEAN RESET)
-   2 COLUMNS PER SWIPE × 3 SWIPES
-   
-   
-   TODO: admin-orders mobile swipe
-   Revisit if mobile admin becomes required.
-   Desktop is the primary target. 
-
-===================================================== */
-
-@media (max-width: 480px) and (orientation: portrait) {
-
-  .admin-table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .admin-orders-table {
-    table-layout: fixed;
-    width: 1200px;        /* 🔑 total width = 3 swipes */
-    min-width: 1200px;
-    font-size: 15px;
-  }
-
-  .admin-orders-table th,
-  .admin-orders-table td {
-    padding: 10px 12px;
-    white-space: nowrap;
-  }
-
-  /* === COLUMN PAIRS === */
-  /* Swipe 1 */
-  .admin-orders-table th:nth-child(1),
-  .admin-orders-table td:nth-child(1) { width: 300px; } /* Order ID */
-
-  .admin-orders-table th:nth-child(2),
-  .admin-orders-table td:nth-child(2) { width: 300px; } /* User */
-
-  /* Swipe 2 */
-  .admin-orders-table th:nth-child(3),
-  .admin-orders-table td:nth-child(3) { width: 200px; } /* Total */
-
-  .admin-orders-table th:nth-child(4),
-  .admin-orders-table td:nth-child(4) { width: 200px; } /* Status */
-
-  /* Swipe 3 */
-  .admin-orders-table th:nth-child(5),
-  .admin-orders-table td:nth-child(5) { width: 120px; } /* Created */
-
-  .admin-orders-table th:nth-child(6),
-  .admin-orders-table td:nth-child(6) { width: 80px; }  /* Action */
+/* ===============================
+   INLINE ORDER DETAILS (expand row)
+=============================== */
+.order-details-row td {
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid #e5e7eb;
+  overflow: hidden;
 }
 
+/* Closed state */
+.inline-order-wrapper {
+  width: 100%;
+  background: #f9fafb;
 
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
 
-/* =====================================================
-   ADMIN PAGINATION
-   ===================================================== */
+  transition:
+    max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    padding 0.25s ease;
 
+  padding: 0 24px;
+
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Open state */
+.order-details-row.open .inline-order-wrapper {
+  max-height: 400px;
+  opacity: 1;
+  transform: translateY(0);
+  padding: 16px 24px;
+}
+
+.inline-order-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 280px;
+  text-align: right;
+}
+
+.inline-status-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Status action buttons (ONE definition only) */
+.status-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+}
+
+.status-btn.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* Specific hover tint */
+.status-btn[data-status='Cancelled']:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.status-btn[data-status='Shipped']:hover {
+  background: #ecfeff;
+  border-color: #99f6e4;
+}
+
+.status-btn[data-status='Delivered']:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* ===============================
+   PAGINATION
+=============================== */
 #pagination {
   display: flex;
-  gap: 8px;                /* 👈 space between items */
+  gap: 8px;
   justify-content: center;
   margin-top: 24px;
   flex-wrap: wrap;
@@ -675,7 +502,6 @@ transition:
     background 0.15s ease;
 }
 
-/* Hover grow (controlled, not stupid) */
 #pagination button:hover,
 #pagination a:hover {
   background: #f1f5f9;
@@ -683,7 +509,6 @@ transition:
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
-/* Active page */
 #pagination .active,
 #pagination button.active {
   background: #111827;
@@ -693,29 +518,114 @@ transition:
   box-shadow: none;
 }
 
-/* Mobile tap comfort */
-@media (max-width: 768px) {
-  #pagination button,
-  #pagination a {
-    min-width: 42px;
-    height: 42px;
-    font-size: 16px;
-  }
-}
-
-
 #pagination button.active {
   pointer-events: none;
 }
 
+/* ===============================
+   STATUS BADGES
+=============================== */
+.status {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
 
+.status-processing {
+  background: #eef2ff;
+  color: #3730a3;
+}
 
+.status-shipped {
+  background: #ecfeff;
+  color: #0f766e;
+}
 
+.status-delivered {
+  background: #f1f5f9;
+  color: #475569;
+}
 
-/* =====================================================
-   ADMIN ORDER DETAILS
-   ===================================================== */
+.status-cancelled {
+  background: #fef2f2;
+  color: #991b1b;
+}
 
+.payment-status {
+  font-weight: 600;
+}
+
+.payment-status.paid {
+  color: #0a7c2f;
+}
+
+.payment-status.pending {
+  color: #c97a00;
+}
+
+.payment-status.failed {
+  color: #c40000;
+}
+
+.payment-status.refunded {
+  color: #555;
+}
+
+/* ===============================
+   ADMIN USERS TABLE
+=============================== */
+.admin-users-table {
+  width: 100%;
+  min-width: 360px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-users-table th:nth-child(1),
+.admin-users-table td:nth-child(1) {
+  width: auto;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.admin-users-table th:nth-child(2),
+.admin-users-table td:nth-child(2) {
+  width: 90px;
+}
+
+.admin-users-table th:nth-child(3),
+.admin-users-table td:nth-child(3) {
+  width: 90px;
+}
+
+.admin-search-bar {
+  padding: 16px 0;
+}
+
+.admin-search-bar input {
+  width: 320px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+/* ===============================
+   ADMIN ORDER DETAILS PAGE
+=============================== */
 .admin-order-details .order-box {
   background: #ffffff;
   padding: 20px;
@@ -725,7 +635,6 @@ transition:
   font-size: 14px;
 }
 
-/* Section titles */
 .admin-order-details .order-box h3 {
   margin-top: 0;
   margin-bottom: 14px;
@@ -734,10 +643,7 @@ transition:
   color: #111827;
 }
 
-/* =====================================================
-   PRODUCTS TABLE (ALIGNED, GAP FIXED SAFELY)
-===================================================== */
-
+/* Products table */
 .admin-order-details .order-products {
   width: 100%;
   border-collapse: collapse;
@@ -752,7 +658,6 @@ transition:
   vertical-align: middle;
 }
 
-/* Header styling */
 .admin-order-details .order-products th {
   background: #f9fafb;
   font-weight: 600;
@@ -760,39 +665,26 @@ transition:
   text-align: left;
 }
 
-/* Column widths (SAFE) */
-.admin-order-details .order-products th:nth-child(1),
-.admin-order-details .order-products td:nth-child(1) {
-  width: auto; /* 🔑 prevents empty gap */
+.admin-order-details .order-products th:first-child {
+  padding-left: 56px;
 }
 
 .admin-order-details .order-products th:nth-child(2),
 .admin-order-details .order-products td:nth-child(2) {
   width: 80px;
-  text-align: left;
 }
 
 .admin-order-details .order-products th:nth-child(3),
 .admin-order-details .order-products td:nth-child(3) {
   width: 110px;
-  text-align: left;
 }
 
 .admin-order-details .order-products th:nth-child(4),
 .admin-order-details .order-products td:nth-child(4) {
   width: 110px;
-  text-align: left;
 }
 
-/* Align Product header with product content (thumbnail offset) */
-.admin-order-details .order-products th:first-child {
-  padding-left: 56px;
-}
-
-/* =====================================================
-   PRODUCT THUMBNAIL
-===================================================== */
-
+/* Product cell */
 .admin-order-details .product-cell {
   display: flex;
   align-items: center;
@@ -818,10 +710,7 @@ transition:
   text-overflow: ellipsis;
 }
 
-/* =====================================================
-   STATUS CONTROLS
-===================================================== */
-
+/* Status controls */
 .admin-order-details .status-controls {
   display: flex;
   gap: 12px;
@@ -852,10 +741,6 @@ transition:
   font-size: 14px;
 }
 
-/* =====================================================
-   STATUS HISTORY
-===================================================== */
-
 .admin-order-details #statusHistory {
   margin-top: 10px;
   padding-left: 18px;
@@ -866,141 +751,13 @@ transition:
   font-size: 14px;
 }
 
-/* =====================================================
-   MOBILE ADJUSTMENTS (SAFE)
-===================================================== */
-
-@media (max-width: 480px) {
-
-
-/* Column widths (SAFE) */
-.admin-order-details .order-products th:nth-child(1),
-.admin-order-details .order-products td:nth-child(1) {
-  width: auto; /* 🔑 prevents empty gap */
-}
-
-.admin-order-details .order-products th:nth-child(2),
-.admin-order-details .order-products td:nth-child(2) {
-  width: 30px;
-  text-align: left;
-}
-
-.admin-order-details .order-products th:nth-child(3),
-.admin-order-details .order-products td:nth-child(3) {
-  width: 65px;
-  text-align: left;
-}
-
-.admin-order-details .order-products th:nth-child(4),
-.admin-order-details .order-products td:nth-child(4) {
-  width: 65px;
-  text-align: left;
-}
-
-}
-
-
-
-/* =====================================================
-   ADMIN USERS
-   ===================================================== */
-
-
-.admin-users-table {
-  width: 100%;
-  min-width: 360px; /* enough for Email + Role + Action */
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.admin-users-table th,
-.admin-users-table td {
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 14px;
-  text-align: left;
-  white-space: nowrap;
-}
-
-/* Email column */
-.admin-users-table th:nth-child(1),
-.admin-users-table td:nth-child(1) {
-  width: auto;
-  white-space: normal;
-  word-break: break-word;
-}
-
-/* Role */
-.admin-users-table th:nth-child(2),
-.admin-users-table td:nth-child(2) {
-  width: 90px;
-}
-
-/* Action */
-.admin-users-table th:nth-child(3),
-.admin-users-table td:nth-child(3) {
-  width: 90px;
-}
-
-
-/* ================================
-   ADMIN USERS – MOBILE (FIXED, TABLE-BASED)
-================================ */
-@media (max-width: 480px) {
-
-  /* Keep table behavior */
-  .admin-users-table {
-    table-layout: fixed; /* 🔑 critical */
-    width: 100%;
-  }
-
-  .admin-users-table th,
-  .admin-users-table td {
-    padding: 10px;
-    font-size: 15px;
-    white-space: nowrap;
-  }
-
-  /* Email column */
-  .admin-users-table th:nth-child(1),
-  .admin-users-table td:nth-child(1) {
-    width: 60%;
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  /* Role */
-  .admin-users-table th:nth-child(2),
-  .admin-users-table td:nth-child(2) {
-    width: 20%;
-    text-align: center;
-  }
-
-  /* Action */
-  .admin-users-table th:nth-child(3),
-  .admin-users-table td:nth-child(3) {
-    width: 20%;
-    text-align: right;
-  }
-
-  .admin-users select {
-    max-width: 100%;
-  }
-}
-
-
-
-
-
-/* =====================================================
-   ADMIN SIGN IN (CENTERED)
-   ===================================================== */
-
-   .admin-signin {
+/* ===============================
+   ADMIN SIGN IN
+=============================== */
+.admin-signin {
   min-height: 100vh;
   background: #f5f6f8;
 }
-
 
 .admin-signin .signin-wrapper {
   width: 100%;
@@ -1010,12 +767,8 @@ transition:
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   text-align: center;
-
-
-
-  margin: 82px auto 0; /* 👈 THIS WAS MISSING */
+  margin: 82px auto 0;
 }
-
 
 .admin-signin h1 {
   margin-bottom: 24px;
@@ -1048,116 +801,245 @@ transition:
   background: #1f2937;
 }
 
-/* Base message (neutral) */
 .admin-signin #error {
   margin-top: 14px;
   font-size: 14px;
-  color: #374151; /* neutral grey */
+  color: #374151;
 }
 
-
-/* Error state */
 .admin-signin #error.error {
-  color: #dc2626; /* red */
+  color: #dc2626;
 }
 
-/* Success state inside button (subtle) */
 .admin-signin button.success {
-  background: #ffffff;   /* same as normal */
-  color: #16a34a;        /* calm, readable */
+  background: #ffffff;
+  color: #16a34a;
   font-weight: 600;
   border: 1px solid black;
 }
-
 
 .admin-signin button:disabled {
   opacity: 0.75;
   cursor: not-allowed;
 }
 
+/* ===============================
+   ADMIN DASHBOARD
+=============================== */
+.admin-dashboard {
+  min-height: 100vh;
+}
 
+.admin-dashboard .dashboard-wrapper {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  margin: 82px auto 0;
+}
 
-/* =====================================================
-   ADMIN SIGN IN – MOBILE & TABLET
-   ===================================================== */
+.admin-dashboard h1 {
+  margin-bottom: 24px;
+}
 
+.admin-dashboard .dashboard-nav {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 24px;
+}
+
+.admin-dashboard .dashboard-nav li + li {
+  margin-top: 12px;
+}
+
+.admin-dashboard .dashboard-nav a {
+  display: block;
+  padding: 14px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #1f2933;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-dashboard .dashboard-nav a:hover {
+  background: #e5e7eb;
+}
+
+/* ===============================
+   RESPONSIVE
+=============================== */
 @media (max-width: 768px) {
-  .admin-signin {
-    padding: 0;
+  h1 {
+    font-size: 20px;
   }
 
-  .admin-signin .signin-wrapper {
-    min-height: 100vh;
-    max-width: none;
-    padding: 24px;
-    border-radius: 0;
-    box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+  h3 {
+    font-size: 16px;
   }
 
-  .admin-signin input,
-  .admin-signin button {
-    font-size: 18px;
-    padding: 16px;
+  button {
+    font-size: 16px;
+    padding: 14px;
   }
 
-  .admin-signin h1 {
-    font-size: 22px;
+  #logoutBtn {
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+
+  .admin-signin .signin-wrapper,
+  .admin-dashboard .dashboard-wrapper {
+    margin-top: 24px;
   }
 }
 
 @media (max-width: 480px) {
-  .admin-signin {
-    padding: 20px;
+  .admin-back {
+    font-size: 15px;
   }
 
-  .admin-signin .signin-wrapper {
-    padding: 20px;
-    max-width: 85vh;
+  .admin-top {
+    padding: 12px 16px;
   }
 
-  .admin-signin h1 {
-    margin-bottom: 20px;
+  .admin-top h1 {
+    font-size: 18px;
+  }
+
+  .admin-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .autocomplete-wrapper {
+    width: 100%;
+  }
+
+  #orderSearch {
+    width: 100%;
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .admin-status-filters .filter-btn {
+    flex: 1 1 calc(33.33% - 8px);
+    padding: 10px 0;
+    border-radius: 10px;
+  }
+
+  /* Mobile tables scroll */
+  .admin-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .admin-orders-table {
+    min-width: 760px;
+    width: 760px;
+    table-layout: auto;
+  }
+
+  .admin-orders-table th,
+  .admin-orders-table td {
+    padding: 12px;
+    font-size: 14px;
+    white-space: nowrap;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) and (orientation: portrait) {
+  .admin-orders-table {
+    table-layout: fixed;
+    width: 1200px;
+    min-width: 1200px;
+    font-size: 15px;
+  }
 
+  .admin-orders-table th:nth-child(1),
+  .admin-orders-table td:nth-child(1) {
+    width: 300px;
+  }
 
-  .admin-signin .signin-wrapper,
-  .admin-dashboard .dashboard-wrapper {
-    margin-top: 24px;   /* 👈 was 82px */
+  .admin-orders-table th:nth-child(2),
+  .admin-orders-table td:nth-child(2) {
+    width: 300px;
+  }
+
+  .admin-orders-table th:nth-child(3),
+  .admin-orders-table td:nth-child(3) {
+    width: 200px;
+  }
+
+  .admin-orders-table th:nth-child(4),
+  .admin-orders-table td:nth-child(4) {
+    width: 200px;
+  }
+
+  .admin-orders-table th:nth-child(5),
+  .admin-orders-table td:nth-child(5) {
+    width: 120px;
+  }
+
+  .admin-orders-table th:nth-child(6),
+  .admin-orders-table td:nth-child(6) {
+    width: 80px;
   }
 }
 
-@media (max-width: 768px) {
+/* ===== REFUND MODAL ===== */
 
-  .signin-wrapper,
-  .dashboard-wrapper {
-    padding: 20px;
-  }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
 }
 
+.modal-card {
+  background: #ffffff;
+  padding: 28px;
+  border-radius: 10px;
+  width: 380px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
+}
 
-
-
-/* =====================================================
-   ADMIN Search
-   ===================================================== */
-
-
-.admin-search-bar {
+.modal-actions {
+  margin-top: 20px;
   display: flex;
-  gap: 10px;
-  margin: 16px 0;
+  justify-content: center;
+  gap: 12px;
 }
 
-.admin-search-bar input,
-.admin-search-bar select {
-  padding: 10px 12px;
+.btn-danger {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 9px 18px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
+  cursor: pointer;
 }
 
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+.btn-secondary {
+  background: #e5e5e5;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+}

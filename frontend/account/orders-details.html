@@ -12,6 +12,9 @@
   <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
 
   <link rel="stylesheet" href="/assets/css/orders.css?v=20260206-dev" />
+      <script>
+      window.__disableLayout = true;
+    </script>
 </head>
 
 <body>
@@ -22,7 +25,7 @@
 <main class="page-account order-details-page">
     
         <div class="page-top">
-      <a href="/" class="auth-back">← Back to Home</a>
+      <a href="orders.html" class="auth-back">← Back to Orders</a>
     </div>
     
     
@@ -38,12 +41,15 @@
 
 </main>
 
-   <script>
-  window.__pageScripts = [
-    "/assets/js/require-auth.js", 
-        "/assets/js/orders-details.js"  
+<script src="/assets/js/require-auth.js"></script>
 
-  ];
-</script>
+    <script src="/assets/js/config-global.js"></script>
+
+    <script src="/assets/js/layout.js"></script>
+    <script>
+      window.__pageScripts = ['/assets/js/orders-details.js'];
+    </script>
+  </body>
+
 </body>
 </html>

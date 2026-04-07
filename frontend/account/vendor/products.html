@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>My Products | Sell4Life</title>
+
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
+  </head>
+
+  <body>
+    <div class="vendor-layout">
+      <!-- Sidebar injected by layout.js -->
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/account/vendor/dashboard.html" class="vendor-back-link">
+            ← Back to dashboard
+          </a>
+
+          <h1 class="vendor-title">My Products</h1>
+
+          <div class="vendor-products-header">
+            <a href="/account/vendor/add-product.html" class="btn-add-product-header">
+              + Add Product
+            </a>
+          </div>
+
+          <div id="vendor-products" class="vendor-products-grid">
+            <p class="products-loading">Loading products...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/vendor-products.js"></script>
+  </body>
+</html>

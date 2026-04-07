@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Add Product | Sell4Life</title>
+
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
+  </head>
+
+  <body>
+    <div class="vendor-layout">
+      <!-- Sidebar loads here -->
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <h1 class="vendor-title">Add Product</h1>
+
+          <form id="add-product-form" class="vendor-form">
+            <div class="form-group">
+              <label>Product Name</label>
+              <input type="text" id="product-name" required />
+            </div>
+
+            <div class="form-group">
+              <label>Description</label>
+              <textarea id="product-description" rows="4"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Price (£)</label>
+              <input type="number" id="product-price" step="0.01" required />
+            </div>
+
+            <div class="form-group">
+              <label>Stock</label>
+              <input type="number" id="product-stock" value="1" />
+            </div>
+
+            <!-- CATEGORY -->
+            <div class="form-group">
+              <label>Category</label>
+              <select id="product-category" required>
+                <option value="">Select category</option>
+                <option value="fashion">Fashion</option>
+                <option value="electronics">Electronics</option>
+                <option value="books">Books</option>
+                <option value="home">Home & Garden</option>
+                <option value="toys">Toys</option>
+                <option value="health">Health & Beauty</option>
+              </select>
+            </div>
+
+            <!-- SUBCATEGORY -->
+            <div class="form-group">
+              <label>Subcategory</label>
+              <select id="product-subcategory" disabled>
+                <option value="">Select subcategory</option>
+              </select>
+            </div>
+
+            <!-- IMAGE -->
+            <div class="form-group">
+              <label>Image URL</label>
+              <input type="text" id="product-image" />
+            </div>
+
+            <button type="submit" class="btn-save-product">Create Product</button>
+          </form>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/vendor-add-product.js"></script>
+  </body>
+</html>

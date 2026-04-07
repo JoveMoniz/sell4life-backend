@@ -1,112 +1,274 @@
+// =======================================================
+// SELL4LIFE – THANK YOU PAGE (FINAL STABLE VERSION)
+// Stripe → Webhook → Order → Render → Cleanup
+// =======================================================
 
-
-
-// thankyou.js – FINAL CLEANUP
-
-
-// ================================
-// THANK YOU – KILL BACK-FORWARD CACHE
-// ================================
+// =======================================================
+// BACK-FORWARD CACHE PROTECTION
+// =======================================================
 
 (function () {
-  const isCheckoutDone = localStorage.getItem("checkout_completed") === "true";
+  window.addEventListener('pageshow', function (event) {
+    const done = localStorage.getItem('checkout_completed') === 'true';
 
-  // Fires when page is restored from cache (BACK button)
-  window.addEventListener("pageshow", function (event) {
-    if (event.persisted && isCheckoutDone) {
-      window.location.replace("/index.html");
+    if (event.persisted && done) {
+      window.location.replace('/index.html');
     }
   });
-
-  // Mark checkout as completed
-  localStorage.setItem("checkout_completed", "true");
 })();
 
+// =======================================================
+// MAIN
+// =======================================================
 
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🔥 Thankyou started');
 
-import { API_BASE } from "./config.js";
+  const API = window.API_BASE || '';
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const params  = new URLSearchParams(window.location.search);
-  const orderId = params.get("id");
+  const params = new URLSearchParams(window.location.search);
+  const paymentIntentId = params.get('payment_intent');
 
-  const idEl    = document.getElementById("order-id");
-  const dateEl  = document.getElementById("order-date");
-  const itemsEl = document.getElementById("order-items");
-  const totalEl = document.getElementById("order-total");
+  // 🔥 STORE PAYMENT INTENT FOR GLOBAL CLEANUP
+  localStorage.setItem('last_payment_intent', paymentIntentId);
+  localStorage.removeItem('checkout_completed');
 
-  if (!orderId) {
-    idEl.textContent = "—";
-    dateEl.textContent = "-";
-    itemsEl.innerHTML = "<p>Order not found.</p>";
-    totalEl.textContent = "—";
+  const idEl = document.getElementById('order-id');
+  const dateEl = document.getElementById('order-date');
+  const itemsEl = document.getElementById('order-items');
+  const totalEl = document.getElementById('order-total');
+  const statusMsg = document.getElementById('payment-status-message');
+
+  // =====================================================
+  // VALIDATION
+  // =====================================================
+  if (!paymentIntentId || paymentIntentId.length < 10) {
+    console.warn('Invalid payment_intent');
+
+    if (itemsEl) {
+      itemsEl.innerHTML = '<p>Payment not found.</p>';
+    }
     return;
   }
 
-  try {
-    const token = localStorage.getItem("s4l_token");
+  // =====================================================
+  // AUTH
+  // =====================================================
 
-    const res = await fetch(`${API_BASE}/orders/${orderId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`
+  const token = localStorage.getItem('s4l_token');
+
+  if (!token) {
+    window.location.href = '/account/signin.html';
+    return;
+  }
+
+  // =====================================================
+  // UI: LOADING STATE
+  // =====================================================
+
+  if (itemsEl) {
+    itemsEl.innerHTML = `
+  <div style="
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:200px;
+    font-size:18px;
+    font-weight:500;
+  ">
+    Processing your order… please wait
+  </div>
+`;
+  }
+
+  // =====================================================
+  // WAIT FOR WEBHOOK
+  // =====================================================
+
+  async function waitForPaid() {
+    const maxMs = 90000;
+    const stepMs = 1500;
+    const started = Date.now();
+
+    while (Date.now() - started < maxMs) {
+      try {
+        const res = await fetch(`${API}/orders/by-payment/${paymentIntentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const order = await res.json();
+
+          console.log('🔄 Status:', order.paymentStatus);
+
+          if (order && order.paymentStatus === 'paid') {
+            return order;
+          }
+        } else if (res.status !== 404) {
+          console.warn('Unexpected status:', res.status);
+        }
+      } catch (err) {
+        console.warn('Retry…', err);
       }
-    });
 
-    if (!res.ok) throw new Error("Order not found");
+      await new Promise((r) => setTimeout(r, stepMs));
+    }
 
-    const order = await res.json();
+    return null;
+  }
 
-    // 🔹 SAME rule everywhere
-    const displayId = `S4L-${order.id.slice(0, 10).toUpperCase()}`;
+  // =====================================================
+  // CLEAN CART (ONLY AFTER PAID)
+  // =====================================================
 
-    idEl.textContent   = displayId;
-    dateEl.textContent = new Date(order.createdAt).toLocaleString();
+  function cleanupCart(order) {
+    if (!order || order.paymentStatus !== 'paid') return;
 
-    // 🔹 Render items
-    let itemsHTML = "";
-    let computedTotal = 0;
+    console.log('🧹 Cleaning cart');
 
-    order.items.forEach(item => {
-      const qty   = Number(item.quantity || 1);
-      const price = Number(item.price || 0);
-      const line  = qty * price;
+    const planRaw = localStorage.getItem('checkout_cleanup_plan');
 
-      computedTotal += line;
+    if (!planRaw) {
+      console.warn('No cleanup plan → force clear');
 
-      itemsHTML += `
-        <div class="ty-item">
-          <span class="ty-item-name">${item.name}</span>
-          <span class="ty-item-qty">${qty} × £${price.toFixed(2)}</span>
-          <span class="ty-item-line">£${line.toFixed(2)}</span>
-        </div>
-      `;
-    });
+      localStorage.removeItem('cart');
+      localStorage.setItem('checkout_completed', 'true');
+      document.dispatchEvent(new Event('cartUpdated'));
+      return;
+    }
 
- itemsEl.innerHTML = order.items
-  .map(item => {
-    const qty = Number(item.quantity || item.qty || 1);
-    const price = Number(item.price || 0);
-    const lineTotal = qty * price;
+    let plan;
 
-    return `
-      <div class="ty-item">
-        <div class="ty-item-left">
-          <span>${item.name}</span>
-          <span class="ty-item-qty">×${qty}</span>
-        </div>
-        <span class="ty-item-subtotal">£${lineTotal.toFixed(2)}</span>
-      </div>
-    `;
-  })
-      .join("");
+    try {
+      plan = JSON.parse(planRaw);
+    } catch {
+      localStorage.removeItem('checkout_cleanup_plan');
+      localStorage.removeItem('cart');
+      return;
+    }
 
-    // Final total only
-    totalEl.textContent = `£${order.total.toFixed(2)}`;
+    if (plan.buyNow) {
+      const backup = localStorage.getItem('cart_backup');
 
+      if (backup) {
+        localStorage.setItem('cart', backup);
+        localStorage.removeItem('cart_backup');
+      } else {
+        localStorage.removeItem('cart');
+      }
+
+      localStorage.removeItem('buyNow');
+    } else {
+      localStorage.removeItem('cart');
+    }
+
+    localStorage.removeItem('checkout_cleanup_plan');
+    localStorage.setItem('checkout_completed', 'true');
+
+    document.dispatchEvent(new Event('cartUpdated'));
+  }
+
+  // =====================================================
+  // RENDER ORDER (SAFE ZONE)
+  // =====================================================
+
+  function renderOrder(order) {
+    if (!order) return;
+
+    const displayId = order.shortId || order.id || '—';
+
+    if (idEl) idEl.textContent = displayId;
+
+    if (dateEl) {
+      dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString() : '-';
+    }
+
+    if (itemsEl) {
+      itemsEl.innerHTML = (order.items || [])
+        .map((item) => {
+          const qty = Number(item.quantity || 1);
+          const price = Number(item.price || 0);
+          const total = qty * price;
+
+          return `
+            <div class="ty-item">
+              <div class="ty-item-left">
+                <span>${item.name}</span>
+                <span class="ty-item-qty">×${qty}</span>
+              </div>
+              <span class="ty-item-subtotal">
+                £${total.toFixed(2)}
+              </span>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    if (totalEl) {
+      totalEl.textContent = `£${Number(order.total || 0).toFixed(2)}`;
+    }
+
+    // =====================================================
+    // ✅ SAFE STATUS UPDATE (THIS WAS MISSING)
+    // =====================================================
+
+    if (statusMsg) {
+      if (order.paymentStatus === 'paid') {
+        statusMsg.textContent = 'Payment successful. Thank you!';
+      } else {
+        statusMsg.textContent = 'Processing your payment...';
+      }
+    }
+  }
+
+  // =====================================================
+  // FETCH + WAIT FLOW
+  // =====================================================
+
+  try {
+    let order = null;
+
+    // fast attempt
+    try {
+      const res = await fetch(`${API}/orders/by-payment/${paymentIntentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        order = await res.json();
+      }
+    } catch (err) {
+      console.warn('Initial fetch failed');
+    }
+
+    // 🔥 THIS IS THE FIX
+    if (!order || order.paymentStatus !== 'paid') {
+      order = await waitForPaid();
+    }
+
+    // still nothing
+    if (!order) {
+      console.warn('⏳ Order not ready yet');
+
+      if (itemsEl) {
+        itemsEl.innerHTML = '<p>Payment received. Please check your orders shortly.</p>';
+      }
+
+      localStorage.setItem('checkout_completed', 'true');
+      return;
+    }
+
+    // ✅ NOW SAFE
+    renderOrder(order);
+    cleanupCart(order);
+
+    console.log('✅ Thankyou complete');
   } catch (err) {
-    console.error("Thank-you fetch failed:", err);
+    console.error('Thankyou error:', err);
 
-    itemsEl.innerHTML =
-      "<p>Server is waking up. Please wait a moment and refresh.</p>";
+    if (itemsEl) {
+      itemsEl.innerHTML = '<p>Something went wrong. Please refresh or check your orders.</p>';
+    }
   }
 });

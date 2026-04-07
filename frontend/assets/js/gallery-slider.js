@@ -174,6 +174,12 @@
     thumbnailGallery.scrollLeft = 0;
   }
 
-// Re-init the slider when product.js finishes injecting images
+// Re-init when product injects images
 document.addEventListener("productImagesLoaded", initSlider);
+
+// ALSO try once on DOM ready (in case event already fired)
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(initSlider, 0);
+});
+
 })();

@@ -1,13 +1,11 @@
-
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-    width: 100%;
+  width: 100%;
   max-width: 100%;
   overflow-x: hidden;
 }
-
-
 
 /* =====================================================
    ORDERS PAGE – Sell4Life
@@ -22,7 +20,6 @@ html, body {
 
   display: block;
   flex-direction: column;
-    
 }
 
 .order-page #orders-container {
@@ -30,13 +27,11 @@ html, body {
   max-width: 900px;
   margin: 0 auto;
   box-sizing: border-box;
-  background: rgba(255,255,255,0.08);
-    border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
   padding: 30px;
   box-sizing: border-box;
 }
-
-
 
 /* Top row */
 .page-top {
@@ -45,7 +40,7 @@ html, body {
 }
 
 .auth-back {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-size: 14px;
 }
@@ -63,14 +58,13 @@ html, body {
 }
 
 .order-page .order-card {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid rgba(255,255,255,0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   width: 100%;
   box-sizing: border-box;
 }
-
 
 /* Loading / empty */
 #orders-loading,
@@ -93,11 +87,9 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.7px;
   opacity: 1;
-  line-height: 1.1;   /* 🔴 THIS is the key */
+  line-height: 1.1; /* 🔴 THIS is the key */
   margin: 0;
-
 }
-
 
 .order-header {
   display: flex;
@@ -112,7 +104,7 @@ html, body {
   font-weight: 700;
   color: #f28c28;
   white-space: nowrap;
- 
+
   padding: 6px 12px;
   border-radius: 8px;
 
@@ -122,9 +114,8 @@ html, body {
 }
 
 .order-page .order-total {
-     background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
 }
-
 
 /* Meta */
 .order-meta {
@@ -136,7 +127,6 @@ html, body {
   font-size: 14.5px;
   opacity: 1;
 }
-
 
 /* =========================================
    MY ORDERS – LINK CLEANUP
@@ -153,6 +143,62 @@ html, body {
   opacity: 0.85;
 }
 
+.page-account h1 {
+  font-size: 24px;
+}
+
+.order-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  /* ✨ Surface separation */
+  background: #2e8078; /* slightly lighter than page */
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.order-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.order-header {
+  flex-direction: row;
+  align-items: center;
+}
+
+.order-card-link {
+  display: block;
+}
+
+.pay-now-btn {
+  position: relative;
+  z-index: 5;
+  cursor: pointer;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  background: #f59e0b;
+  color: white;
+  font-weight: 600;
+}
+
+.pay-now-btn:hover {
+  cursor: pointer;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -163,8 +209,9 @@ html, body {
   .page-account h1 {
     font-size: 24px;
   }
-  
-   .order-card {
+
+  .order-card {
+    position: relative;
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -181,10 +228,7 @@ html, body {
     flex-direction: row;
     align-items: center;
   }
-
- 
 }
-
 
 /*---------------- order details--------------*/
 /* =========================================
@@ -192,22 +236,17 @@ html, body {
    Targets #order-details explicitly
 ========================================= */
 
-
 .order-details-container {
-
-   width: 100%;
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
-
 }
-
 
 #order-details {
   margin-top: 40px;
   border-radius: 14px;
   padding: 28px;
   background: rgba(0, 0, 0, 0.15);
-
 }
 
 /* Header info */
@@ -253,8 +292,6 @@ html, body {
   background: #0b4f4f;
 }
 
-
-
 #order-details .order-info div:first-child {
   font-weight: 600;
 }
@@ -284,9 +321,6 @@ html, body {
   justify-content: flex-end;
 }
 
-
-
-
 /* Ensure text hierarchy feels intentional */
 
 #order-details h2 {
@@ -308,7 +342,6 @@ html, body {
   opacity: 0.8;
 }
 
-
 .back-link {
   display: inline-block;
   margin-bottom: 20px;
@@ -322,20 +355,18 @@ html, body {
   opacity: 1;
 }
 
-
 /* =========================================
    ORDER DETAILS – MOBILE FIX
    Make it readable with thumbs, not mice
 ========================================= */
 
 @media (max-width: 480px) {
-
   #order-details .order-item {
     display: grid;
     grid-template-columns: 44px 1fr;
     grid-template-areas:
-      "thumb info"
-      "lineprice lineprice";
+      'thumb info'
+      'lineprice lineprice';
     gap: 12px;
     padding: 12px;
   }
@@ -362,19 +393,57 @@ html, body {
   }
 }
 
-
 /* =========================================
    ORDER DETAILS PAGE – FONT FIX
 ========================================= */
 
 .order-details-page,
 .order-page {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
 }
 
 /* Only order details needs white text */
-.order-details-page {
+.payment-status {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.payment-status.paid {
+  background: linear-gradient(135deg, #0a7c2f, #0e9f3d);
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.payment-status.pending,
+.payment-status.unpaid {
+  background: #b45309; /* deep burnt orange */
   color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.payment-status.unpaid {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.payment-status.failed {
+  background: rgba(196, 0, 0, 0.12);
+  color: #c40000;
+}
+
+.payment-status.refunded {
+  background: #fde8e8;
+  color: #b91c1c;
+  font-weight: 600;
 }

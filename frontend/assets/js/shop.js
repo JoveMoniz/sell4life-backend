@@ -1,90 +1,127 @@
-// /frontend/assets/js/shop.js
+// =====================================================
+// SELL4LIFE SHOP PAGE (API ONLY - STABLE VERSION)
+// =====================================================
 
-(async function () { 
-  console.log("shop.js loaded");
+console.log('shop.js loaded');
 
-  const container = document.getElementById("product-list");
-  const IMAGE_BASE = "/assets/images/products/";
+let products = [];
 
-  // ---------------------------------------------------------
-  // 1. Load products.json
-  // ---------------------------------------------------------
-  let products = [];
+// -----------------------------------------------------
+// URL PARAMS
+// -----------------------------------------------------
+
+const params = new URLSearchParams(window.location.search);
+
+const searchQuery = (params.get('q') || '').toLowerCase().trim();
+const selectedCategory = (params.get('category') || '').toLowerCase().trim();
+const selectedSubcategory = (params.get('subcategory') || '').toLowerCase().trim();
+
+const normalize = (str = '') => str.toLowerCase().trim();
+
+const grid = document.getElementById('product-list');
+
+// =====================================================
+// LOAD PRODUCTS (API ONLY)
+// =====================================================
+
+async function loadProducts() {
   try {
-    const res = await fetch("/data/products.json", { cache: "no-store" });
-    products = await res.json();
-  } catch (err) {
-    console.error("Failed to load /data/products.json:", err);
-    container.innerHTML = `<p>Could not load products.</p>`;
-    return;
-  }
+    let url = `${API_BASE}/products`;
 
-  // ---------------------------------------------------------
-  // 2. Read URL parameters
-  // ---------------------------------------------------------
-  const params = new URLSearchParams(window.location.search);
+    // Backend handles search
+    if (searchQuery) {
+      url += `?search=${encodeURIComponent(searchQuery)}`;
+    }
 
-  const searchTerm = (params.get("q") || "").trim().toLowerCase();
-  const selectedCategory = (params.get("category") || "").trim().toLowerCase();
-  const selectedSub = (params.get("subcategory") || "").trim().toLowerCase();
+    const res = await fetch(url);
 
-  console.log("Search term:", searchTerm);
-  console.log("Category:", selectedCategory);
-  console.log("Subcategory:", selectedSub);
+    if (!res.ok) {
+      throw new Error('API error');
+    }
 
-  // ---------------------------------------------------------
-  // 3. BASE FILTER
-  // ---------------------------------------------------------
-  let filtered = products;
+    const data = await res.json();
 
-  // CATEGORY (case-insensitive)
-  if (selectedCategory) {
-    filtered = filtered.filter(p =>
-      p.category.toLowerCase() === selectedCategory
-    );
-  }
+    products = Array.isArray(data.products) ? data.products : [];
 
-  // SUBCATEGORY
-  if (selectedSub) {
-    filtered = filtered.filter(p =>
-      p.subcategory.toLowerCase() === selectedSub
-    );
-  }
+    // -------------------------------------------------
+    // FILTER (CATEGORY + SUBCATEGORY ONLY)
+    // -------------------------------------------------
 
-  // SEARCH FILTER
-  if (searchTerm) {
-    filtered = filtered.filter(p => {
-      const name = p.name.toLowerCase();
-      const cat  = p.category.toLowerCase();
-      const sub  = p.subcategory.toLowerCase();
+    const filtered = products.filter((p) => {
+      const cat = normalize(p.category);
+      const sub = normalize(p.subcategory);
 
-      return (
-        name.includes(searchTerm) ||
-        cat.includes(searchTerm) ||
-        sub.includes(searchTerm)
-      );
+      const matchCategory = selectedCategory ? cat === selectedCategory : true;
+
+      const matchSubcategory = selectedSubcategory ? sub === selectedSubcategory : true;
+
+      return matchCategory && matchSubcategory;
     });
-  }
 
-  // ---------------------------------------------------------
-  // 4. HANDLE EMPTY RESULTS
-  // ---------------------------------------------------------
-  if (filtered.length === 0) {
-    container.innerHTML = `<p>No products found.</p>`;
+    renderProducts(filtered);
+  } catch (err) {
+    console.error('LOAD PRODUCTS ERROR:', err);
+    renderProducts([]);
+  }
+}
+
+// =====================================================
+// RENDER GRID
+// =====================================================
+
+function renderProducts(list) {
+  if (!grid) return;
+
+  if (!Array.isArray(list) || list.length === 0) {
+    grid.innerHTML = '<p>No products found.</p>';
     return;
   }
 
-  // ---------------------------------------------------------
-  // 5. RENDER PRODUCTS
-  // ---------------------------------------------------------
-  container.innerHTML = filtered.map(p => `
-    <div class="product-card">
-      <a href="/product/product.html?id=${p.id}">
-        <img src="${IMAGE_BASE + p.images[0]}" alt="${p.name}">
-        <h3>${p.name}</h3>
-        <p>£${p.price.toFixed(2)}</p>
-      </a>
-    </div>
-  `).join("");
+  grid.innerHTML = list.map(renderProductCard).join('');
+}
 
-})();
+// =====================================================
+// PRODUCT CARD
+// =====================================================
+
+function renderProductCard(product) {
+  const id = product._id || product.id;
+  const name = product.name || 'Product';
+  const price = Number(product.price || 0).toFixed(2);
+
+  let image = '/assets/images/products/sell4life-placeholder.png';
+
+  if (product.image && typeof product.image === 'string') {
+    const img = product.image.trim();
+
+    if (img.includes('.') && !img.endsWith('/')) {
+      image = img;
+    }
+  } else if (Array.isArray(product.images) && product.images.length) {
+    const first = product.images[0];
+
+    if (typeof first === 'string' && first.includes('.')) {
+      image = `/assets/images/products/${first}`;
+    }
+  }
+
+  return `
+    <a href="/product/product.html?id=${id}" class="product-card">
+      <img 
+        src="${image}" 
+        alt="${name}"
+        onerror="this.src='/assets/images/products/sell4life-placeholder.png'"
+      >
+      <div class="product-info">
+        <h3>${name}</h3>
+        <p class="product-price">£${price}</p>
+      </div>
+    </a>
+  `;
+}
+
+// =====================================================
+// START
+// =====================================================
+
+loadProducts();

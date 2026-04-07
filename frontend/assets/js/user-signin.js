@@ -1,50 +1,79 @@
 // =====================================================
-// SIGN IN (intent-based, NOT role-based)
+// SIGN IN (intent-based, upgraded with vendor check)
 // =====================================================
 
-import { API_BASE } from "./config.js";
-
-console.log("signin.js loaded");
+console.log('user-signin.js loaded');
 
 // =====================================================
-// AUTO-REDIRECT IF ALREADY LOGGED IN
+// AUTO-REDIRECT IF ALREADY LOGGED IN (INTENT AWARE)
 // =====================================================
-const existingToken = localStorage.getItem("s4l_token");
 
-if (existingToken) {
-  const redirect =
-    localStorage.getItem("postLoginRedirect") || "/account/orders.html";
+const existingToken = localStorage.getItem('s4l_token');
+const existingUser = localStorage.getItem('s4l_user');
 
-  localStorage.removeItem("postLoginRedirect");
-  window.location.href = redirect;
+if (existingToken && existingUser) {
+  const intent = localStorage.getItem('s4l_intent');
+
+  // 🔥 ONLY go vendor flow if user intended it
+  if (intent === 'sell') {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/vendor/me`, {
+          headers: {
+            Authorization: `Bearer ${existingToken}`,
+          },
+        });
+
+        const data = await res.json();
+
+        localStorage.removeItem('s4l_intent');
+
+        if (data.isVendor) {
+          window.location.href = '/account/vendor/dashboard.html';
+        } else {
+          window.location.href = '/account/vendor/create.html';
+        }
+      } catch {
+        const redirect = localStorage.getItem('postLoginRedirect');
+        localStorage.removeItem('postLoginRedirect');
+
+        window.location.href = redirect || '/index.html';
+      }
+    })();
+  } else {
+    // 🧠 USE SAVED REDIRECT OR DEFAULT
+    const redirect = localStorage.getItem('postLoginRedirect');
+
+    localStorage.removeItem('postLoginRedirect');
+
+    window.location.href = redirect || '/index.html';
+  }
 }
 
 // =====================================================
-// DOM READY
+// INITIALISE FORM
 // =====================================================
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("signinForm");
-  const msg  = document.getElementById("msg");
 
-  if (!form || !msg) {
-    console.error("Signin DOM elements missing");
-    return;
-  }
+const form = document.getElementById('signinForm');
+const msg = document.getElementById('msg');
 
-  form.addEventListener("submit", async (e) => {
+if (!form || !msg) {
+  console.error('Signin DOM elements missing');
+} else {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const email    = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
 
-    msg.textContent = "Checking credentials…";
-    msg.style.color = "#e5e7eb"; // neutral
+    msg.textContent = 'Checking credentials…';
+    msg.style.color = '#e5e7eb';
 
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
       const text = await res.text();
@@ -52,47 +81,65 @@ document.addEventListener("DOMContentLoaded", () => {
       let data;
       try {
         data = JSON.parse(text);
+        console.log('STATUS:', res.status);
+        console.log('RESPONSE:', data);
       } catch {
-        msg.textContent = "Invalid server response";
-        msg.style.color = "red";
+        msg.textContent = 'Invalid server response';
+        msg.style.color = 'red';
         return;
       }
 
       if (!res.ok || !data.token || !data.user) {
-        msg.textContent = data.msg || "Login failed";
-        msg.style.color = "red";
+        msg.textContent = data.msg || 'Login failed';
+        msg.style.color = 'red';
         return;
       }
 
-      // =====================================================
-      // STORE AUTH (TOKEN CREATED HERE ONLY)
-      // =====================================================
-      localStorage.setItem("s4l_token", data.token);
-      localStorage.setItem("s4l_user", JSON.stringify(data.user));
+      // STORE AUTH
+      localStorage.setItem('s4l_token', data.token);
+      localStorage.setItem('s4l_user', JSON.stringify(data.user));
 
-      msg.textContent = "Login successful";
-      msg.style.color = "lightgreen";
+      msg.textContent = 'Login successful';
+      msg.style.color = 'lightgreen';
 
       // =====================================================
-      // REDIRECT LOGIC (INTENT ONLY)
+      // POST-LOGIN REDIRECT WITH VENDOR CHECK
       // =====================================================
-      let redirect = localStorage.getItem("postLoginRedirect");
 
-      localStorage.removeItem("postLoginRedirect");
+      const intent = localStorage.getItem('s4l_intent');
+      localStorage.removeItem('s4l_intent');
 
-      // PUBLIC SIGN-IN ALWAYS GOES TO USER AREA
-      if (!redirect) {
-        redirect = "/account/orders.html";
+      let redirect = localStorage.getItem('postLoginRedirect');
+
+      if (intent === 'sell') {
+        try {
+          const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
+            headers: {
+              Authorization: `Bearer ${data.token}`,
+            },
+          });
+
+          const vendorData = await vendorRes.json();
+
+          if (vendorData.isVendor) {
+            redirect = '/account/vendor/dashboard.html';
+          } else {
+            redirect = '/account/vendor/create.html';
+          }
+        } catch {
+          redirect = '/index.html';
+        }
+      } else {
+        // 🧠 USE SAVED REDIRECT OR DEFAULT
+        redirect = redirect || '/index.html';
       }
+      localStorage.removeItem('postLoginRedirect');
 
-      setTimeout(() => {
-        window.location.href = redirect;
-      }, 300);
-
+      window.location.replace(redirect);
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
-      msg.textContent = "Server error";
-      msg.style.color = "red";
+      console.error('LOGIN ERROR:', err);
+      msg.textContent = 'Server error';
+      msg.style.color = 'red';
     }
   });
-});
+}

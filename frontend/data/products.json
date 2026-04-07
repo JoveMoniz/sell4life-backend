@@ -1,33 +1,26 @@
 [
+
   {
     "id": "wireless-earbuds",
     "name": "Wireless Earbuds",
     "category": "electronics",
     "subcategory": "audio",
-    "brand":"umbranded",
+    "brand": "umbranded",
     "price": 35.0,
     "currency": "£",
     "description": "High-quality Bluetooth earbuds with charging case. Crisp sound, long battery life, and comfort for daily use.",
-    "images": [
-       "electronics.png",
-    "dress.png",
-    "fashion-pic.png"
-    ]
+    "images": ["electronics.png", "dress.png", "fashion-pic.png"]
   },
   {
     "id": "mens",
     "name": "Men's Classic Suit",
     "category": "fashion",
-    "subcategory": "men",
-    "brand":"umbranded",
+    "subcategory": "tops",
+    "brand": "umbranded",
     "price": 120.0,
     "currency": "£",
-    "description": "Tailored men's suit crafted with high-quality fabric for comfort and style. Perfect for business or special occasions.",
-    "images": [
-      "dress.png",
-  "electronics.png",    
-    "fashion-pic.png"
-    ]
+    "description": "Tailored men's suit crafted with high-quality fabric for comfort and style.",
+    "images": ["dress.png", "electronics.png", "fashion-pic.png"]
   },
   {
     "id": "audio",
@@ -37,669 +30,165 @@
     "brand": "Sony",
     "price": 59.99,
     "currency": "£",
-    "description": "Voice-controlled smart speaker with Wi-Fi and Bluetooth support. Delivers deep sound and integrates with your smart home system.",
-    "images": [
- "fashion-pic.png",
-    "dress.png",    
-   "electronics.png"
-    ]
+    "description": "Voice-controlled smart speaker with Wi-Fi and Bluetooth support.",
+    "images": ["fashion-pic.png", "dress.png", "electronics.png"]
   },
 
-  
+  { "id": "p101", "name": "Classic Yellow Dress", "category": "fashion", "subcategory": "tops", "price": 19.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p102", "name": "Men's Urban Jacket", "category": "fashion", "subcategory": "tops", "price": 34.99, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p103", "name": "Women Accessories Pack", "category": "fashion", "subcategory": "accessories", "price": 14.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p201", "name": "Wireless Headphones", "category": "electronics", "subcategory": "audio", "price": 24.99, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p202", "name": "Gaming Mouse", "category": "electronics", "subcategory": "computers", "price": 11.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p203", "name": "Smartphone Charger", "category": "electronics", "subcategory": "gaming", "price": 7.99, "currency": "£", "images": ["accessories_1.png"] },
+
+  { "id": "p301", "name": "Healthy Skin Lotion", "category": "health-beauty", "subcategory": "skincare", "price": 9.49, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p302", "name": "Vitamins Pack", "category": "health-beauty", "subcategory": "supplements", "price": 5.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p401", "name": "Home Storage Box", "category": "home-garden", "subcategory": "furniture", "price": 12.99, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p402", "name": "Kids Learning Toy", "category": "toys", "subcategory": "educational", "price": 8.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p501", "name": "Slim Fit Shirt", "category": "fashion", "subcategory": "tops", "price": 17.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p502", "name": "Winter Hoodie", "category": "fashion", "subcategory": "tops", "price": 24.99, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p503", "name": "Running Shoes", "category": "fashion", "subcategory": "footwear", "price": 32.99, "currency": "£", "images": ["accessories.png"] },
+  { "id": "p504", "name": "Leather Belt", "category": "fashion", "subcategory": "accessories", "price": 9.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p505", "name": "Casual Sandals", "category": "fashion", "subcategory": "footwear", "price": 14.49, "currency": "£", "images": ["mensfashion_pic.png"] },
+
+  { "id": "p601", "name": "Bluetooth Speaker", "category": "electronics", "subcategory": "audio", "price": 15.99, "currency": "£", "images": ["accessories.png"] },
+  { "id": "p602", "name": "USB Keyboard", "category": "electronics", "subcategory": "computers", "price": 10.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p603", "name": "LED Desk Lamp", "category": "electronics", "subcategory": "audio", "price": 12.59, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p604", "name": "HDMI Cable", "category": "electronics", "subcategory": "gaming", "price": 4.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p701", "name": "Romantic Novel", "category": "books", "subcategory": "fiction", "price": 6.49, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p702", "name": "Science Workbook", "category": "books", "subcategory": "education", "price": 7.49, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p703", "name": "Kids Story Book", "category": "books", "subcategory": "children", "price": 5.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p801", "name": "Face Cleansing Kit", "category": "health-beauty", "subcategory": "skincare", "price": 8.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p802", "name": "Hair Growth Oil", "category": "health-beauty", "subcategory": "haircare", "price": 6.49, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p803", "name": "Makeup Brush Set", "category": "health-beauty", "subcategory": "makeup", "price": 9.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p901", "name": "Clay Flower Pot", "category": "home-garden", "subcategory": "garden", "price": 6.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p902", "name": "Bathroom Organizer", "category": "home-garden", "subcategory": "furniture", "price": 11.49, "currency": "£", "images": ["mensfashion_pic.png"] },
+  { "id": "p903", "name": "Kitchen Knife Set", "category": "home-garden", "subcategory": "kitchen", "price": 18.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p1001", "name": "RC Car Mini", "category": "toys", "subcategory": "outdoor", "price": 13.99, "currency": "£", "images": ["dress-yellow.png"] },
+  { "id": "p1002", "name": "Soft Plush Bear", "category": "toys", "subcategory": "outdoor", "price": 7.99, "currency": "£", "images": ["mensfashion_pic.png"] },
+
+  { "id": "p1101", "name": "Urban Street Jacket", "category": "fashion", "subcategory": "tops", "price": 27.99, "currency": "£", "images": ["tops.png"] },
+  { "id": "p1102", "name": "Classic Denim Jeans", "category": "fashion", "subcategory": "bottoms", "price": 22.49, "currency": "£", "images": ["accessories.png"] },
+  { "id": "p1103", "name": "Sport Training Shorts", "category": "fashion", "subcategory": "bottoms", "price": 13.99, "currency": "£", "images": ["accessories.png"] },
+  { "id": "p1104", "name": "Minimalist Sneakers", "category": "fashion", "subcategory": "footwear", "price": 31.99, "currency": "£", "images": ["tops.png"] },
+  { "id": "p1105", "name": "Casual Canvas Shoes", "category": "fashion", "subcategory": "footwear", "price": 21.49, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p1106", "name": "Wireless Earbuds Lite", "category": "electronics", "subcategory": "audio", "price": 19.99, "currency": "£", "images": ["tops.png"] },
+  { "id": "p1107", "name": "Portable Powerbank", "category": "electronics", "subcategory": "mobiles", "price": 14.29, "currency": "£", "images": ["accessories_1.png"] },
+  { "id": "p1108", "name": "Gaming Mouse RGB", "category": "electronics", "subcategory": "computers", "price": 12.89, "currency": "£", "images": ["accessories_1.png"] },
+  { "id": "p1109", "name": "Smart Alarm Clock", "category": "electronics", "subcategory": "gaming", "price": 16.99, "currency": "£", "images": ["accessories.png"] },
+
+  { "id": "p1110", "name": "Notebook Planner", "category": "books", "subcategory": "education", "price": 5.99, "currency": "£", "images": ["fashion.png"] },
+  { "id": "p1111", "name": "Cooking Recipes Guide", "category": "books", "subcategory": "education", "price": 8.49, "currency": "£", "images": ["accessories_1.png"] },
+  { "id": "p1112", "name": "Daily Motivation Book", "category": "books", "subcategory": "education", "price": 6.99, "currency": "£", "images": ["accessories.png"] }
 
 
+  ,
+{ "id": "extra-001", "name": "Classic White T-Shirt", "category": "fashion", "subcategory": "tops", "price": 12.99, "currency": "£", "images": ["tops.png"] },
+{ "id": "extra-002", "name": "Slim Fit Black Jeans", "category": "fashion", "subcategory": "bottoms", "price": 29.99, "currency": "£", "images": ["bottoms.png"] },
+{ "id": "extra-003", "name": "Canvas Summer Sneakers", "category": "fashion", "subcategory": "footwear", "price": 25.99, "currency": "£", "images": ["footwear.png"] },
+{ "id": "extra-004", "name": "Leather Crossbody Bag", "category": "fashion", "subcategory": "accessories", "price": 34.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-005", "name": "Blue Denim Jacket", "category": "fashion", "subcategory": "tops", "price": 44.99, "currency": "£", "images": ["fashion-pic.png"] },
 
+{ "id": "extra-006", "name": "Wireless Charging Pad", "category": "electronics", "subcategory": "mobiles", "price": 14.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-007", "name": "Gaming Keyboard RGB", "category": "electronics", "subcategory": "computers", "price": 32.49, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-008", "name": "Portable Bluetooth Speaker Mini", "category": "electronics", "subcategory": "audio", "price": 18.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-009", "name": "Smartphone Tripod Stand", "category": "electronics", "subcategory": "mobiles", "price": 9.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-010", "name": "LED Gaming Headset", "category": "electronics", "subcategory": "gaming", "price": 27.99, "currency": "£", "images": ["electronics.png"] },
 
-  {
-    "id": "p101",
-    "name": "Classic Yellow Dress",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 19.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p102",
-    "name": "Men's Urban Jacket",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 34.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p103",
-    "name": "Women Accessories Pack",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 14.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p201",
-    "name": "Wireless Headphones",
-    "category": "electronics",
-    "subcategory": "audio",
-    "price": 24.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p202",
-    "name": "Gaming Mouse",
-    "category": "electronics",
-    "subcategory": "computers",
-    "price": 11.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p203",
-    "name": "Smartphone Charger",
-    "category": "electronics",
-    "subcategory": "accessories",
-    "price": 7.99,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p301",
-    "name": "Healthy Skin Lotion",
-    "category": "health-beauty",
-    "subcategory": "skincare",
-    "price": 9.49,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p302",
-    "name": "Vitamins Pack",
-    "category": "health-beauty",
-    "subcategory": "supplements",
-    "price": 5.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p401",
-    "name": "Home Storage Box",
-    "category": "home-garden",
-    "subcategory": "storage",
-    "price": 12.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p402",
-    "name": "Kids Learning Toy",
-    "category": "toys",
-    "subcategory": "educational",
-    "price": 8.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-011", "name": "Mystery Thriller Novel", "category": "books", "subcategory": "fiction", "price": 6.99, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-012", "name": "Beginner Math Workbook", "category": "books", "subcategory": "education", "price": 7.99, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-013", "name": "Children Bedtime Stories", "category": "books", "subcategory": "children", "price": 5.49, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-014", "name": "Non-Fiction Biography", "category": "books", "subcategory": "non-fiction", "price": 8.99, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-015", "name": "Advanced Science Guide", "category": "books", "subcategory": "education", "price": 9.49, "currency": "£", "images": ["dress-yellow.png"] },
 
+{ "id": "extra-016", "name": "Vitamin C Tablets", "category": "health-beauty", "subcategory": "supplements", "price": 6.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-017", "name": "Hydrating Face Cream", "category": "health-beauty", "subcategory": "skincare", "price": 8.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-018", "name": "Organic Hair Conditioner", "category": "health-beauty", "subcategory": "haircare", "price": 5.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-019", "name": "Professional Makeup Palette", "category": "health-beauty", "subcategory": "makeup", "price": 12.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-020", "name": "Daily Multivitamin Pack", "category": "health-beauty", "subcategory": "supplements", "price": 4.99, "currency": "£", "images": ["accessories.png"] },
 
-  
-  {
-    "id": "p501",
-    "name": "Slim Fit Shirt",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 17.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p502",
-    "name": "Winter Hoodie",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 24.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p503",
-    "name": "Running Shoes",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 32.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p504",
-    "name": "Leather Belt",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 9.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p505",
-    "name": "Casual Sandals",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 14.49,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
+{ "id": "extra-021", "name": "Modern Table Lamp", "category": "home-garden", "subcategory": "decor", "price": 15.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-022", "name": "Kitchen Storage Rack", "category": "home-garden", "subcategory": "kitchen", "price": 21.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-023", "name": "Wooden Garden Bench", "category": "home-garden", "subcategory": "garden", "price": 45.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-024", "name": "Minimalist Wall Clock", "category": "home-garden", "subcategory": "decor", "price": 13.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-025", "name": "Metal Shoe Rack", "category": "home-garden", "subcategory": "furniture", "price": 27.99, "currency": "£", "images": ["accessories.png"] },
 
-  {
-    "id": "p601",
-    "name": "Bluetooth Speaker",
-    "category": "electronics",
-    "subcategory": "audio",
-    "price": 15.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p602",
-    "name": "USB Keyboard",
-    "category": "electronics",
-    "subcategory": "computers",
-    "price": 10.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p603",
-    "name": "LED Desk Lamp",
-    "category": "electronics",
-    "subcategory": "lighting",
-    "price": 12.59,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p604",
-    "name": "HDMI Cable",
-    "category": "electronics",
-    "subcategory": "accessories",
-    "price": 4.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-026", "name": "Remote Control Helicopter", "category": "toys", "subcategory": "outdoor", "price": 18.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-027", "name": "Kids Educational Puzzle", "category": "toys", "subcategory": "puzzles", "price": 7.49, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-028", "name": "Action Figure Hero Set", "category": "toys", "subcategory": "action", "price": 11.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-029", "name": "Outdoor Water Gun", "category": "toys", "subcategory": "outdoor", "price": 6.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-030", "name": "Learning Alphabet Blocks", "category": "toys", "subcategory": "educational", "price": 9.99, "currency": "£", "images": ["fashion.png"] },
 
-  {
-    "id": "p701",
-    "name": "Romantic Novel",
-    "category": "books",
-    "subcategory": "fiction",
-    "price": 6.49,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p702",
-    "name": "Science Workbook",
-    "category": "books",
-    "subcategory": "education",
-    "price": 7.49,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p703",
-    "name": "Kids Story Book",
-    "category": "books",
-    "subcategory": "kids",
-    "price": 5.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-031", "name": "Casual Summer Shorts", "category": "fashion", "subcategory": "bottoms", "price": 16.99, "currency": "£", "images": ["bottoms.png"] },
+{ "id": "extra-032", "name": "Formal Leather Shoes", "category": "fashion", "subcategory": "footwear", "price": 49.99, "currency": "£", "images": ["footwear.png"] },
+{ "id": "extra-033", "name": "Stylish Sunglasses", "category": "fashion", "subcategory": "accessories", "price": 14.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-034", "name": "Bluetooth Fitness Tracker", "category": "electronics", "subcategory": "mobiles", "price": 22.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-035", "name": "USB-C Charging Cable", "category": "electronics", "subcategory": "mobiles", "price": 5.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-036", "name": "Classic Literature Collection", "category": "books", "subcategory": "fiction", "price": 12.99, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-037", "name": "Organic Body Lotion", "category": "health-beauty", "subcategory": "skincare", "price": 7.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-038", "name": "Garden Tool Kit", "category": "home-garden", "subcategory": "garden", "price": 23.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-039", "name": "Kids Soccer Ball", "category": "toys", "subcategory": "outdoor", "price": 6.49, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-040", "name": "Makeup Storage Organizer", "category": "health-beauty", "subcategory": "makeup", "price": 10.99, "currency": "£", "images": ["accessories.png"] }
 
-  {
-    "id": "p801",
-    "name": "Face Cleansing Kit",
-    "category": "health-beauty",
-    "subcategory": "skincare",
-    "price": 8.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p802",
-    "name": "Hair Growth Oil",
-    "category": "health-beauty",
-    "subcategory": "haircare",
-    "price": 6.49,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p803",
-    "name": "Makeup Brush Set",
-    "category": "health-beauty",
-    "subcategory": "makeup",
-    "price": 9.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+,
+{ "id": "extra-041", "name": "Graphic Print Hoodie", "category": "fashion", "subcategory": "tops", "price": 28.99, "currency": "£", "images": ["tops.png"] },
+{ "id": "extra-042", "name": "Straight Fit Trousers", "category": "fashion", "subcategory": "bottoms", "price": 26.49, "currency": "£", "images": ["bottoms.png"] },
+{ "id": "extra-043", "name": "Running Performance Shoes", "category": "fashion", "subcategory": "footwear", "price": 48.99, "currency": "£", "images": ["footwear.png"] },
+{ "id": "extra-044", "name": "Elegant Wrist Watch", "category": "fashion", "subcategory": "accessories", "price": 39.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-045", "name": "Summer Cotton Dress", "category": "fashion", "subcategory": "dresses", "price": 32.99, "currency": "£", "images": ["dress-yellow.png"] },
 
-  {
-    "id": "p901",
-    "name": "Clay Flower Pot",
-    "category": "home-garden",
-    "subcategory": "garden",
-    "price": 6.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p902",
-    "name": "Bathroom Organizer",
-    "category": "home-garden",
-    "subcategory": "storage",
-    "price": 11.49,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "p903",
-    "name": "Kitchen Knife Set",
-    "category": "home-garden",
-    "subcategory": "kitchen",
-    "price": 18.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-046", "name": "Wireless Gaming Controller", "category": "electronics", "subcategory": "gaming", "price": 34.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-047", "name": "Compact Bluetooth Mouse", "category": "electronics", "subcategory": "computers", "price": 13.49, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-048", "name": "Smartphone Power Adapter", "category": "electronics", "subcategory": "mobiles", "price": 8.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-049", "name": "Portable Audio Recorder", "category": "electronics", "subcategory": "audio", "price": 22.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-050", "name": "Noise Cancelling Headphones", "category": "electronics", "subcategory": "audio", "price": 64.99, "currency": "£", "images": ["electronics.png"] },
 
-  {
-    "id": "p1001",
-    "name": "RC Car Mini",
-    "category": "toys",
-    "subcategory": "outdoor",
-    "price": 13.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "p1002",
-    "name": "Soft Plush Bear",
-    "category": "toys",
-    "subcategory": "outdoor",
-    "price": 7.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
+{ "id": "extra-051", "name": "Classic Crime Novel", "category": "books", "subcategory": "fiction", "price": 7.49, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-052", "name": "Physics Study Guide", "category": "books", "subcategory": "education", "price": 9.99, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-053", "name": "Children Adventure Tales", "category": "books", "subcategory": "children", "price": 6.29, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-054", "name": "Historical Biography", "category": "books", "subcategory": "non-fiction", "price": 10.49, "currency": "£", "images": ["dress-yellow.png"] },
+{ "id": "extra-055", "name": "Educational Flashcards", "category": "books", "subcategory": "education", "price": 4.99, "currency": "£", "images": ["dress-yellow.png"] },
 
+{ "id": "extra-056", "name": "Hydrating Lip Balm", "category": "health-beauty", "subcategory": "skincare", "price": 3.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-057", "name": "Daily Protein Supplement", "category": "health-beauty", "subcategory": "supplements", "price": 14.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-058", "name": "Professional Hair Dryer", "category": "health-beauty", "subcategory": "haircare", "price": 29.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-059", "name": "Compact Makeup Mirror", "category": "health-beauty", "subcategory": "makeup", "price": 11.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-060", "name": "Vitamin B Complex", "category": "health-beauty", "subcategory": "supplements", "price": 6.79, "currency": "£", "images": ["accessories.png"] },
 
+{ "id": "extra-061", "name": "Decorative Wall Shelf", "category": "home-garden", "subcategory": "decor", "price": 19.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-062", "name": "Stainless Kitchen Utensils Set", "category": "home-garden", "subcategory": "kitchen", "price": 17.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-063", "name": "Outdoor Garden Hose", "category": "home-garden", "subcategory": "garden", "price": 15.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-064", "name": "Modern Coffee Table", "category": "home-garden", "subcategory": "furniture", "price": 59.99, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-065", "name": "Ceramic Flower Vase", "category": "home-garden", "subcategory": "decor", "price": 9.99, "currency": "£", "images": ["accessories.png"] },
 
+{ "id": "extra-066", "name": "Kids Building Blocks", "category": "toys", "subcategory": "educational", "price": 12.49, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-067", "name": "Outdoor Skateboard", "category": "toys", "subcategory": "outdoor", "price": 21.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-068", "name": "3D Puzzle Set", "category": "toys", "subcategory": "puzzles", "price": 8.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-069", "name": "Superhero Action Figure", "category": "toys", "subcategory": "action", "price": 14.99, "currency": "£", "images": ["fashion.png"] },
+{ "id": "extra-070", "name": "Inflatable Beach Ball", "category": "toys", "subcategory": "outdoor", "price": 4.99, "currency": "£", "images": ["fashion.png"] },
 
-  
-  {
-    "id": "p1101",
-    "name": "Urban Street Jacket",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 27.99,
-    "currency": "£",
-    "images": ["tops.png"]
-  },
-  {
-    "id": "p1102",
-    "name": "Classic Denim Jeans",
-    "category": "fashion",
-    "subcategory": "bottoms",
-    "price": 22.49,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p1103",
-    "name": "Sport Training Shorts",
-    "category": "fashion",
-    "subcategory": "bottoms",
-    "price": 13.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "p1104",
-    "name": "Minimalist Sneakers",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 31.99,
-    "currency": "£",
-    "images": ["tops.png"]
-  },
-  {
-    "id": "p1105",
-    "name": "Casual Canvas Shoes",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 21.49,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-071", "name": "Oversized Knit Sweater", "category": "fashion", "subcategory": "tops", "price": 36.99, "currency": "£", "images": ["tops.png"] },
+{ "id": "extra-072", "name": "Formal Office Skirt", "category": "fashion", "subcategory": "bottoms", "price": 24.99, "currency": "£", "images": ["bottoms.png"] },
+{ "id": "extra-073", "name": "Leather Ankle Boots", "category": "fashion", "subcategory": "footwear", "price": 54.99, "currency": "£", "images": ["footwear.png"] },
+{ "id": "extra-074", "name": "Silk Scarf", "category": "fashion", "subcategory": "accessories", "price": 18.49, "currency": "£", "images": ["accessories.png"] },
+{ "id": "extra-075", "name": "Elegant Evening Dress", "category": "fashion", "subcategory": "dresses", "price": 69.99, "currency": "£", "images": ["dress-red.png"] },
 
-  {
-    "id": "p1106",
-    "name": "Wireless Earbuds Lite",
-    "category": "electronics",
-    "subcategory": "audio",
-    "price": 19.99,
-    "currency": "£",
-    "images": ["tops.png"]
-  },
-  {
-    "id": "p1107",
-    "name": "Portable Powerbank",
-    "category": "electronics",
-    "subcategory": "mobile",
-    "price": 14.29,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1108",
-    "name": "Gaming Mouse RGB",
-    "category": "electronics",
-    "subcategory": "computers",
-    "price": 12.89,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1109",
-    "name": "Smart Alarm Clock",
-    "category": "electronics",
-    "subcategory": "home",
-    "price": 16.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
+{ "id": "extra-076", "name": "USB Flash Drive 64GB", "category": "electronics", "subcategory": "computers", "price": 11.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-077", "name": "Portable Gaming Console", "category": "electronics", "subcategory": "gaming", "price": 79.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-078", "name": "Car Bluetooth Adapter", "category": "electronics", "subcategory": "audio", "price": 12.99, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-079", "name": "Mobile Phone Stand", "category": "electronics", "subcategory": "mobiles", "price": 6.49, "currency": "£", "images": ["electronics.png"] },
+{ "id": "extra-080", "name": "Wireless Presentation Clicker", "category": "electronics", "subcategory": "computers", "price": 14.99, "currency": "£", "images": ["electronics.png"] }
 
-  {
-    "id": "p1110",
-    "name": "Notebook Planner",
-    "category": "books",
-    "subcategory": "stationery",
-    "price": 5.99,
-    "currency": "£",
-    "images": ["fashion.png"]
-  },
-  {
-    "id": "p1111",
-    "name": "Cooking Recipes Guide",
-    "category": "books",
-    "subcategory": "cooking",
-    "price": 8.49,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1112",
-    "name": "Daily Motivation Book",
-    "category": "books",
-    "subcategory": "selfhelp",
-    "price": 6.99,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-
-  {
-    "id": "p1113",
-    "name": "Vitamin D3 Boost",
-    "category": "health-beauty",
-    "subcategory": "supplements",
-    "price": 7.49,
-    "currency": "£",
-    "images": ["fashion.png"]
-  },
-  {
-    "id": "p1114",
-    "name": "Aloe Vera Gel",
-    "category": "health-beauty",
-    "subcategory": "skincare",
-    "price": 4.99,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1115",
-    "name": "Herbal Shampoo",
-    "category": "health-beauty",
-    "subcategory": "haircare",
-    "price": 5.49,
-    "currency": "£",
-    "images": ["fashion.png"]
-  },
-
-  {
-    "id": "p1116",
-    "name": "Home Scent Diffuser",
-    "category": "home-garden",
-    "subcategory": "home",
-    "price": 9.79,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1117",
-    "name": "Garden Watering Can",
-    "category": "home-garden",
-    "subcategory": "garden",
-    "price": 11.49,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "p1118",
-    "name": "Metal Storage Rack",
-    "category": "home-garden",
-    "subcategory": "storage",
-    "price": 18.99,
-    "currency": "£",
-    "images": ["fashion.png"]
-  },
-
-  {
-    "id": "p1119",
-    "name": "Puzzle Block Set",
-    "category": "toys",
-    "subcategory": "puzzle",
-    "price": 8.99,
-    "currency": "£",
-    "images": ["fashion_2.png"]
-  },
-  {
-    "id": "p1120",
-    "name": "Kids Foam Ball",
-    "category": "toys",
-    "subcategory": "outdoor",
-    "price": 5.49,
-    "currency": "£",
-    "images": ["fashion.png"]
-  },
-
-
-
-  
-  {
-    "id": "prod-021",
-    "name": "Urban Street Jacket",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 54.99,
-    "currency": "£",
-    "images": ["fashion_2.png"]
-  },
-  {
-    "id": "prod-022",
-    "name": "Classic Slim Trousers",
-    "category": "fashion",
-    "subcategory": "bottoms",
-    "price": 39.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "prod-023",
-    "name": "Executive Black Coat",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 74.99,
-    "currency": "£",
-    "images": ["mensfashion_pic.png"]
-  },
-  {
-    "id": "prod-024",
-    "name": "Women's Red Elegance Dress",
-    "category": "fashion",
-    "subcategory": "dresses",
-    "price": 62.50,
-    "currency": "£",
-    "images": ["dress-red.png"]
-  },
-  {
-    "id": "prod-025",
-    "name": "Modern Casual Accessories Set",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 21.00,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "prod-026",
-    "name": "Premium Leather Wallet",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 29.99,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "prod-027",
-    "name": "Daily Fit Sneakers",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 45.00,
-    "currency": "£",
-    "images": ["footwear.png"]
-  },
-  {
-    "id": "prod-028",
-    "name": "Women Casual Tee",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 19.99,
-    "currency": "£",
-    "images": ["tops.png"]
-  },
-  {
-    "id": "prod-029",
-    "name": "Men’s Outdoor Jacket",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 59.50,
-    "currency": "£",
-    "images": ["fashion-pic.png"]
-  },
-  {
-    "id": "prod-030",
-    "name": "Luxury Gold Watch",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 120.00,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "prod-031",
-    "name": "Heavy-Duty Work Boots",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 68.00,
-    "currency": "£",
-    "images": ["footwear.png"]
-  },
-  {
-    "id": "prod-032",
-    "name": "Summer Floral Dress",
-    "category": "fashion",
-    "subcategory": "dresses",
-    "price": 49.99,
-    "currency": "£",
-    "images": ["dress-yellow.png"]
-  },
-  {
-    "id": "prod-033",
-    "name": "Black Handbag",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 34.95,
-    "currency": "£",
-    "images": ["accessories_1.png"]
-  },
-  {
-    "id": "prod-034",
-    "name": "Basic Cotton Shorts",
-    "category": "fashion",
-    "subcategory": "bottoms",
-    "price": 24.00,
-    "currency": "£",
-    "images": ["bottoms.png"]
-  },
-  {
-    "id": "prod-035",
-    "name": "Women’s Long Cardigan",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 41.20,
-    "currency": "£",
-    "images": ["bottoms.png"]
-  },
-  {
-    "id": "prod-036",
-    "name": "Everyday Running Shoes",
-    "category": "fashion",
-    "subcategory": "footwear",
-    "price": 52.10,
-    "currency": "£",
-    "images": ["fashion_2.png"]
-  },
-  {
-    "id": "prod-037",
-    "name": "Stylish Textured Belt",
-    "category": "fashion",
-    "subcategory": "accessories",
-    "price": 14.50,
-    "currency": "£",
-    "images": ["accessories.png"]
-  },
-  {
-    "id": "prod-038",
-    "name": "High Rise Women Jeans",
-    "category": "fashion",
-    "subcategory": "bottoms",
-    "price": 42.99,
-    "currency": "£",
-    "images": ["bottoms.png"]
-  },
-  {
-    "id": "prod-039",
-    "name": "Men’s Polo Shirt",
-    "category": "fashion",
-    "subcategory": "tops",
-    "price": 27.99,
-    "currency": "£",
-    "images": ["dress-red.png"]
-  },
-  {
-    "id": "prod-040",
-    "name": "Red Party Dress",
-    "category": "fashion",
-    "subcategory": "dresses",
-    "price": 58.00,
-    "currency": "£",
-    "images": ["dress-red.png"]
-  }
 ]
+
+
+
+

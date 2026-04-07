@@ -1,67 +1,46 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Order Complete | Sell4Life</title>
-  
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Order Complete | Sell4Life</title>
 
-  <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/thankyou.css?v=20260206-dev">
-</head>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/thankyou.css?v=20260301" />
+  </head>
 
-<body>
+  <body>
+    <div class="thankyou-container">
+      <div class="thankyou-card">
+        <div class="gallery-item">
+          <span class="check-inline" aria-hidden="true">✓</span>
+          <h1>Thank You for Your Order!</h1>
+        </div>
 
-<div class="thankyou-container">
-  <div class="thankyou-container">
+        <p id="payment-status-message">Processing your payment...</p>
 
-  <div class="thankyou-card">
-    <div class="gallery-item">
-  <span class="check-inline" aria-hidden="true">✓</span>
-  <h1>Thank You for Your Order!</h1>
-</div>
+        <div class="ty-details">
+          <strong>Order Number:</strong>
+          <span id="order-id">—</span>
+        </div>
 
-    <p>Your order has been placed successfully. A confirmation has been sent to your email.</p>
+        <div class="ty-details">
+          <strong>Order Date:</strong>
+          <span id="order-date">—</span>
+        </div>
 
-    <div class="ty-details">
-      <strong>Order Number:</strong>
-      <span id="order-id">#000000</span>
+        <div id="order-items" class="ty-items"></div>
+
+        <div class="ty-summary-row ty-summary-total">
+          <span>Total</span>
+          <span id="order-total">£0.00</span>
+        </div>
+
+        <a href="/" class="ty-btn">Back to Home</a>
+      </div>
     </div>
 
-    <div class="ty-details">
-      <strong>Order Date:</strong>
-      <span id="order-date">--</span>
-    </div>
-
-    <!-- ITEMS LIST -->
-    <div id="order-items" class="ty-items"></div>
-
-    <!-- TOTAL (this was missing) -->
-  <div class="ty-summary-row ty-summary-total">
-    <span>Total</span>
-    <span id="order-total">£0.00</span>
-  </div>
-
-    <!-- BUTTON -->
-    <a href="/" class="ty-btn">Back to Home</a>
-  </div>
-
-</div>
-
-<!-- Page scripts LAST -->
-<script type="module" src="/assets/js/thankyou.js?v=20260211"></script>
-
-
-<script>
-(function () {
-  window.addEventListener("pageshow", function (event) {
-    // Page restored from back/forward cache
-    if (event.persisted) {
-      window.location.reload();
-    }
-  });
-})();
-</script>
-
-</body>
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/thankyou.js"></script>
+  </body>
 </html>

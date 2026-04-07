@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <title>Create Vendor</title>
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
+  </head>
+  <body class="vendor-create-page">
+    <div class="vendor-create-container">
+      <a href="/index.html" class="create-back-link">← Back to home</a>
+
+      <h1>Create Your Store</h1>
+
+      <form id="vendorForm">
+        <input type="text" id="storeName" placeholder="Store Name" required />
+        <input type="text" id="storeSlug" placeholder="Store Slug" required />
+        <button type="submit">Create Store</button>
+      </form>
+
+      <p id="msg"></p>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/vendor-create.js"></script>
+  </body>
+</html>

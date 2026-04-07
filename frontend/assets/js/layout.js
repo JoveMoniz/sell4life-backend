@@ -1,220 +1,308 @@
 // =====================================================
-// layout.js — SINGLE, DEFENSIVE SOURCE OF TRUTH
-// Header / Footer / Auth / Cart / Search
-// Cache-safe, idempotent, boring (the good kind)
+// BASIC PAGE CHECK
 // =====================================================
 
+const path = location.pathname.toLowerCase();
+
+const noLayoutPages = [
+  '/cart.html',
+  '/checkout.html',
+  '/account/orders.html',
+  '/account/orders-details.html',
+  '/account/signin.html',
+  '/account/register.html',
+];
+
+const shouldInjectLayout = !noLayoutPages.some((route) => path.includes(route));
 
 // =====================================================
-// LOGOUT (single source of truth)
+// GLOBAL FUNCTIONS
 // =====================================================
+
+window.confirmAction = function (message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    if (!modal) return resolve(false);
+
+    const text = document.getElementById('confirmText');
+    const yes = document.getElementById('confirmYes');
+    const no = document.getElementById('confirmNo');
+
+    text.textContent = message;
+    modal.style.display = 'flex';
+
+    const cleanup = () => {
+      modal.style.display = 'none';
+      yes.onclick = null;
+      no.onclick = null;
+    };
+
+    yes.onclick = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    no.onclick = () => {
+      cleanup();
+      resolve(false);
+    };
+  });
+};
+
+window.showToast = function (message, type = 'success') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.className = 'toast show';
+
+  if (type === 'error') {
+    toast.classList.add('error');
+  }
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+};
+
+// =====================================================
+// LOGOUT
+// =====================================================
+
 function logout() {
-  localStorage.removeItem("s4l_token");
-  localStorage.removeItem("s4l_user");
+  localStorage.removeItem('s4l_token');
+  localStorage.removeItem('s4l_user');
+  localStorage.removeItem('s4l_isVendor');
 
-  if (location.pathname !== "/account/signin.html") {
-    window.location.href = "/account/signin.html";
+  window.showToast('You have been logged out');
+
+  setTimeout(() => {
+    window.location.href = '/';
+  }, 1500);
+}
+
+// =====================================================
+// LOAD HEADER + FOOTER
+// =====================================================
+
+async function loadLayout() {
+  if (!shouldInjectLayout) return;
+
+  try {
+    if (!document.querySelector('.s4l-header-desktop')) {
+      const res = await fetch('/includes/header.html', { cache: 'no-store' });
+      const html = await res.text();
+      document.body.insertAdjacentHTML('afterbegin', html);
+    }
+
+    // ⚠️ delay to ensure DOM ready
+    setTimeout(() => {
+      document.dispatchEvent(new Event('headerLoaded'));
+    }, 0);
+  } catch (err) {
+    console.warn('Header skipped', err);
+  }
+
+  try {
+    if (!document.querySelector('.site-footer')) {
+      const res = await fetch('/includes/footer.html', { cache: 'no-store' });
+      const html = await res.text();
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+  } catch (err) {
+    console.warn('Footer skipped', err);
+  }
+
+  await loadVendorSidebar();
+
+  document.dispatchEvent(new Event('layoutReady'));
+}
+
+// =====================================================
+// GLOBAL CLICK CONTROL (ACCOUNT + SEARCH)
+// =====================================================
+
+document.addEventListener('click', (e) => {
+  const clickedInsideAccount = e.target.closest('.account-menu');
+
+  if (!clickedInsideAccount) {
+    document.querySelectorAll('.account-dropdown').forEach((menu) => {
+      menu.classList.remove('open');
+    });
+  }
+
+  const searchBox = document.querySelector('.search-autocomplete');
+  const clickedInsideSearch = e.target.closest('.header-search, .mobile-search');
+
+  if (searchBox && !clickedInsideSearch) {
+    searchBox.classList.remove('show');
+  }
+});
+
+// =====================================================
+// VENDOR SIDEBAR
+// =====================================================
+
+async function loadVendorSidebar() {
+  const container = document.getElementById('vendor-sidebar');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/account/vendor/vendor-sidebar.html', {
+      cache: 'no-store',
+    });
+
+    const html = await res.text();
+    container.innerHTML = html;
+  } catch (err) {
+    console.warn('Sidebar skipped', err);
   }
 }
 
-
 // =====================================================
-// LOAD HEADER + FOOTER (NO CACHE, DEFENSIVE)
+// HEADER INTERACTIONS
 // =====================================================
-(async function loadLayout() {
 
-  // ----- HEADER -----
-  try {
-    // Prevent duplicate header injection
-    if (!document.querySelector(".site-header")) {
-      const res = await fetch("/includes/header.html", {
-        cache: "no-store"
-      });
+document.addEventListener('headerLoaded', () => {
+  const userRaw = localStorage.getItem('s4l_user');
 
-      if (!res.ok) throw new Error("Header fetch failed");
+  if (userRaw) {
+    try {
+      const user = JSON.parse(userRaw);
+      const displayName = user.name ? user.name.split(' ')[0] : user.username;
 
-      const html = await res.text();
-      document.body.insertAdjacentHTML("afterbegin", html);
-    }
+      const desktopBtn = document.getElementById('accountBtnDesktop');
+      const mobileBtn = document.getElementById('accountBtnMobile');
 
-    document.dispatchEvent(new Event("headerLoaded"));
-  } catch (err) {
-    console.warn("layout.js: header skipped", err);
+      if (desktopBtn) desktopBtn.textContent = displayName + ' ▾';
+      if (mobileBtn) mobileBtn.textContent = displayName + ' ▾';
+    } catch {}
   }
 
-  // ----- FOOTER -----
-  try {
-    if (!document.querySelector(".site-footer")) {
-      const res = await fetch("/includes/footer.html", {
-        cache: "no-store"
+  function setupAccount(btnId, menuId) {
+    const btn = document.getElementById(btnId);
+    const menu = document.getElementById(menuId); // THIS is the dropdown
+
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isOpen = menu.classList.contains('open');
+
+      // close ALL dropdowns
+      document.querySelectorAll('.account-dropdown').forEach((m) => {
+        m.classList.remove('open');
       });
 
-      if (!res.ok) throw new Error("Footer fetch failed");
+      // open current if it was closed
+      if (!isOpen) {
+        menu.classList.add('open');
+      }
+    });
 
-      const html = await res.text();
-      document.body.insertAdjacentHTML("beforeend", html);
+    const token = localStorage.getItem('s4l_token');
+
+    const login = menu.querySelector('.dd-login');
+    const register = menu.querySelector('.dd-register');
+    const orders = menu.querySelector('.dd-orders');
+    const logoutBtn = menu.querySelector('.dd-logout');
+
+    if (token) {
+      login && (login.style.display = 'none');
+      register && (register.style.display = 'none');
+      orders && (orders.style.display = 'block');
+      logoutBtn && (logoutBtn.style.display = 'block');
+      logoutBtn && logoutBtn.addEventListener('click', logout);
+    } else {
+      orders && (orders.style.display = 'none');
+      logoutBtn && (logoutBtn.style.display = 'none');
+      login && (login.style.display = 'block');
+      register && (register.style.display = 'block');
     }
-  } catch (err) {
-    console.warn("layout.js: footer skipped", err);
   }
 
-})();
-
+  setupAccount('accountBtnDesktop', 'accountDropdownDesktop');
+  setupAccount('accountBtnMobile', 'accountDropdownMobile');
+});
 
 // =====================================================
-// GLOBAL VERSIONED SCRIPT LOADER
+// SCRIPT LOADER
 // =====================================================
-document.addEventListener("headerLoaded", async () => {
 
-  if (window.__layoutInitialized) return;
-
+(async function loadScripts() {
   let version;
 
   try {
-   const res = await fetch(`${API_BASE}/api/version`);
-
+    const res = await fetch('https://sell4life-backend.onrender.com/api/version');
     const data = await res.json();
     version = data.version;
   } catch {
     version = Date.now();
   }
 
-  // Core shared scripts
-  const coreScripts = [
-    "/assets/js/cart.js",
-    "/assets/js/search.js"
-  ];
+  if (!window.__coreLoaded) {
+    window.__coreLoaded = true;
 
-  coreScripts.forEach(path => {
-    const script = document.createElement("script");
-    script.src = `${path}?v=${version}`;
-    script.defer = true;
-    document.body.appendChild(script);
-  });
+    ['/assets/js/cart.js', '/assets/js/search.js'].forEach((path) => {
+      const s = document.createElement('script');
+      s.src = `${path}?v=${version}`;
+      s.defer = true;
+      document.body.appendChild(s);
+    });
+  }
 
-  // Page-specific scripts (declared per page)
   if (window.__pageScripts && Array.isArray(window.__pageScripts)) {
-    window.__pageScripts.forEach(path => {
-      const script = document.createElement("script");
-      script.src = `${path}?v=${version}`;
-      script.defer = true;
-      document.body.appendChild(script);
+    window.__pageScripts.forEach((path) => {
+      const s = document.createElement('script');
+      s.src = `${path}?v=${version}`;
+      s.defer = true;
+      document.body.appendChild(s);
     });
   }
-
-  window.__layoutInitialized = true;
-});
-
+})();
 
 // =====================================================
-// MINI CART (DESKTOP HOVER + MOBILE TAP)
+// START
 // =====================================================
-let miniCartTimeout;
 
-document.addEventListener("headerLoaded", () => {
-
-  // ----- DESKTOP -----
-  const wrapper  = document.querySelector(".s4l-header-desktop .basket-wrapper");
-  const miniCart = document.querySelector(".s4l-header-desktop .mini-cart");
-
-  if (wrapper && miniCart) {
-    document.addEventListener("mouseover", (e) => {
-
-      if (!wrapper.classList.contains("has-items")) {
-        miniCart.style.display = "none";
-        miniCart.style.opacity = "0";
-        miniCart.style.visibility = "hidden";
-        return;
-      }
-
-      if (wrapper.contains(e.target) || miniCart.contains(e.target)) {
-        clearTimeout(miniCartTimeout);
-        miniCart.style.display = "block";
-        miniCart.style.opacity = "1";
-        miniCart.style.visibility = "visible";
-        return;
-      }
-
-      miniCartTimeout = setTimeout(() => {
-        miniCart.style.opacity = "0";
-        miniCart.style.visibility = "hidden";
-        miniCart.style.display = "none";
-      }, 200);
-    });
-  }
-
-  // ----- MOBILE -----
-  const mobileBasket =
-    document.querySelector(".s4l-header-mobile .mobile-basket");
-
-  if (mobileBasket) {
-    mobileBasket.addEventListener("click", () => {
-      const qtyEl = mobileBasket.querySelector(".basket-qty");
-      const qty = parseInt(qtyEl?.textContent || "0", 10);
-
-      if (qty > 0) {
-        window.location.href = "/cart/cart.html";
-      }
-    });
-  }
-
-});
-
+loadLayout();
 
 // =====================================================
-// ACCOUNT DROPDOWN + AUTH STATE (DESKTOP + MOBILE)
+// GLOBAL CART CLEANUP (POST PAYMENT)
 // =====================================================
-document.addEventListener("headerLoaded", () => {
 
-  function setupAccount(btnId, menuId) {
-    const btn  = document.getElementById(btnId);
-    const menu = document.getElementById(menuId);
+async function autoCleanupAfterPayment() {
+  const paymentIntentId = localStorage.getItem('last_payment_intent');
+  const done = localStorage.getItem('checkout_completed');
 
-    if (!btn || !menu) return;
+  if (!paymentIntentId || done === 'true') return;
 
-    // Toggle dropdown
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      menu.style.display =
-        menu.style.display === "block" ? "none" : "block";
+  const token = localStorage.getItem('s4l_token');
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${window.API_BASE}/orders/by-payment/${paymentIntentId}`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    // Close when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".account-menu")) {
-        menu.style.display = "none";
-      }
-    });
+    if (!res.ok) return;
 
-    // Auth state
-    const token = localStorage.getItem("s4l_token");
+    const order = await res.json();
 
-    const login     = menu.querySelector(".dd-login");
-    const register  = menu.querySelector(".dd-register");
-    const orders    = menu.querySelector(".dd-orders");
-    const logoutBtn = menu.querySelector(".dd-logout");
+    if (order && order.paymentStatus === 'paid') {
+      console.log('🧹 Global cleanup triggered');
 
-    if (token) {
-      login && (login.style.display = "none");
-      register && (register.style.display = "none");
+      localStorage.removeItem('cart');
+      localStorage.setItem('checkout_completed', 'true');
 
-      orders && (orders.style.display = "block");
-      logoutBtn && (logoutBtn.style.display = "block");
-
-      logoutBtn && logoutBtn.addEventListener("click", logout);
-    } else {
-      orders && (orders.style.display = "none");
-      logoutBtn && (logoutBtn.style.display = "none");
-
-      login && (login.style.display = "block");
-      register && (register.style.display = "block");
+      document.dispatchEvent(new Event('cartUpdated'));
     }
+  } catch (err) {
+    console.warn('Cleanup check failed');
   }
+}
 
-  // Desktop
-  setupAccount("accountBtnDesktop", "accountDropdownDesktop");
-
-  // Mobile
-  setupAccount("accountBtnMobile", "accountDropdownMobile");
-
-});
+// Run AFTER layout is ready
+autoCleanupAfterPayment();

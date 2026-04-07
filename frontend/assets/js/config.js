@@ -1,6 +1,3 @@
-// config.js
-export const API_BASE =
-  location.hostname.includes("localhost")
-    ? "http://localhost:5000/api"
-    : "https://sell4life-backend.onrender.com/api";
-
+export const API_BASE = location.hostname.includes('localhost')
+  ? 'http://localhost:5000/api'
+  : 'https://sell4life-backend.onrender.com/api';

@@ -1,5 +1,5 @@
-.product-page { 
-display: flex;
+.product-page {
+  display: flex;
   flex-wrap: nowrap; /* prevent gallery and info from stacking too early */
   justify-content: space-between;
   align-items: flex-start;
@@ -13,16 +13,11 @@ display: flex;
   padding-right: 0;
 }
 
-
-
 .product-info {
   flex: 1 1 45%;
-  max-width: 600px;           /* makes the text block larger */
+  max-width: 600px; /* makes the text block larger */
   padding: 40px 40px 40px 60px; /* pushes content inward nicely */
-
-
 }
-
 
 .product-title {
   font-size: 2.4rem;
@@ -88,12 +83,17 @@ display: flex;
   border-color: #e86c22;
 }
 
+.product-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(60%);
+}
+
 /* Remove any global margin/padding that could block full-width gallery */
 body {
   margin: 0;
   padding: 0;
 }
-
 
 @media (max-width: 1400px) {
   .product-page {
@@ -101,5 +101,4 @@ body {
     margin-top: 20px;
     flex-direction: column;
   }
-
 }

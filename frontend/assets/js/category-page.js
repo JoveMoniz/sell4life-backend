@@ -1,160 +1,216 @@
-// /assets/js/category-page.js
-// Universal logic for ALL category pages
+// ======================================================
+// CATEGORY PAGE (MODERN + DEFENSIVE VERSION)
+// ======================================================
 
-document.addEventListener("DOMContentLoaded", async () => {
+(async function () {
+  console.log('category-page.js loaded');
 
-  const CATEGORY_JSON_URL  = "/data/category.json";
-  const PRODUCTS_JSON_URL  = "/data/products.json";
-  const PRODUCT_IMAGE_BASE = "/assets/images/products/";
+  // ======================================================
+  // CONFIG
+  // ======================================================
+  const API_URL = 'https://sell4life-backend.onrender.com/api/products';
+  const CATEGORY_JSON_URL = '/data/category.json';
+  const IMAGE_BASE = '/assets/images/products/';
+  const FALLBACK_IMAGE = '/assets/images/products/sell4life-placeholder.png';
 
-  // ---------------------------------------
-  // Helpers
-  // ---------------------------------------
-  const $  = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  // ======================================================
+  // HELPERS
+  // ======================================================
 
-  // Featured card generator
-  function featuredCardHtml(p) {
-    return `
-      <a class="featured-item" href="/product/product.html?id=${p.id}">
-        <img src="${p.image}" alt="${p.name}">
-        <h3>${p.name}</h3>
-        <div class="price">£${p.price}</div>
-      </a>
-    `;
-  }
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-  function getCategoryIdFromPath() {
-    const parts = location.pathname.split("/").filter(Boolean);
-    const last  = parts[parts.length - 1] || "";
-    return last.replace(".html", "").toLowerCase();
-  }
+  const normalize = (str = '') => str.toLowerCase().replace(/\s+/g, '-');
 
-  function makePrice(p) {
-    const currency = p.currency || "£";
-    const value    = Number(p.price || 0);
+  const makePrice = (p) => {
+    const currency = p.currency || '£';
+    const value = Number(p.price || 0);
     return currency + value.toFixed(2);
+  };
+
+  const getProductId = (p) => p._id || p.id;
+
+  const resolveImage = (p) => {
+    const img = p.images?.[0] || '';
+
+    if (!img) return FALLBACK_IMAGE;
+
+    return img.startsWith('http') ? img : IMAGE_BASE + img;
+  };
+
+  // ======================================================
+  // LOAD PRODUCTS (API + FALLBACK)
+  // ======================================================
+  async function loadProducts() {
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+
+      const products = data.products;
+
+      if (Array.isArray(products) && products.length > 0) {
+        console.log('Using API products');
+        return products;
+      }
+
+      throw new Error('API empty');
+    } catch (err) {
+      console.warn('Fallback to products.json');
+
+      const res = await fetch('/data/products.json', { cache: 'no-store' });
+      return res.json();
+    }
   }
 
-  // Product Card
-  function productCardHtml(p) {
-    const imgFile = (p.images && p.images[0]) ? p.images[0] : "";
-    const imgSrc  = imgFile ? (PRODUCT_IMAGE_BASE + imgFile) : "";
-    const price   = makePrice(p);
+  // ======================================================
+  // HTML BUILDERS
+  // ======================================================
 
+  function productCardHtml(p) {
     return `
       <div class="product-card">
-        <a href="/product/product.html?id=${encodeURIComponent(p.id)}">
-          ${imgSrc ? `<img src="${imgSrc}" alt="${p.name}">` : ""}
+        <a href="/product/product.html?id=${encodeURIComponent(getProductId(p))}">
+          <img src="${resolveImage(p)}" alt="${p.name}">
           <h3>${p.name}</h3>
-          <p class="product-price">${price}</p>
+          <p class="product-price">${makePrice(p)}</p>
         </a>
       </div>
     `;
   }
 
-  // ---------------------------------------
-  // Resolve category from URL
-  // ---------------------------------------
+  function featuredCardHtml(p) {
+    return `
+      <a class="featured-item" href="/product/product.html?id=${encodeURIComponent(getProductId(p))}">
+        <img src="${resolveImage(p)}" alt="${p.name}">
+        <h3>${p.name}</h3>
+        <div class="price">${makePrice(p)}</div>
+      </a>
+    `;
+  }
+
+  // ======================================================
+  // RESOLVE CATEGORY FROM URL
+  // ======================================================
+
+  function getCategoryIdFromPath() {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    return last.replace('.html', '').toLowerCase();
+  }
+
   const categoryId = getCategoryIdFromPath();
   if (!categoryId) return;
 
+  // ======================================================
+  // LOAD DATA
+  // ======================================================
+
   let categories = [];
-  let products   = [];
+  let products = [];
 
   try {
-    const [catRes, prodRes] = await Promise.all([
-      fetch(CATEGORY_JSON_URL, { cache: "no-store" }),
-      fetch(PRODUCTS_JSON_URL, { cache: "no-store" })
+    const [catRes, prodData] = await Promise.all([
+      fetch(CATEGORY_JSON_URL, { cache: 'no-store' }),
+      loadProducts(),
     ]);
 
     categories = await catRes.json();
-    products   = await prodRes.json();
+    products = prodData;
   } catch (err) {
-    console.error("[category-page] Failed loading JSON:", err);
+    console.error('Failed loading data:', err);
     return;
   }
 
-  const category = categories.find(c => (c.id || "").toLowerCase() === categoryId);
+  // ======================================================
+  // MATCH CATEGORY
+  // ======================================================
 
-  // Filter all products for this category
-  const catProducts = products.filter(
-    p => (p.category || "").toLowerCase() === categoryId
-  );
+  const category = categories.find((c) => normalize(c.id) === categoryId);
 
-  // ---------------------------------------
-  // 1) FEATURED LIST
-  // ---------------------------------------
-  const featuredWrap = $("#featured-list");
+  // ======================================================
+  // FUTURE-PROOF CATEGORY + SUBCATEGORY FILTER
+  // ======================================================
+
+  const urlParams = new URLSearchParams(location.search);
+  const subcategoryId = normalize(urlParams.get('subcategory') || '');
+
+  console.log('Category:', categoryId);
+  console.log('Subcategory:', subcategoryId);
+
+  const catProducts = products.filter((p) => {
+    if (!p.category) return false;
+
+    const matchCategory = normalize(p.category) === categoryId;
+
+    // no subcategory yet → only filter by category
+    if (!subcategoryId) return matchCategory;
+
+    // future: filter by subcategory too
+    const matchSubcategory = p.subcategory && normalize(p.subcategory) === subcategoryId;
+
+    return matchCategory && matchSubcategory;
+  });
+  // ======================================================
+  // FEATURED SECTION
+  // ======================================================
+
+  const featuredWrap = $('#featured-list');
 
   if (featuredWrap) {
     const featured = catProducts.slice(0, 2);
 
-    if (!featured.length) {
-      featuredWrap.innerHTML = `<p class="empty-note">No featured products yet.</p>`;
-    } else {
-      featuredWrap.innerHTML = featured.map(p =>
-        featuredCardHtml({
-          id: p.id,
-          name: p.name,
-          price: p.price.toFixed(2),
-          image: PRODUCT_IMAGE_BASE + p.images[0]
-        })
-      ).join("");
-    }
+    featuredWrap.innerHTML = featured.length
+      ? featured.map(featuredCardHtml).join('')
+      : `<p class="empty-note">No featured products yet.</p>`;
   }
 
-  // ---------------------------------------
-  // 2) SUBCATEGORY CARDS
-  // ---------------------------------------
-  const subcatWrap = $("#subcategory-cards");
+  // ======================================================
+  // SUBCATEGORIES
+  // ======================================================
 
-  if (subcatWrap && category && Array.isArray(category.subcategories)) {
-    subcatWrap.innerHTML = category.subcategories.map(sub => {
-      const href = `/shop/index.html?category=${encodeURIComponent(category.id)}&subcategory=${encodeURIComponent(sub.id)}`;
+  const subcatWrap = $('#subcategory-cards');
 
-      const imgSrc = sub.image
-        ? sub.image
-        : `/assets/images/category/${category.id}/${sub.id}.png`;
+  if (subcatWrap && category?.subcategories) {
+    subcatWrap.innerHTML = category.subcategories
+      .map((sub) => {
+        const href = `/shop/index.html?category=${encodeURIComponent(category.id)}&subcategory=${encodeURIComponent(sub.id)}`;
+        const imgSrc = sub.image || `/assets/images/category/${category.id}/${sub.id}.png`;
 
-      return `
-        <a href="${href}" class="subcat-card">
-          <div class="subcat-thumb">
-            <img src="${imgSrc}" alt="${sub.name}">
-          </div>
-          <span class="subcat-name">${sub.name}</span>
-        </a>
-      `;
-    }).join("");
+        return `
+          <a href="${href}" class="subcat-card">
+            <div class="subcat-thumb">
+              <img src="${imgSrc}" alt="${sub.name}">
+            </div>
+            <span class="subcat-name">${sub.name}</span>
+          </a>
+        `;
+      })
+      .join('');
   }
 
-  // ---------------------------------------
-  // 3) ALL PRODUCTS LIST
-  // ---------------------------------------
-  const productsWrap = $("#category-product-grid");
+  // ======================================================
+  // ALL PRODUCTS GRID
+  // ======================================================
+
+  const productsWrap = $('#category-product-grid');
 
   if (productsWrap) {
-    if (!catProducts.length) {
-      productsWrap.innerHTML = `<p class="empty-note">No products found in this category yet.</p>`;
-    } else {
-      productsWrap.innerHTML = catProducts.map(productCardHtml).join("");
-    }
+    productsWrap.innerHTML = catProducts.length
+      ? catProducts.map(productCardHtml).join('')
+      : `<p class="empty-note">No products found in this category yet.</p>`;
   }
 
-  // ---------------------------------------
-  // 4) Auto Titles
-  // ---------------------------------------
+  // ======================================================
+  // UI TITLES
+  // ======================================================
+
   if (category) {
-    const allTitle = $(".category-products h2");
-    if (allTitle) allTitle.textContent = `All ${category.name}`;
+    const title = $('.category-products h2');
+    if (title) title.textContent = `All ${category.name}`;
 
-    const shopAllBtn = document.querySelector(".btn-shop-all");
-    if (shopAllBtn) {
-      shopAllBtn.textContent = `Shop All ${category.name}`;
-      shopAllBtn.setAttribute(
-        "href",
-        `/shop/index.html?category=${encodeURIComponent(category.id)}`
-      );
+    const shopBtn = $('.btn-shop-all');
+    if (shopBtn) {
+      shopBtn.textContent = `Shop All ${category.name}`;
+      shopBtn.href = `/shop/index.html?category=${encodeURIComponent(category.id)}`;
     }
   }
-});
+})();

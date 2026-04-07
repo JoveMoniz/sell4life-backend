@@ -1,0 +1,249 @@
+import mongoose from 'mongoose';
+
+/* =================================
+   VARIANT SCHEMA (size, color etc.)
+================================= */
+
+const variantSchema = new mongoose.Schema(
+  {
+    _id: false,
+
+    sku: {
+      type: String,
+      trim: true,
+    },
+
+    attributes: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    price: {
+      type: Number,
+      min: 0,
+    },
+
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    image: String,
+  },
+  { _id: false }
+);
+
+/* =================================
+   MAIN PRODUCT SCHEMA
+================================= */
+
+const productSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: '',
+    },
+
+    shortDescription: {
+      type: String,
+      default: '',
+    },
+
+    /* PRICING */
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    comparePrice: {
+      type: Number,
+      min: 0,
+    },
+
+    costPrice: {
+      type: Number,
+      min: 0,
+    },
+
+    /* IMAGES */
+
+    images: {
+      type: [String],
+      default: [],
+    },
+
+    /* INVENTORY */
+
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    sku: {
+      type: String,
+      trim: true,
+    },
+
+    trackInventory: {
+      type: Boolean,
+      default: true,
+    },
+
+    allowBackorder: {
+      type: Boolean,
+      default: false,
+    },
+
+    /* VARIANTS */
+
+    variants: {
+      type: [variantSchema],
+      default: [],
+    },
+
+    /* CATEGORY */
+
+    category: {
+      type: String,
+      index: true,
+    },
+
+    subcategory: {
+      type: String,
+      index: true,
+    },
+
+    tags: {
+      type: [String],
+      default: [],
+    },
+
+    /* SEO */
+
+    slug: {
+      type: String,
+      required: true,
+      unique: true, // 🔥 IMPORTANT
+      index: true,
+      trim: true,
+    },
+
+    seoTitle: String,
+    seoDescription: String,
+
+    /* OWNER */
+
+    vendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
+      required: true,
+      index: true,
+    },
+
+    /* STATUS */
+
+    active: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    archived: {
+      type: Boolean,
+      default: false,
+    },
+
+    /* SHIPPING */
+
+    weight: Number,
+
+    dimensions: {
+      width: Number,
+      height: Number,
+      length: Number,
+    },
+
+    /* ANALYTICS */
+
+    views: {
+      type: Number,
+      default: 0,
+    },
+
+    salesCount: {
+      type: Number,
+      default: 0,
+    },
+
+    /* FLAGS */
+
+    featured: {
+      type: Boolean,
+      default: false,
+    },
+
+    bestseller: {
+      type: Boolean,
+      default: false,
+    },
+
+    /* FLEX */
+
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
+
+/* =================================
+   VIRTUAL IMAGE
+================================= */
+
+productSchema.virtual('image').get(function () {
+  const basePath = '/assets/images/products/';
+
+  if (Array.isArray(this.images) && this.images.length > 0) {
+    return basePath + this.images[0];
+  }
+
+  return basePath + 'sell4life-placeholder.png';
+});
+
+/* =================================
+   INDEXES
+================================= */
+
+productSchema.index({
+  name: 'text',
+  description: 'text',
+  shortDescription: 'text',
+  tags: 'text',
+  category: 'text',
+  subcategory: 'text',
+});
+productSchema.index({ vendor: 1 });
+productSchema.index({ category: 1, subcategory: 1 });
+productSchema.index({ slug: 1 });
+productSchema.index({ price: 1 });
+
+/* =================================
+   EXPORT
+================================= */
+
+export default mongoose.models.Product || mongoose.model('Product', productSchema);

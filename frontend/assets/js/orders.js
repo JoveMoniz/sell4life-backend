@@ -1,71 +1,139 @@
 // =====================================================
-// Orders list (API_BASE + readable IDs, no thumbnails)
+// SELL4LIFE – CUSTOMER ORDERS LIST (CLEAN)
 // =====================================================
 
-import { API_BASE } from "./config.js";
+console.log('orders.js running');
 
-document.addEventListener("DOMContentLoaded", async () => {
-  console.log("orders.js running");
+const API = window.API_BASE || '';
 
-  const token = localStorage.getItem("s4l_token");
-  const loading = document.getElementById("orders-loading");
-  const list = document.getElementById("orders-list");
+async function initOrders() {
+  const token = localStorage.getItem('s4l_token');
+
+  const loading = document.getElementById('orders-loading');
+  const list = document.getElementById('orders-list');
 
   if (!loading || !list) return;
 
   if (!token) {
-    loading.textContent = "Please sign in.";
+    loading.textContent = 'Please sign in.';
     return;
   }
 
   try {
-    const res = await fetch(`${API_BASE}/orders`, {
+    const res = await fetch(`${API}/orders`, {
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
 
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    loading.style.display = "none";
-
-    if (!data.orders || data.orders.length === 0) {
-      list.innerHTML = "<p>You don’t have any orders yet.</p>";
+    if (res.status === 401) {
+      localStorage.removeItem('s4l_token');
+      window.location.href = '/account/signin.html';
       return;
     }
 
-    list.innerHTML = data.orders.map(o => {
-      const date = o.createdAt
-        ? new Date(o.createdAt).toLocaleString()
-        : "—";
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      // 🔹 Short, readable ID
-      const displayId = o.orderNumber || `S4L-${o.id.slice(0, 10).toUpperCase()}`;
+    const data = await res.json();
 
+    loading.style.display = 'none';
 
-      // 🔹 Item count instead of thumbnail
-      const itemCount = o.items?.length || 0;
+    if (!data.orders || data.orders.length === 0) {
+      list.innerHTML = '<p>You don’t have any orders yet.</p>';
+      return;
+    }
 
-      return `
-        <a href="./orders-details.html?id=${o.id}" class="order-card">
-          <div class="order-header">
-            <span class="order-id">${displayId}</span>
-            <span class="order-total">£${Number(o.total).toFixed(2)}</span>
-          </div>
-
-          <div class="order-meta">
-            <div>${itemCount} item${itemCount === 1 ? "" : "s"} • Status: ${o.status}</div>
-            <div class="order-date">${date}</div>
-          </div>
-        </a>
-      `;
-    }).join("");
-
+    list.innerHTML = data.orders.map(renderOrderCard).join('');
   } catch (err) {
-    console.error("ORDERS LOAD ERROR:", err);
-    loading.textContent = "Failed to load orders.";
+    console.error('ORDERS LOAD ERROR:', err);
+    loading.textContent = 'Failed to load orders.';
   }
+}
+
+// =====================================================
+// RENDER ORDER CARD
+// =====================================================
+
+function renderOrderCard(o) {
+  const date = o.createdAt ? new Date(o.createdAt).toLocaleString() : '—';
+
+  const displayId = o.shortId || `S4L-${o.id.slice(0, 10).toUpperCase()}`;
+
+  const itemCount = o.items?.length || 0;
+
+  const { paymentLabel, paymentClass } = getPaymentStatus(o.paymentStatus);
+
+  const payNowButton =
+    o.paymentStatus === 'pending'
+      ? `<button class="pay-now-btn" data-id="${o.id}">Pay Now</button>`
+      : '';
+
+  return `
+  <div class="order-card">
+
+    <a href="./orders-details.html?id=${o.id}" class="order-card-link">
+
+      <div class="order-header">
+        <span class="order-id">${displayId}</span>
+        <span class="order-total">£${Number(o.total).toFixed(2)}</span>
+      </div>
+
+      <div class="order-meta">
+        <div>
+          ${itemCount} item${itemCount === 1 ? '' : 's'}
+          • ${o.status}
+          • <span class="payment-status ${paymentClass}">
+              ${paymentLabel}
+            </span>
+        </div>
+
+        <div class="order-date">${date}</div>
+      </div>
+
+    </a>
+
+    ${payNowButton}
+
+  </div>
+`;
+}
+
+// =====================================================
+// PAYMENT STATUS HELPER
+// =====================================================
+
+function getPaymentStatus(status) {
+  switch (status) {
+    case 'paid':
+      return { paymentLabel: 'Paid', paymentClass: 'paid' };
+
+    case 'failed':
+      return { paymentLabel: 'Failed', paymentClass: 'failed' };
+
+    case 'refunded':
+      return { paymentLabel: 'Refunded', paymentClass: 'refunded' };
+
+    default:
+      return { paymentLabel: 'Unpaid', paymentClass: 'pending' };
+  }
+}
+
+// =====================================================
+// RETRY PAYMENT BUTTON
+// =====================================================
+
+document.addEventListener('click', (e) => {
+  if (!e.target.classList.contains('pay-now-btn')) return;
+
+  e.preventDefault();
+
+  const orderId = e.target.dataset.id;
+
+  window.location.href = `/cart/checkout.html?order=${orderId}`;
 });
+
+// =====================================================
+// START
+// =====================================================
+
+initOrders();
