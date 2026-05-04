@@ -1,6 +1,7 @@
-const FINAL_STATES = ['cancelled', 'delivered'];
-import { API_BASE } from './config.js';
+const FINAL_STATES = ['cancelled', 'returned'];
+const FINAL_PAYMENT_STATES = ['refunded'];
 
+const API = window.API_BASE;
 /* =================================
    AUTH GUARD
 ================================= */
@@ -14,44 +15,109 @@ if (!token || role !== 'admin') {
 /* =================================
    STATE
 ================================= */
-let activeIndex = -1;
-let lastSentQuery = '';
-let searchInput;
 let currentPage = 1;
 let currentQuery = '';
 let currentStatus = 'all';
 
+let searchInput;
+
 /* =================================
    HELPERS
 ================================= */
-async function updateOrderStatus(orderId, status) {
-  const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ status }),
-  });
 
-  if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || 'Status update failed');
-  }
-}
-
-function getAllowedTransitions(currentStatus) {
+function getAdminActions(status) {
   const map = {
+    // ======================
+    // NORMAL FLOW
+    // ======================
     Pending: ['Processing', 'Cancelled'],
-    Processing: ['Shipped', 'Cancel Requested'],
+
+    Processing: ['Shipped'],
+
     Shipped: ['Delivered'],
-    Delivered: ['Refund Requested'],
+
+    Delivered: [], // no action unless request comes
+
+    // ======================
+    // CUSTOMER REQUESTS
+    // ======================
     'Cancel Requested': ['Cancelled', 'Processing'],
-    'Refund Requested': ['Cancelled', 'Delivered'],
+
+    'Return Requested': ['Return Approved', 'Return Rejected'],
+
+    // ======================
+    // RETURN FLOW
+    // ======================
+    'Return Approved': ['Returned'],
+
+    'Return Rejected': [],
+
+    // ======================
+    // FINAL / PAYMENT FLOW
+    // ======================
+    Returned: ['Refunded'],
+
+    'Refund Requested': ['Refunded'],
+
     Cancelled: [],
   };
 
-  return map[currentStatus] || [];
+  return map[status] || [];
+}
+
+function getAdminLabel(status) {
+  const labels = {
+    Processing: 'Start Processing',
+    Shipped: 'Mark Shipped',
+    Delivered: 'Mark Delivered',
+    Cancelled: 'Force Cancel',
+
+    'Return Requested': 'Mark Return Requested', // ✅ FIX
+    'Return Approved': 'Approve Return',
+    'Return Rejected': 'Reject Return',
+    Returned: 'Mark Returned',
+
+    Refunded: 'Issue Refund',
+  };
+
+  return labels[status] || status;
+}
+/* =================================
+   SEARCH HANDLER (ONLY ONE SOURCE)
+================================= */
+function attachSearchHandlers() {
+  searchInput.addEventListener('input', (e) => {
+    let raw = e.target.value;
+
+    const isEmail = /[a-z]/i.test(raw);
+
+    if (isEmail) {
+      // EMAIL MODE
+      currentQuery = raw.replace(/^S4L-/i, '');
+      return;
+    }
+
+    // ID MODE
+    let clean = raw.replace(/^S4L-/i, '').toUpperCase();
+
+    currentQuery = clean;
+
+    // 🔥 SAFE PREFIX (NO CURSOR BREAK)
+    const cursorPos = searchInput.selectionStart;
+
+    const newValue = clean ? `S4L-${clean}` : '';
+
+    searchInput.value = newValue;
+
+    const offset = newValue.length - raw.length;
+    searchInput.setSelectionRange(cursorPos + offset, cursorPos + offset);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadOrders(currentPage, currentQuery, currentStatus);
+    }
+  });
 }
 
 /* =================================
@@ -73,6 +139,7 @@ async function loadOrders(page = 1, q = '', status = 'all') {
   }
 
   const data = await res.json();
+
   const tbody = document.getElementById('ordersTable');
   tbody.innerHTML = '';
 
@@ -81,21 +148,22 @@ async function loadOrders(page = 1, q = '', status = 'all') {
 
     const paymentStatus = order.paymentStatus || 'pending';
 
-    const paymentLabel =
-      paymentStatus === 'paid'
-        ? 'Paid'
-        : paymentStatus === 'failed'
-          ? 'Failed'
-          : paymentStatus === 'refunded'
-            ? 'Refunded'
-            : 'Unpaid';
+    const paymentLabelMap = {
+      paid: 'Paid',
+      refund_scheduled: 'Refund Scheduled',
+      refunded: 'Refunded',
+      failed: 'Failed',
+    };
 
-    let displayId = order.shortId || order.id.slice(0, 10).toUpperCase();
+    const paymentLabel = paymentLabelMap[paymentStatus] || 'Unpaid';
 
-    // ensure prefix exists
-    if (!displayId.startsWith('S4L-')) {
-      displayId = 'S4L-' + displayId;
-    }
+    const realId = order._id;
+
+    let displayId =
+      order.displayId ||
+      (order.shortId
+        ? `S4L-${order.shortId}`
+        : `S4L-${(order._id || order.id).slice(0, 10).toUpperCase()}`);
 
     const cleanId = displayId.replace('S4L-', '');
 
@@ -133,7 +201,7 @@ async function loadOrders(page = 1, q = '', status = 'all') {
 <td>${new Date(order.createdAt).toLocaleString()}</td>
 
 <td>
-  <button class="view-order" data-id="${order.id}">
+  <button class="view-order" data-id="${realId}">
     View
   </button>
 </td>
@@ -170,349 +238,230 @@ function renderPagination(current, total) {
 }
 
 /* =================================
-   TABLE CLICK HANDLER
+   TABLE CLICK HANDLER (FINAL CLEAN)
 ================================= */
-document.getElementById('ordersTable').addEventListener('click', async (e) => {
-  /* QUICK SEARCH CLICK (Order ID / Email) */
-  const idBtn = e.target.closest('.quick-search-id');
-  if (idBtn) {
-    const shortId = idBtn.dataset.id;
-
-    // show prefix in the field
-    if (searchInput) searchInput.value = 'S4L-' + shortId;
-
-    // backend should receive clean value
-    currentQuery = shortId;
-    currentPage = 1;
-    loadOrders(1, currentQuery, currentStatus);
+document.getElementById('ordersTable').addEventListener('click', (e) => {
+  // ===============================
+  // LET LINKS WORK
+  // ===============================
+  if (e.target.closest('.inline-details-link')) {
     return;
   }
 
-  const emailBtn = e.target.closest('.quick-search-email');
-  if (emailBtn) {
-    const email = emailBtn.dataset.email;
+  // ===============================
+  // STATUS BUTTON CLICK
+  // ===============================
+  const statusBtn = e.target.closest('.status-btn');
+  if (statusBtn) {
+    const orderId = statusBtn.dataset.id;
+    const newStatus = statusBtn.dataset.status;
 
-    if (searchInput) searchInput.value = email;
-
-    currentQuery = email;
-    currentPage = 1;
-    loadOrders(1, currentQuery, currentStatus);
+    updateOrderStatus(orderId, newStatus);
     return;
   }
-  /* OPEN INLINE DETAILS */
   const viewBtn = e.target.closest('.view-order');
-  if (viewBtn) {
-    const row = viewBtn.closest('tr');
-    const orderId = viewBtn.dataset.id;
+  if (!viewBtn) return;
 
-    const backendStatus = row.children[3].textContent.trim();
-    const paymentState = row.children[4].textContent.trim().toLowerCase();
+  const row = viewBtn.closest('tr');
+  const orderId = viewBtn.dataset.id;
 
-    const isFinalOrder = ['cancelled', 'delivered'].includes(backendStatus.toLowerCase());
-    const isRefunded = paymentState === 'refunded';
+  let detailsRow = row.nextElementSibling;
 
-    const isFinal = isFinalOrder || isRefunded;
-    const isUnpaid = paymentState !== 'paid';
+  // ===============================
+  // CLOSE
+  // ===============================
+  if (detailsRow && detailsRow.classList.contains('order-details-row')) {
+    const wrapper = detailsRow.querySelector('.inline-order-wrapper');
 
-    let detailsRow = row.nextElementSibling;
-    if (detailsRow && detailsRow.classList.contains('order-details-row')) {
-      detailsRow.classList.remove('open');
+    if (wrapper) {
+      // lock current height
+      wrapper.style.height = wrapper.scrollHeight + 'px';
+
+      requestAnimationFrame(() => {
+        wrapper.style.height = '0px';
+      });
 
       setTimeout(() => {
         detailsRow.remove();
-      }, 350); // match CSS duration
-
-      return;
+      }, 450);
     }
 
-    document.querySelectorAll('.order-details-row').forEach((r) => r.remove());
-
-    const allowedStatuses = getAllowedTransitions(backendStatus);
-
-    detailsRow = document.createElement('tr');
-    detailsRow.className = 'order-details-row';
-
-    const cell = document.createElement('td');
-    cell.colSpan = 7;
-
-    cell.innerHTML = `
-  <div class="inline-order-wrapper">
-    <div class="inline-order-content">
-
-      <div class="inline-status-line">
-        <strong>Status</strong>
-        <span class="status status-${backendStatus.toLowerCase()}">
-          ${backendStatus}
-        </span>
-      </div>
-
-     ${
-       isFinal
-         ? `<div class="inline-final-message">
-       Final state – no further changes
-     </div>`
-         : isUnpaid
-           ? `<div class="inline-final-message">
-         Cannot change status – payment not completed
-       </div>`
-           : `
-            <div class="inline-status-buttons">
-              ${allowedStatuses
-                .map(
-                  (status) => `
-                  <button
-                    class="status-btn ${status === backendStatus ? 'active' : ''}"
-                    data-id="${orderId}"
-                    data-status="${status}">
-                    ${status}
-                  </button>
-                `
-                )
-                .join('')}
-            </div>
-          `
-     }
-
-      <a class="inline-details-link"
-         href="/account/admin/order-details.html?id=${orderId}">
-        View full details →
-      </a>
-
-    </div>
-  </div>
-`;
-
-    detailsRow.appendChild(cell);
-    row.after(detailsRow);
-    // trigger animation
-    requestAnimationFrame(() => {
-      detailsRow.classList.add('open');
-    });
     return;
   }
 
-  /* STATUS BUTTON CLICK */
-  const statusBtn = e.target.closest('.status-btn');
-  if (!statusBtn) return;
+  // ===============================
+  // REMOVE ANY OPEN ROW
+  // ===============================
+  // ===============================
+  // CLOSE ANY OPEN ROW (SMOOTH, NOT INSTANT)
+  // ===============================
+  const openRow = document.querySelector('.order-details-row');
 
-  const orderId = statusBtn.dataset.id;
-  const newStatus = statusBtn.dataset.status;
+  if (openRow && openRow !== detailsRow) {
+    const openWrapper = openRow.querySelector('.inline-order-wrapper');
 
-  statusBtn.disabled = true;
-  statusBtn.textContent = 'Saving…';
+    if (openWrapper) {
+      // lock current height
+      openWrapper.style.height = openWrapper.scrollHeight + 'px';
 
-  try {
-    await updateOrderStatus(orderId, newStatus);
+      requestAnimationFrame(() => {
+        openWrapper.style.height = '0px';
+      });
 
-    const detailsRow = statusBtn.closest('tr');
-    const mainRow = detailsRow.previousElementSibling;
-    const statusCell = mainRow.children[3];
-
-    // Update main table badge
-    statusCell.innerHTML = `
-    <span class="status status-${newStatus.toLowerCase()}">
-      ${newStatus}
-    </span>
-  `;
-
-    const content = detailsRow.querySelector('.inline-order-content');
-
-    // Update inline badge
-    const inlineStatus = content.querySelector('.inline-status-line span');
-    if (inlineStatus) {
-      inlineStatus.className = `status status-${newStatus.toLowerCase()}`;
-      inlineStatus.textContent = newStatus;
+      // remove AFTER animation
+      setTimeout(() => {
+        openRow.remove();
+      }, 450);
     }
+  }
 
-    // Get new transitions
-    const allowedStatuses = getAllowedTransitions(newStatus);
+  const backendStatus = row.children[3].innerText.trim();
+  const allowedStatuses = getAdminActions(backendStatus);
+  // ===============================
+  // CREATE ROW
+  // ===============================
+  detailsRow = document.createElement('tr');
+  detailsRow.className = 'order-details-row';
 
-    const buttonsContainer = content.querySelector('.inline-status-buttons');
+  const cell = document.createElement('td');
+  cell.colSpan = 7;
 
-    // If no transitions → final state
-    if (!allowedStatuses.length) {
-      buttonsContainer?.remove();
+  cell.innerHTML = `
+<div class="inline-order-wrapper">
+  <div class="inline-order-content">
 
-      // Avoid duplicating final message
-      if (!content.querySelector('.inline-final-message')) {
-        const msg = document.createElement('div');
-        msg.className = 'inline-final-message';
-        msg.textContent = 'Final state – no further changes';
+    <div class="inline-status-line">
+      <strong>Status</strong>
+      <span class="status status-${backendStatus.toLowerCase()}">
+        ${backendStatus}
+      </span>
+    </div>
 
-        content.insertBefore(msg, content.querySelector('.inline-details-link'));
-      }
+    <div class="inline-status-buttons">
+      ${allowedStatuses
+        .map(
+          (status) => `
+        <button class="status-btn" data-id="${orderId}" data-status="${status}">
+         ${getAdminLabel(status)}
+        </button>
+      `
+        )
+        .join('')}
+    </div>
 
+    <a class="inline-details-link"
+       href="/account/admin/order-details.html?id=${orderId}">
+      View full details →
+    </a>
+
+  </div>
+</div>
+`;
+
+  detailsRow.appendChild(cell);
+  row.after(detailsRow);
+
+  // ===============================
+  // OPEN (SMOOTH + FULL HEIGHT)
+  // ===============================
+  const wrapper = detailsRow.querySelector('.inline-order-wrapper');
+
+  // measure real height
+  wrapper.style.height = 'auto';
+  const fullHeight = wrapper.scrollHeight + 'px';
+
+  // collapse
+  wrapper.style.height = '0px';
+  wrapper.offsetHeight;
+
+  // animate open
+  requestAnimationFrame(() => {
+    wrapper.style.height = fullHeight;
+  });
+});
+
+async function updateOrderStatus(orderId, status) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Update failed');
       return;
     }
 
-    // Otherwise rebuild buttons
-    buttonsContainer.innerHTML = allowedStatuses
-      .map(
-        (status) => `
-        <button
-          class="status-btn"
-          data-id="${orderId}"
-          data-status="${status}">
-          ${status}
-        </button>
-      `
-      )
-      .join('');
+    // reload updated data
+    loadOrders(currentPage, currentQuery, currentStatus);
   } catch (err) {
     console.error(err);
-    statusBtn.textContent = 'Error';
+    alert('Something went wrong');
   }
-
-  setTimeout(() => {
-    statusBtn.textContent = newStatus;
-    statusBtn.disabled = false;
-  }, 800);
-});
-
+}
 /* =================================
-   STATUS FILTER BUTTONS
+   FILTERS
 ================================= */
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.filter-btn');
   if (!btn) return;
 
-  document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
-
-  btn.classList.add('active');
-
   currentStatus = btn.dataset.status;
   currentPage = 1;
 
-  loadOrders(1, currentQuery, currentStatus);
+  document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  loadOrders(currentPage, currentQuery, currentStatus);
 });
 
 /* =================================
-   LIVE SEARCH + TABLE KEYBOARD NAV
+   QUICK SEARCH
 ================================= */
-
-document.addEventListener('DOMContentLoaded', () => {
-  searchInput = document.getElementById('orderSearch');
-  if (!searchInput) return;
-
-  // Default prefix
-  searchInput.value = 'S4L-';
-
-  let liveTimer;
-
-  /* ================================
-     TABLE KEYBOARD NAVIGATION
-  ================================= */
-  searchInput.addEventListener('keydown', (e) => {
-    const rows = Array.from(document.querySelectorAll('#ordersTable tr')).filter((row) =>
-      row.querySelector('.view-order')
-    );
-
-    if (!rows.length) return;
-
-    let activeRowIndex = rows.findIndex((row) => row.classList.contains('row-active'));
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-
-      if (activeRowIndex === -1) activeRowIndex = 0;
-      else activeRowIndex = Math.min(activeRowIndex + 1, rows.length - 1);
-
-      setActiveRow(rows, activeRowIndex);
-    }
-
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-
-      if (activeRowIndex === -1) activeRowIndex = rows.length - 1;
-      else activeRowIndex = Math.max(activeRowIndex - 1, 0);
-
-      setActiveRow(rows, activeRowIndex);
-    }
-
-    if (e.key === 'Enter') {
-      if (activeRowIndex >= 0) {
-        const viewBtn = rows[activeRowIndex].querySelector('.view-order');
-        if (viewBtn) {
-          viewBtn.click();
-
-          // After inline opens, move focus
-          setTimeout(() => {
-            const detailsRow = rows[activeRowIndex].nextElementSibling;
-
-            if (detailsRow && detailsRow.classList.contains('order-details-row')) {
-              const firstFocusable = detailsRow.querySelector('button, a, select');
-
-              if (firstFocusable) {
-                firstFocusable.focus();
-              }
-            }
-          }, 50); // small delay to allow DOM render
-        }
-      }
-    }
-  });
-
-  function setActiveRow(rows, index) {
-    rows.forEach((row) => row.classList.remove('row-active'));
-
-    const row = rows[index];
-    if (!row) return;
-
-    row.classList.add('row-active');
-    row.scrollIntoView({ block: 'nearest' });
+document.addEventListener('click', (e) => {
+  const idBtn = e.target.closest('.quick-search-id');
+  if (idBtn) {
+    currentQuery = idBtn.dataset.id;
+    currentPage = 1;
+    loadOrders(currentPage, currentQuery, currentStatus);
+    return;
   }
 
-  /* ================================
-     LIVE SEARCH INPUT
-  ================================= */
-  searchInput.addEventListener('input', () => {
-    let value = searchInput.value;
-
-    // If empty → restore prefix
-    if (value === '') {
-      searchInput.value = 'S4L-';
-      currentQuery = '';
-      loadOrders(1, '', currentStatus);
-      return;
-    }
-
-    // Remove any active highlight when new search starts
-    document
-      .querySelectorAll('#ordersTable tr')
-      .forEach((row) => row.classList.remove('row-active'));
-
-    // Prefix logic
-    if (value.toUpperCase().startsWith('S4L-')) {
-      const after = value.slice(4);
-
-      if (/^[0-9]/.test(after)) {
-        currentQuery = after;
-      } else {
-        searchInput.value = after;
-        currentQuery = after;
-      }
-    } else if (/^[0-9]/.test(value)) {
-      searchInput.value = 'S4L-' + value;
-      currentQuery = value;
-    } else {
-      currentQuery = value;
-    }
-
-    clearTimeout(liveTimer);
-
-    if (currentQuery.length < 2) return;
-
-    liveTimer = setTimeout(() => {
-      if (currentQuery === lastSentQuery) return;
-
-      lastSentQuery = currentQuery;
-      currentPage = 1;
-      loadOrders(1, currentQuery, currentStatus);
-    }, 150);
-  });
+  const emailBtn = e.target.closest('.quick-search-email');
+  if (emailBtn) {
+    currentQuery = emailBtn.dataset.email;
+    currentPage = 1;
+    loadOrders(currentPage, currentQuery, currentStatus);
+  }
 });
 
 /* =================================
    INIT
 ================================= */
-loadOrders();
+document.addEventListener('DOMContentLoaded', () => {
+  searchInput = document.getElementById('orderSearch');
+
+  if (!searchInput) {
+    console.error('❌ Search input not found');
+    return;
+  }
+
+  attachSearchHandlers();
+  loadOrders();
+});
+
+/* =================================
+   LIVE UPDATES
+================================= */
+startLiveUpdates(() => {
+  const openRow = document.querySelector('.order-details-row');
+  if (openRow) return;
+
+  loadOrders(currentPage, currentQuery, currentStatus);
+});

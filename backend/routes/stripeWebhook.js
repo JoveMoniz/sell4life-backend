@@ -179,14 +179,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     /* ======================================================
        REFUND EVENT
     ====================================================== */
+    if (event.type.startsWith('refund.')) {
+      const refund = event.data.object;
 
-    if (event.type === 'charge.refunded') {
-      const charge = event.data.object;
+      const paymentIntentId = refund.payment_intent;
 
-      console.log('💰 Refund event:', charge.payment_intent);
+      console.log('💰 Refund event:', paymentIntentId);
 
       const order = await Order.findOne({
-        paymentIntentId: charge.payment_intent,
+        paymentIntentId,
       });
 
       if (!order) {
@@ -197,12 +198,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       // MONEY STATE
       order.paymentStatus = 'refunded';
 
-      // SYSTEM STATE
-      order.status = 'Cancelled';
-
       // HISTORY
       order.statusHistory.push({
-        status: 'Cancelled',
+        status: 'Refunded',
         note: 'Refund confirmed by Stripe',
         date: new Date(),
       });

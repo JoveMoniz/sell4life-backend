@@ -1,100 +1,171 @@
-/* ======================================================
-   INIT
-====================================================== */
+// ======================================================
+// VENDOR ORDER DETAILS (FINAL CLEAN + FULLY ALIGNED)
+// ======================================================
 
-console.log('vendor order details loaded');
+console.log('vendor orders loaded');
+
+let currentStatus = 'all';
+let currentQuery = '';
+
+let timerInterval; // 👈 HERE
 
 const params = new URLSearchParams(window.location.search);
 const orderId = params.get('id');
 
 const container = document.getElementById('vendor-order-details');
-
-if (!container) {
-  console.error('❌ Container not found');
-}
-
 const token = localStorage.getItem('s4l_token');
 
-if (!orderId || !token) {
-  container.innerHTML = '<p>Invalid access</p>';
+if (!container || !orderId || !token) {
+  if (container) container.innerHTML = '<p>Invalid access</p>';
   throw new Error('Invalid access');
 }
 
 /* ======================================================
-   ACTION BUILDER
+   DISPLAY STATUS (HONEST + FULL STORY)
 ====================================================== */
 
-function getActionsHTML(order, id) {
-  // 🔒 LOCK if refund scheduled
-  if (order.status === 'Refund Scheduled') {
-    return `<p>Refund scheduled. No actions available.</p>`;
+function getDisplayStatus(order) {
+  const payment = (order.paymentStatus || '').toLowerCase();
+  const status = order.status;
+
+  if (status === 'Return Rejected') {
+    return 'Delivered • Return Rejected ❌';
   }
 
-  let html = '';
-
-  // ===============================
-  // NORMAL FLOW
-  // ===============================
-
-  if (order.status === 'Pending') {
-    html += `<button class="btn-process" data-id="${id}">Process</button>`;
-    html += `<button class="btn-cancel" data-id="${id}">Cancel</button>`;
+  if (payment === 'refunded') {
+    return `${status} • Refunded`;
   }
 
-  if (order.status === 'Processing') {
-    html += `<button class="btn-ship" data-id="${id}">Mark Shipped</button>`;
-    html += `<button class="btn-cancel" data-id="${id}">Cancel</button>`;
+  const isRefundLocked = order.refundScheduledAt && new Date(order.refundScheduledAt) > new Date();
+
+  if (isRefundLocked) {
+    return `<p>Refund in progress. No actions available.</p>`;
   }
 
-  if (order.status === 'Shipped') {
-    html += `<button class="btn-deliver" data-id="${id}">Mark Delivered</button>`;
+  if (payment === 'refunded') {
+    return `<p>Refund completed.</p>`;
   }
 
-  // ===============================
-  // RETURN FLOW
-  // ===============================
+  return status;
+}
 
-  if (order.status === 'Return Requested') {
-    html += `<button class="btn-approve-return" data-id="${id}">Approve Return</button>`;
+/* ======================================================
+   VENDOR TRANSITIONS (ALIGNED WITH BACKEND)
+====================================================== */
+
+function getAllowedTransitions(status) {
+  const map = {
+    Pending: ['Processing'],
+    Processing: ['Shipped'],
+    Shipped: ['Delivered'],
+
+    Delivered: [],
+
+    'Return Requested': ['Return Approved', 'Return Rejected'],
+    'Return Approved': ['Returned'],
+    'Return Rejected': [],
+
+    'Cancel Requested': ['Cancelled'],
+
+    Cancelled: [],
+    Returned: [],
+  };
+
+  return map[status] || [];
+}
+
+/* ======================================================
+   LABELS (NO RAW DATABASE TEXT)
+====================================================== */
+
+function getVendorLabel(status) {
+  const map = {
+    Processing: 'Start Processing',
+    Shipped: 'Mark Shipped',
+    Delivered: 'Mark Delivered',
+
+    'Return Approved': 'Approve Return',
+    'Return Rejected': 'Reject Return',
+
+    Returned: 'Mark Returned',
+    Cancelled: 'Cancel Order',
+  };
+
+  return map[status] || status;
+}
+
+/* ======================================================
+   PAYMENT LABEL
+====================================================== */
+
+function getPaymentLabel(paymentStatus) {
+  switch ((paymentStatus || '').toLowerCase()) {
+    case 'paid':
+      return 'Paid';
+    case 'refund_scheduled':
+      return 'Refund Scheduled';
+    case 'refunded':
+      return 'Refunded';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Pending';
+  }
+}
+
+/* ======================================================
+   ACTION BUILDER (SMART + SAFE)
+====================================================== */
+
+function buildActions(order, id) {
+  const payment = (order.paymentStatus || '').toLowerCase();
+
+  const isRefundLocked = order.refundScheduledAt && new Date(order.refundScheduledAt) > new Date();
+
+  // 🚫 block unpaid
+  if (payment !== 'paid') {
+    return `<p>Payment not completed.</p>`;
   }
 
-  if (order.status === 'Return Approved') {
-    html += `<button class="btn-mark-returned" data-id="${id}">Mark Returned</button>`;
+  // 🚫 block refund flow
+  if (payment === 'refund_scheduled' || isRefundLocked) {
+    return `<p>Refund in progress. No actions available.</p>`;
   }
 
-  // ===============================
-  // DANGER ZONE
-  // ===============================
-
-  let dangerButtons = '';
-
-  if (
-    order.paymentStatus === 'paid' &&
-    ['Cancelled', 'Returned', 'Refund Scheduled'].includes(order.status)
-  ) {
-    dangerButtons += `<button class="btn-refund danger" data-id="${id}">Refund</button>`;
+  if (payment === 'refunded') {
+    return `<p>Refund completed.</p>`;
   }
 
-  if (order.status === 'Cancel Requested') {
-    dangerButtons += `<button class="btn-approve-cancel danger" data-id="${id}">Approve Cancel</button>`;
+  // 🚫 return rejected = end for vendor
+  if (order.status === 'Return Rejected') {
+    return `<p>Return rejected. No further action.</p>`;
   }
 
-  if (order.status === 'Refund Requested') {
-    dangerButtons += `<button class="btn-approve-refund danger" data-id="${id}">Approve Refund</button>`;
-  }
+  const allowed = getAllowedTransitions(order.status);
 
-  if (dangerButtons) {
-    html += `
-      <div class="danger-zone">
-        <button class="btn-danger-toggle">⚠ Actions</button>
-        <div class="danger-dropdown">
-          ${dangerButtons}
-        </div>
-      </div>
-    `;
-  }
+  const map = {
+    Processing: 'btn-process',
+    Cancelled: 'btn-cancel',
+    Shipped: 'btn-ship',
+    Delivered: 'btn-deliver',
+    'Return Approved': 'btn-approve-return',
+    'Return Rejected': 'btn-reject-return',
+    Returned: 'btn-mark-returned',
+  };
 
-  return html;
+  const buttons = allowed
+    .map((s) => {
+      const cls = map[s] || '';
+
+      return `
+        <button class="${cls}" data-id="${id}" data-label="${s}">
+          ${getVendorLabel(s)}
+        </button>
+      `;
+    })
+    .join('');
+
+  return buttons || `<p>No actions available</p>`;
 }
 
 /* ======================================================
@@ -112,84 +183,108 @@ async function loadOrder() {
     const order = await res.json();
 
     const id = order._id || order.id;
-    const displayId = order.shortId ? order.shortId : `S4L-${id.slice(0, 10).toUpperCase()}`;
+    const displayId = order.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
 
+    const paymentStatus = (order.paymentStatus || 'pending').toLowerCase();
+    const paymentLabel = getPaymentLabel(paymentStatus);
+
+    // get vendor id
     const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     const vendorData = await vendorRes.json();
+
+    const vendor = vendorData.vendor;
+
+    if (!vendor) {
+      container.innerHTML = '<p>Create your store first</p>';
+      return;
+    }
+
+    if (vendor.status === 'pending') {
+      container.innerHTML = '<p>Your store is under review</p>';
+      return;
+    }
+
+    if (vendor.status === 'suspended') {
+      container.innerHTML = '<p>Your store is suspended</p>';
+      return;
+    }
+
     const vendorId = vendorData.vendor?._id;
 
     const vendorItems = (order.items || []).filter(
       (item) => String(item.vendorId) === String(vendorId)
     );
 
-    const vendorTotal = vendorItems.reduce((sum, item) => {
-      return sum + Number(item.price) * Number(item.quantity);
-    }, 0);
+    const vendorTotal = vendorItems.reduce(
+      (sum, item) => sum + Number(item.price) * Number(item.quantity),
+      0
+    );
 
     container.innerHTML = `
 <div class="order-details-card">
 
-<h2>Order ${displayId}</h2>
+  <h2>Order ${displayId}</h2>
 
-<div class="order-status">
-Status: ${order.status} <br/>
-Payment: ${order.paymentStatus}
+  <div class="order-status">
+    <div>
+      Status:
+      <strong>${getDisplayStatus(order)}</strong>
+    </div>
 
-${
-  order.status === 'Refund Scheduled' && order.refundScheduledAt
-    ? `<div class="refund-info">
-        Refund scheduled at: ${new Date(order.refundScheduledAt).toLocaleString()}
-      </div>`
-    : ''
-}
-</div>
+    ${
+      paymentStatus === 'refund_scheduled' && order.refundScheduledAt
+        ? `
+        <div class="refund-info">
+          <div>Refund scheduled at: ${new Date(order.refundScheduledAt).toLocaleString()}</div>
+          <div id="refund-timer" data-time="${order.refundScheduledAt}"></div>
+        </div>
+        `
+        : ''
+    }
+  </div>
 
-<div class="order-actions">
-${getActionsHTML(order, id)}
-</div>
+  <div class="order-actions">
+    ${buildActions(order, id)}
+  </div>
 
-<div class="order-items">
-${
-  vendorItems.length === 0
-    ? '<p>No items for this vendor</p>'
-    : vendorItems
-        .map(
-          (item) => `
-<div class="order-item">
+  <div class="order-items">
+    ${
+      vendorItems.length === 0
+        ? '<p>No items for this vendor</p>'
+        : vendorItems
+            .map(
+              (item) => `
+          <div class="order-item">
+            <img 
+              src="${item.image || '/assets/images/products/sell4life-placeholder.png'}"
+              width="60"
+              height="60"
+            />
+            <div>
+              <div>${item.name}</div>
+              <div>Qty: ${item.quantity}</div>
+            </div>
+            <div class="order-price">
+              £${(item.price * item.quantity).toFixed(2)}
+            </div>
+          </div>
+        `
+            )
+            .join('')
+    }
+  </div>
 
-<img 
-  src="${item.image || '/assets/images/products/sell4life-placeholder.png'}"
-  alt="${item.name}"
-  width="60"
-  height="60"
-  onerror="this.onerror=null;this.src='/assets/images/products/sell4life-placeholder.png';"
-/>
-
-<div>
-  <div>${item.name}</div>
-  <div>Qty: ${item.quantity}</div>
-</div>
-
-<div class="order-price">
-  £${(Number(item.price) * Number(item.quantity)).toFixed(2)}
-</div>
-
-</div>
-`
-        )
-        .join('')
-}
-</div>
-
-<div class="order-total">
-Total: £${vendorTotal.toFixed(2)}
-</div>
+  <div class="order-total">
+    Total: £${vendorTotal.toFixed(2)}
+  </div>
 
 </div>
 `;
+
+    initTimer();
   } catch (err) {
     console.error(err);
     container.innerHTML = '<p>Could not load order</p>';
@@ -197,95 +292,62 @@ Total: £${vendorTotal.toFixed(2)}
 }
 
 /* ======================================================
-   INITIAL LOAD
+   TIMER
 ====================================================== */
 
-loadOrder();
+function initTimer() {
+  const el = document.getElementById('refund-timer');
+  if (!el) return;
+
+  const target = new Date(el.dataset.time).getTime();
+
+  function update() {
+    const diff = target - Date.now();
+
+    if (diff <= 0) {
+      el.textContent = 'Refund processing...';
+      return;
+    }
+
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+
+    el.textContent = `Refund in: ${h}h ${m}m ${s}s`;
+  }
+
+  update();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(update, 1000);
+}
 
 /* ======================================================
-   ACTION HANDLER
+   ACTION HANDLER (SAFE TARGETING)
 ====================================================== */
 
 document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('button');
-
-  // ===============================
-  // TOGGLE DROPDOWN
-  // ===============================
-  if (btn && btn.classList.contains('btn-danger-toggle')) {
-    const zone = btn.closest('.danger-zone');
-
-    document.querySelectorAll('.danger-zone').forEach((el) => {
-      if (el !== zone) el.classList.remove('open');
-    });
-
-    zone.classList.toggle('open');
-    return;
-  }
-
-  // CLOSE dropdown
-  if (!e.target.closest('.danger-zone')) {
-    document.querySelectorAll('.danger-zone').forEach((el) => {
-      el.classList.remove('open');
-    });
-  }
+  const btn = e.target.closest(
+    '.btn-process, .btn-cancel, .btn-ship, .btn-deliver, .btn-approve-return, .btn-reject-return, .btn-mark-returned'
+  );
 
   if (!btn) return;
 
   const id = btn.dataset.id;
-  if (!id) return;
+  const status = btn.dataset.label;
+
+  if (!status) return;
 
   try {
-    if (btn.classList.contains('btn-process')) {
-      await updateStatus(id, 'Processing');
-    }
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
 
-    if (btn.classList.contains('btn-cancel')) {
-      if (!confirm('Cancel this order?')) return;
-      await updateStatus(id, 'Cancelled');
-    }
-
-    if (btn.classList.contains('btn-ship')) {
-      await updateStatus(id, 'Shipped');
-    }
-
-    if (btn.classList.contains('btn-deliver')) {
-      await updateStatus(id, 'Delivered');
-    }
-
-    if (btn.classList.contains('btn-approve-return')) {
-      await updateStatus(id, 'Return Approved');
-    }
-
-    if (btn.classList.contains('btn-mark-returned')) {
-      await updateStatus(id, 'Returned');
-    }
-
-    if (btn.classList.contains('btn-approve-cancel')) {
-      await updateStatus(id, 'Cancelled');
-    }
-
-    if (btn.classList.contains('btn-approve-refund')) {
-      if (!confirm('Approve refund?')) return;
-      await refundOrder(id);
-      await updateStatus(id, 'Cancelled');
-    }
-
-    if (btn.classList.contains('btn-refund')) {
-      const ok = confirm('Refund this order? This cannot be undone.');
-      if (!ok) return;
-
-      btn.disabled = true;
-      btn.textContent = 'Processing...';
-
-      await refundOrder(id);
-    }
+    await updateStatus(id, status);
 
     location.reload();
   } catch (err) {
-    console.error(err);
-    alert('Action failed');
+    alert(err.message || 'Action failed');
     btn.disabled = false;
+    btn.textContent = getVendorLabel(status);
   }
 });
 
@@ -303,20 +365,18 @@ async function updateStatus(id, status) {
     body: JSON.stringify({ status }),
   });
 
-  if (!res.ok) throw new Error('Update failed');
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Update failed');
+  }
 }
 
 /* ======================================================
-   REFUND
+   INIT
 ====================================================== */
 
-async function refundOrder(id) {
-  const res = await fetch(`${API_BASE}/orders/${id}/refund`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+loadOrder();
 
-  if (!res.ok) throw new Error('Refund failed');
-}
+startLiveUpdates(() => {
+  loadOrder();
+});

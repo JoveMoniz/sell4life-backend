@@ -35,6 +35,29 @@ async function loadVendorProducts() {
     return;
   }
 
+  // 🔥 CHECK VENDOR STATUS FIRST
+  const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const vendorData = await vendorRes.json();
+  const vendor = vendorData.vendor;
+
+  if (!vendor) {
+    container.innerHTML = '<p>Create your store first</p>';
+    return;
+  }
+
+  if (vendor.status === 'pending') {
+    container.innerHTML = '<p>Your store is under review</p>';
+    return;
+  }
+
+  if (vendor.status === 'suspended') {
+    container.innerHTML = '<p>Your store is suspended</p>';
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/vendor/products`, {
       headers: {
@@ -99,7 +122,7 @@ async function loadVendorProducts() {
               </a>
 
               <button class="btn-delete" data-id="${id}">
-                Delete
+               Archive
               </button>
 
             </div>
@@ -137,7 +160,7 @@ document.addEventListener('click', async (e) => {
     button.disabled = true;
     button.textContent = 'Archiving...';
 
-    await fetch(`${API_BASE}/products/${id}/archive`, {
+    const res = await fetch(`${API_BASE}/products/${id}/archive`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,

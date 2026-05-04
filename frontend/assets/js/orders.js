@@ -79,13 +79,14 @@ function renderOrderCard(o) {
       </div>
 
       <div class="order-meta">
-        <div>
-          ${itemCount} item${itemCount === 1 ? '' : 's'}
-          • ${o.status}
-          • <span class="payment-status ${paymentClass}">
-              ${paymentLabel}
-            </span>
-        </div>
+       <div>
+  ${itemCount} item${itemCount === 1 ? '' : 's'}
+  • Fulfillment: ${o.status}
+  • Payment:
+  <span class="payment-status ${paymentClass}">
+    ${paymentLabel}
+  </span>
+</div>
 
         <div class="order-date">${date}</div>
       </div>
@@ -107,12 +108,16 @@ function getPaymentStatus(status) {
     case 'paid':
       return { paymentLabel: 'Paid', paymentClass: 'paid' };
 
-    case 'failed':
-      return { paymentLabel: 'Failed', paymentClass: 'failed' };
+    case 'refund_scheduled':
+      return { paymentLabel: 'Refund Scheduled', paymentClass: 'refund' };
 
     case 'refunded':
       return { paymentLabel: 'Refunded', paymentClass: 'refunded' };
 
+    case 'failed':
+      return { paymentLabel: 'Failed', paymentClass: 'failed' };
+
+    case 'pending':
     default:
       return { paymentLabel: 'Unpaid', paymentClass: 'pending' };
   }

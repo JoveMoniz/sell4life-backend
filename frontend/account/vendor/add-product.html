@@ -39,7 +39,7 @@
 
             <div class="form-group">
               <label>Stock</label>
-              <input type="number" id="product-stock" value="1" />
+              <input type="number" id="product-stock" value="1" min="0" required />
             </div>
 
             <!-- CATEGORY -->
@@ -67,7 +67,7 @@
             <!-- IMAGE -->
             <div class="form-group">
               <label>Image URL</label>
-              <input type="text" id="product-image" />
+              <input type="url" id="product-image" placeholder="https://..." />
             </div>
 
             <button type="submit" class="btn-save-product">Create Product</button>

@@ -35,12 +35,12 @@
 
             <div class="form-group">
               <label>Price (£)</label>
-              <input type="number" id="product-price" step="0.01" />
+              <input type="number" id="product-price" step="0.01" min="0" />
             </div>
 
             <div class="form-group">
               <label>Stock</label>
-              <input type="number" id="product-stock" />
+              <input type="number" id="product-stock" min="0" />
             </div>
 
             <!-- CATEGORY -->
@@ -76,8 +76,48 @@
       </main>
     </div>
 
-    <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/config-global.js"></script>
+
+    <script>
+      (async () => {
+        const token = localStorage.getItem('s4l_token');
+
+        if (!token) {
+          window.location.href = '/account/signin.html';
+          return;
+        }
+
+        try {
+          const res = await fetch(`${window.API_BASE}/vendor/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const data = await res.json();
+          const vendor = data.vendor;
+
+          if (!vendor) {
+            window.location.href = '/account/vendor/create.html';
+            return;
+          }
+
+          if (vendor.status === 'pending') {
+            alert('Your store is under review');
+            window.location.href = '/account/vendor/dashboard.html';
+            return;
+          }
+
+          if (vendor.status === 'suspended') {
+            alert('Your store is suspended');
+            window.location.href = '/';
+            return;
+          }
+        } catch {
+          window.location.href = '/account/signin.html';
+        }
+      })();
+    </script>
+
+    <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/vendor-edit-product.js"></script>
   </body>
 </html>

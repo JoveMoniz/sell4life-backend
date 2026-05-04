@@ -27,9 +27,6 @@ const subcategoriesMap = {
 };
 
 window.addEventListener('load', () => {
-  const categorySelect = document.getElementById('product-category');
-  const subcategorySelect = document.getElementById('product-subcategory');
-
   if (!categorySelect || !subcategorySelect) {
     console.error('❌ Category elements not found');
     return;
@@ -79,7 +76,29 @@ if (form) {
       return;
     }
 
-    const button = form.querySelector('button');
+    const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const vendorData = await vendorRes.json();
+    const vendor = vendorData.vendor;
+
+    if (!vendor) {
+      alert('Create your store first');
+      return;
+    }
+
+    if (vendor.status === 'pending') {
+      alert('Your store is under review');
+      return;
+    }
+
+    if (vendor.status === 'suspended') {
+      alert('Your store is suspended');
+      return;
+    }
+
+    const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     button.textContent = 'Creating...';
 
@@ -93,8 +112,7 @@ if (form) {
       stock: Number(document.getElementById('product-stock').value),
 
       category: categorySelect.value,
-      subcategory: subcategorySelect.value || null, // ✅ FIXED
-
+      subcategory: subcategorySelect.value,
       images: imageValue ? [imageValue] : [],
     };
 
@@ -109,7 +127,7 @@ if (form) {
       return;
     }
 
-    if (isNaN(product.price) || product.price < 0) {
+    if (!Number.isFinite(product.price) || product.price < 0) {
       showToast('Invalid price', 'error');
       button.disabled = false;
       button.textContent = 'Create Product';
@@ -135,6 +153,7 @@ if (form) {
     ====================================================== */
 
     try {
+      showToast('Creating product...');
       const res = await fetch(`${API_BASE}/products`, {
         method: 'POST',
         headers: {

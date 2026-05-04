@@ -3,6 +3,16 @@ console.log('vendor-create loaded');
 const form = document.getElementById('vendorForm');
 const msg = document.getElementById('msg');
 
+// runs while typing → helps user
+document.getElementById('storeName').addEventListener('input', (e) => {
+  const slug = e.target.value
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+
+  document.getElementById('storeSlug').value = slug;
+});
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -15,10 +25,33 @@ form.addEventListener('submit', async (e) => {
   const storeName = document.getElementById('storeName').value.trim();
   const storeSlug = document.getElementById('storeSlug').value.trim();
 
+  const cleanSlug = document
+    .getElementById('storeSlug')
+    .value.toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
   msg.textContent = 'Creating store...';
   msg.style.color = 'white';
 
   try {
+    if (!storeName || storeName.length < 3) {
+      msg.textContent = 'Store name too short';
+      msg.style.color = 'red';
+      button.disabled = false;
+      button.textContent = 'Create Store';
+      return;
+    }
+
+    if (!cleanSlug || cleanSlug.length < 3) {
+      msg.textContent = 'Store slug too short';
+      msg.style.color = 'red';
+      button.disabled = false;
+      button.textContent = 'Create Store';
+      return;
+    }
     const res = await fetch(`${API_BASE}/vendor/create`, {
       method: 'POST',
       headers: {
@@ -27,7 +60,7 @@ form.addEventListener('submit', async (e) => {
       },
       body: JSON.stringify({
         storeName,
-        storeSlug,
+        storeSlug: cleanSlug,
       }),
     });
 

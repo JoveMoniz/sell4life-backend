@@ -1,16 +1,59 @@
+// ======================================================
+// VENDOR ORDERS (CLEAN + ALIGNED + FIXED DISPLAY)
+// ======================================================
+
 console.log('vendor orders loaded');
 
 let currentStatus = 'all';
 let currentQuery = '';
 
-const FILTER_MAP = {
-  all: null,
-  active: ['Pending', 'Processing', 'Shipped'],
-  issues: ['Cancel Requested', 'Return Requested'],
-  completed: ['Delivered', 'Returned', 'Cancelled', 'Refund Scheduled'],
-};
+let timerInterval; // 🔥 prevent multiple intervals
 
-async function loadVendorOrders(status = 'all', q = '') {
+/* ======================================================
+   DISPLAY STATUS (WITH TIMER SUPPORT)
+====================================================== */
+function getDisplayStatus(o) {
+  const payment = (o.paymentStatus || '').toLowerCase();
+  const status = o.status;
+
+  if (payment === 'refunded') {
+    return `${status} • Refunded`;
+  }
+
+  if (payment === 'refund_scheduled' && o.refundScheduledAt) {
+    return `
+      ${status} • Refund Scheduled
+      <span class="refund-timer" data-time="${o.refundScheduledAt}"></span>
+    `;
+  }
+
+  return status;
+}
+
+/* ======================================================
+   SHARED STATUS LOGIC (FRONTEND MIRROR)
+====================================================== */
+function getAllowedTransitions(status) {
+  if (!status) return [];
+
+  const map = {
+    Pending: ['Processing'],
+    Processing: ['Shipped'],
+    Shipped: ['Delivered'],
+    'Return Requested': ['Return Approved'],
+    'Return Approved': ['Returned'],
+    'Cancel Requested': ['Cancelled'],
+    Cancelled: [],
+    Returned: [],
+  };
+
+  return map[status] || [];
+}
+
+/* ======================================================
+   LOAD ORDERS
+====================================================== */
+async function loadVendorOrders(status = 'all', q = '', page = 1) {
   const container = document.getElementById('vendor-orders');
   const token = localStorage.getItem('s4l_token');
 
@@ -21,24 +64,35 @@ async function loadVendorOrders(status = 'all', q = '') {
   });
 
   const vendorData = await vendorRes.json();
+
+  const vendor = vendorData.vendor;
+
+  if (!vendor) {
+    container.innerHTML = '<p>Create your store first</p>';
+    return;
+  }
+
+  if (vendor.status === 'pending') {
+    container.innerHTML = '<p>Your store is under review</p>';
+    return;
+  }
+
+  if (vendor.status === 'suspended') {
+    container.innerHTML = '<p>Your store is suspended</p>';
+    return;
+  }
+
   const vendorId = vendorData.vendor?._id;
 
   try {
     let url = `${API_BASE}/vendor/orders`;
 
     const params = [];
+    if (status !== 'all') params.push(`status=${status}`);
+    if (q) params.push(`q=${encodeURIComponent(q)}`);
+    params.push(`page=${page}`);
 
-    if (status !== 'all') {
-      params.push(`status=${status}`);
-    }
-
-    if (q) {
-      params.push(`q=${encodeURIComponent(q)}`);
-    }
-
-    if (params.length) {
-      url += `?${params.join('&')}`;
-    }
+    if (params.length) url += `?${params.join('&')}`;
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
@@ -50,179 +104,223 @@ async function loadVendorOrders(status = 'all', q = '') {
     }
 
     const data = await res.json();
-    const orders = Array.isArray(data) ? data : data.orders || [];
+
+    const orders = data.orders || [];
+    const currentPage = data.page || 1;
+    const totalPages = data.totalPages || 1;
 
     if (!orders.length) {
       container.innerHTML = '<p>No orders yet</p>';
+      renderPagination(currentPage, totalPages);
       return;
     }
 
+    // 🔥 RENDER FIRST
     container.innerHTML = orders
       .map((o) => {
         const id = o._id || o.id;
 
-        const displayId = o.shortId ? o.shortId : `S4L-${id.slice(0, 10).toUpperCase()}`;
+        if (!id) {
+          console.error('BROKEN ORDER:', o);
+          return '';
+        }
+
+        const displayId = o.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
 
         const vendorTotal = (o.items || [])
           .filter((item) => String(item.vendorId) === String(vendorId))
-          .reduce((sum, item) => {
-            return sum + Number(item.price) * Number(item.quantity);
-          }, 0);
+          .reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+
+        const safeStatus = o.status || 'Unknown';
+
+        const isRefundLocked = o.refundScheduledAt && new Date(o.refundScheduledAt) > new Date();
+
+        const allowed =
+          o.paymentStatus === 'paid' && !isRefundLocked ? getAllowedTransitions(safeStatus) : [];
+
+        const buttons = allowed
+          .map((s) => {
+            const map = {
+              Processing: 'btn-process',
+              Shipped: 'btn-ship',
+              Delivered: 'btn-deliver',
+              'Return Approved': 'btn-approve-return',
+              Returned: 'btn-mark-returned',
+              Cancelled: 'btn-approve-cancel',
+            };
+
+            const labelMap = {
+              Processing: 'Start Processing',
+              Shipped: 'Mark Shipped',
+              Delivered: 'Mark Delivered',
+              'Return Approved': 'Approve Return',
+              Returned: 'Mark Returned',
+              Cancelled: 'Approve Cancel',
+            };
+
+            const cls = map[s] || '';
+
+            return `
+              <button class="${cls}" data-id="${id}" data-label="${s}">
+                ${labelMap[s] || s}
+              </button>
+            `;
+          })
+          .join('');
 
         return `
-  <div class="order-row">
+<div class="order-row">
 
-    <div class="order-info">
-      <a class="order-id" href="/account/vendor/order-details.html?id=${id}">
-        ${displayId}
-      </a>
+  <div class="order-info">
+    <a class="order-id" href="/account/vendor/order-details.html?id=${id}">
+      ${displayId}
+    </a>
 
-      <div class="order-email">
-        ${o.email || o.user?.email || '-'}
-      </div>
+    <div class="order-email">
+      ${
+        o.user?.email
+          ? `<span class="email-link" data-email="${o.user.email}">
+               ${o.user.email}
+             </span>`
+          : '-'
+      }
     </div>
-
-    <span class="order-status">
-      ${o.status}
-
-      ${
-        o.status === 'Refund Scheduled' && o.refundScheduledAt
-          ? `<div class="mini-refund-timer">
-              Refund in ${Math.max(
-                0,
-                Math.floor((new Date(o.refundScheduledAt) - new Date()) / (1000 * 60 * 60))
-              )}h
-            </div>`
-          : ''
-      }
-    </span>
-
-    <div class="order-actions">
-
-      ${
-        o.status === 'Pending'
-          ? `
-        <button class="btn-process" data-id="${id}" data-label="Process">Process</button>
-        <button class="btn-cancel" data-id="${id}" data-label="Cancel">Cancel</button>
-      `
-          : ''
-      }
-
-      ${
-        o.status === 'Processing'
-          ? `<button class="btn-ship" data-id="${id}" data-label="Mark Shipped">Mark Shipped</button>`
-          : ''
-      }
-
-      ${
-        o.status === 'Shipped'
-          ? `<button class="btn-deliver" data-id="${id}" data-label="Mark Delivered">Mark Delivered</button>`
-          : ''
-      }
-
-      ${
-        o.status === 'Cancel Requested'
-          ? `<button class="btn-cancel-approve" data-id="${id}" data-label="Approve Cancel">Approve Cancel</button>`
-          : ''
-      }
-
-      ${
-        o.status === 'Return Requested'
-          ? `<button class="btn-approve-return" data-id="${id}" data-label="Approve Return">Approve Return</button>`
-          : ''
-      }
-
-      ${
-        o.status === 'Return Approved'
-          ? `<button class="btn-mark-returned" data-id="${id}" data-label="Mark Returned">Mark Returned</button>`
-          : ''
-      }
-
-    </div>
-
-    <span class="order-price">£${vendorTotal.toFixed(2)}</span>
-
   </div>
+
+  <span class="order-status">
+    ${getDisplayStatus(o)}
+  </span>
+
+  <div class="order-actions">
+    ${buttons}
+  </div>
+
+  <span class="order-price">£${vendorTotal.toFixed(2)}</span>
+
+</div>
 `;
       })
       .join('');
+
+    // 🔥 THEN START TIMER (CORRECT PLACE)
+    initRefundTimers();
+
+    renderPagination(currentPage, totalPages);
   } catch (err) {
-    console.error('Vendor orders load error:', err);
+    console.error(err);
     container.innerHTML = '<p>Could not load orders</p>';
   }
 }
 
 /* ======================================================
-   ACTION HANDLERS
+   REFUND TIMER (SAFE SINGLE INSTANCE)
 ====================================================== */
+function initRefundTimers() {
+  const timers = document.querySelectorAll('.refund-timer');
+  if (!timers.length) return;
 
+  // 🔥 prevent stacking intervals
+  if (timerInterval) clearInterval(timerInterval);
+
+  function update() {
+    const now = Date.now();
+
+    timers.forEach((el) => {
+      const target = new Date(el.dataset.time).getTime();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        el.textContent = ' • processing...';
+        return;
+      }
+
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+
+      el.textContent = ` • ${h}h ${m}m ${s}s`;
+    });
+  }
+
+  update();
+  timerInterval = setInterval(update, 1000);
+}
+
+/* ======================================================
+   ACTION HANDLER
+====================================================== */
 document.addEventListener('click', async (e) => {
-  const token = localStorage.getItem('s4l_token');
-  if (!token) return;
-
-  const btn = e.target.closest('button');
+  const btn = e.target.closest('[data-id]');
   if (!btn) return;
 
   const id = btn.dataset.id;
+  const label = btn.dataset.label;
+
+  if (!id || !label) return;
 
   try {
-    if (btn.classList.contains('btn-process')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Processing', btn);
-    }
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
 
-    if (btn.classList.contains('btn-cancel')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Cancelled', btn);
-    }
+    await updateStatus(id, label);
 
-    if (btn.classList.contains('btn-ship')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Shipped', btn);
-    }
-
-    if (btn.classList.contains('btn-deliver')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Delivered', btn);
-    }
-
-    if (btn.classList.contains('btn-cancel-approve')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Cancelled', btn);
-    }
-
-    if (btn.classList.contains('btn-approve-return')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Return Approved', btn);
-    }
-
-    if (btn.classList.contains('btn-mark-returned')) {
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      await updateStatus(id, 'Returned', btn);
-    }
-
-    loadVendorOrders(currentStatus, currentQuery);
+    setTimeout(() => {
+      loadVendorOrders(currentStatus, currentQuery, 1);
+    }, 400);
   } catch (err) {
-    console.error(err);
-    alert('Action failed');
-
+    alert(err.message);
     btn.disabled = false;
-    btn.textContent = btn.dataset.label;
+    btn.textContent = label;
   }
 });
 
 /* ======================================================
+   FILTER
+====================================================== */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+
+  currentStatus = btn.dataset.status;
+
+  document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  loadVendorOrders(currentStatus, currentQuery, 1);
+});
+
+/* ======================================================
+   SEARCH
+====================================================== */
+const searchInput = document.getElementById('vendorOrderSearch');
+let searchTimer;
+
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    let value = searchInput.value;
+
+    if (!value) {
+      currentQuery = '';
+      loadVendorOrders(currentStatus, '', 1);
+      return;
+    }
+
+    currentQuery = value.toUpperCase().startsWith('S4L-') ? value.slice(4) : value;
+
+    clearTimeout(searchTimer);
+
+    if (currentQuery.length < 2) return;
+
+    searchTimer = setTimeout(() => {
+      loadVendorOrders(currentStatus, currentQuery, 1);
+    }, 200);
+  });
+}
+
+/* ======================================================
    UPDATE STATUS
 ====================================================== */
-
-async function updateStatus(id, status, button) {
+async function updateStatus(id, status) {
   const token = localStorage.getItem('s4l_token');
 
   const res = await fetch(`${API_BASE}/vendor/orders/${id}/status`, {
@@ -234,11 +332,57 @@ async function updateStatus(id, status, button) {
     body: JSON.stringify({ status }),
   });
 
-  if (!res.ok) throw new Error('Status update failed');
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Update failed');
+  }
 }
+
+/* ======================================================
+   PAGINATION
+====================================================== */
+function renderPagination(currentPage, totalPages) {
+  const container = document.getElementById('vendor-pagination');
+  if (!container) return;
+
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+
+  if (currentPage > 1) {
+    html += `<button data-page="${currentPage - 1}">←</button>`;
+  }
+
+  for (let i = 1; i <= totalPages; i++) {
+    html += `
+      <button data-page="${i}" class="${i === currentPage ? 'active' : ''}">
+        ${i}
+      </button>
+    `;
+  }
+
+  if (currentPage < totalPages) {
+    html += `<button data-page="${currentPage + 1}">→</button>`;
+  }
+
+  container.innerHTML = html;
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-page]');
+  if (!btn) return;
+
+  loadVendorOrders(currentStatus, currentQuery, Number(btn.dataset.page));
+});
 
 /* ======================================================
    INIT
 ====================================================== */
+loadVendorOrders();
 
-loadVendorOrders(currentStatus, currentQuery);
+startLiveUpdates(() => {
+  loadVendorOrders(currentStatus, currentQuery, 1);
+});

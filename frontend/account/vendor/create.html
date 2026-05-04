@@ -18,14 +18,45 @@
 
       <form id="vendorForm">
         <input type="text" id="storeName" placeholder="Store Name" required />
-        <input type="text" id="storeSlug" placeholder="Store Slug" required />
-        <button type="submit">Create Store</button>
+        <input
+          type="text"
+          id="storeSlug"
+          placeholder="Store Slug (e.g. my-store)"
+          required
+          pattern="[a-z0-9-]+"
+          title="Only lowercase letters, numbers, and hyphens"
+        />
+        <button type="submit" class="btn-create-store">Create Store</button>
       </form>
 
       <p id="msg"></p>
     </div>
 
     <script src="/assets/js/config-global.js"></script>
+
+    <script>
+      (async () => {
+        const token = localStorage.getItem('s4l_token');
+
+        if (!token) return; // allow guest → will be redirected later
+
+        try {
+          const res = await fetch(`${window.API_BASE}/vendor/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const data = await res.json();
+
+          if (data.isVendor) {
+            // already vendor → no reason to be here
+            window.location.href = '/account/vendor/dashboard.html';
+          }
+        } catch {
+          // silent fail
+        }
+      })();
+    </script>
+
     <script src="/assets/js/vendor-create.js"></script>
   </body>
 </html>

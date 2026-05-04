@@ -413,6 +413,24 @@ body {
     sans-serif;
 }
 
+.order-history-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.history-label {
+  font-weight: 500;
+}
+
+.history-label:has(:contains('❌')) {
+  color: #dc2626;
+}
+
+.history-label:has(:contains('✅')) {
+  color: #16a34a;
+}
+
 /* Only order details needs white text */
 .payment-status {
   font-weight: 600;

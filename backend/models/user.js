@@ -115,10 +115,9 @@ const userSchema = new mongoose.Schema(
     /* =================================
        ADDRESSES
     ================================= */
-
     defaultShippingAddress: {
       type: addressSchema,
-      default: {},
+      default: null,
     },
 
     addresses: {

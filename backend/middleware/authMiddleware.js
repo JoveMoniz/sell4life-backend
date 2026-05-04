@@ -65,7 +65,7 @@ export default async function authMiddleware(req, res, next) {
     }
 
     if (user.banned) {
-      return res.status(403).json({ error: 'Account suspended' });
+      return res.status(403).json({ error: 'Account banned' });
     }
 
     /* ======================================================
@@ -78,6 +78,8 @@ export default async function authMiddleware(req, res, next) {
   } catch (err) {
     console.error('AUTH ERROR:', {
       message: err.message,
+      path: req.originalUrl,
+      ip: req.ip,
     });
 
     return res.status(401).json({

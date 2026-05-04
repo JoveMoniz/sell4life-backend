@@ -1,9 +1,9 @@
 // ======================================================
-// ORDER LOGIC (SINGLE SOURCE OF TRUTH)
+// ORDER LOGIC (CLEAN – SEPARATED CONCERNS)
 // ======================================================
 
 // ------------------------------------------------------
-// STATUS TRANSITIONS
+// STATUS TRANSITIONS (FULFILLMENT ONLY)
 // ------------------------------------------------------
 
 export function getAllowedTransitions(role) {
@@ -14,12 +14,11 @@ export function getAllowedTransitions(role) {
 
     Delivered: ['Return Requested', 'Refund Requested'],
 
-    'Return Requested': ['Return Approved', 'Cancelled'],
+    'Return Requested': ['Return Approved', 'Return Rejected'],
     'Return Approved': ['Returned'],
+    'Return Rejected': [],
 
-    Returned: ['Refund Scheduled'],
-
-    'Refund Scheduled': ['Cancelled', 'Returned'], // cancel or proceed
+    Returned: [], // ✅ END STATE (refund handled separately)
 
     'Refund Requested': ['Cancelled'], // goodwill path
 
@@ -35,16 +34,15 @@ export function getAllowedTransitions(role) {
 
     Delivered: ['Return Requested', 'Refund Requested'],
 
-    'Return Requested': ['Return Approved'],
+    'Return Requested': ['Return Approved', 'Return Rejected'],
     'Return Approved': ['Returned'],
+    'Return Rejected': [],
 
-    Returned: ['Refund Scheduled'],
-
-    'Refund Scheduled': ['Returned'],
+    Returned: [],
 
     'Refund Requested': [],
 
-    'Cancel Requested': ['Cancelled'], // 🔥 ADD THIS
+    'Cancel Requested': ['Cancelled'],
 
     Cancelled: [],
   };
@@ -60,8 +58,9 @@ export function canUpdateStatus(order, newStatus, role) {
   if (order.status === 'Cancelled') {
     return { ok: false, error: 'Final state – no changes allowed' };
   }
-  if (order.paymentStatus !== 'paid') {
-    return { ok: false, error: 'Cannot update unpaid or refunded order' };
+
+  if (order.paymentStatus === 'refunded') {
+    return { ok: false, error: 'Cannot update refunded order' };
   }
 
   const rules = getAllowedTransitions(role);
@@ -81,11 +80,19 @@ export function canUpdateStatus(order, newStatus, role) {
 // ------------------------------------------------------
 
 export function canRequestCancel(order) {
-  if (!['Pending', 'Processing'].includes(order.status)) {
+  const statuses = order.vendorOrders?.map((v) => v.status) || [];
+
+  if (!statuses.length) {
+    return { ok: false, error: 'Invalid order' };
+  }
+
+  const allowed = statuses.every((s) => ['Pending', 'Processing'].includes(s));
+
+  if (!allowed) {
     return { ok: false, error: 'Cannot cancel this order' };
   }
 
-  if (order.status === 'Cancel Requested') {
+  if (statuses.every((s) => s === 'Cancel Requested')) {
     return { ok: false, error: 'Cancel already requested' };
   }
 
@@ -93,26 +100,44 @@ export function canRequestCancel(order) {
 }
 
 // ------------------------------------------------------
-// CUSTOMER RETURN REQUEST
+// CUSTOMER RETURN REQUEST (STRICT + FINAL)
 // ------------------------------------------------------
 
 export function canRequestReturn(order) {
-  if (order.status !== 'Delivered') {
+  const statuses = order.vendorOrders?.map((v) => v.status) || [];
+
+  if (!statuses.length) {
+    return { ok: false, error: 'Invalid order' };
+  }
+
+  // must be fully delivered
+  const delivered = statuses.every((s) => s === 'Delivered');
+
+  if (!delivered) {
     return { ok: false, error: 'Return only after delivery' };
   }
 
-  if (order.status === 'Return Requested') {
-    return { ok: false, error: 'Return already requested' };
+  // 🔥 HISTORY CHECK (THIS IS THE REAL FIX)
+  const history = order.statusHistory || [];
+
+  const alreadyRequested = history.some((h) => h.status === 'Return Requested');
+  const alreadyRejected = history.some((h) => h.status === 'Return Rejected');
+  const alreadyApproved = history.some((h) => h.status === 'Return Approved');
+  const alreadyReturned = history.some((h) => h.status === 'Returned');
+
+  if (alreadyRequested || alreadyRejected || alreadyApproved || alreadyReturned) {
+    return { ok: false, error: 'Return already processed' };
   }
 
   return { ok: true };
 }
+
 // ------------------------------------------------------
-// ADMIN REFUND VALIDATION
+// ADMIN REFUND VALIDATION (PAYMENT BASED)
 // ------------------------------------------------------
 
 export function canRefund(order, { force = false } = {}) {
-  if (order.paymentStatus !== 'paid') {
+  if (order.paymentStatus !== 'paid' && order.paymentStatus !== 'refund_scheduled') {
     return { ok: false, error: 'Only paid orders can be refunded' };
   }
 
@@ -124,13 +149,45 @@ export function canRefund(order, { force = false } = {}) {
     return { ok: true };
   }
 
-  // ✅ NORMAL PATHS
-  if (!['Cancelled', 'Refund Scheduled', 'Refund Requested'].includes(order.status)) {
+  if (!['Cancelled', 'Returned'].includes(order.status)) {
     return {
       ok: false,
-      error: 'Refund not allowed in current state',
+      error: 'Refund allowed only after cancel or return',
     };
   }
 
   return { ok: true };
+}
+
+// ------------------------------------------------------
+// DERIVED ORDER STATUS (GLOBAL VIEW)
+// ------------------------------------------------------
+
+export function getDerivedOrderStatus(order) {
+  const statuses = Array.isArray(order.vendorOrders)
+    ? order.vendorOrders.map((vo) => vo.status)
+    : [];
+
+  if (!statuses.length) return order.status;
+
+  // 🔥 priority states (requests first)
+  if (statuses.some((s) => s === 'Cancel Requested')) return 'Cancel Requested';
+  if (statuses.some((s) => s === 'Return Requested')) return 'Return Requested';
+
+  // 🔥 approval stage
+  if (statuses.some((s) => s === 'Return Approved')) return 'Return Approved';
+
+  // 🔥 rejection DOES NOT become a visible state
+  if (statuses.some((s) => s === 'Return Rejected')) return 'Delivered';
+
+  // 🔥 final states
+  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
+  if (statuses.every((s) => s === 'Returned')) return 'Returned';
+
+  // 🔥 normal flow
+  if (statuses.every((s) => s === 'Delivered')) return 'Delivered';
+  if (statuses.some((s) => s === 'Shipped')) return 'Shipped';
+  if (statuses.some((s) => s === 'Processing')) return 'Processing';
+
+  return order.status || 'Pending';
 }

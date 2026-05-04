@@ -74,9 +74,38 @@ categorySelect?.addEventListener('change', () => {
 
 async function loadProduct() {
   try {
+    // 🔥 CHECK VENDOR STATUS FIRST
+    const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const vendorData = await vendorRes.json();
+    const vendor = vendorData.vendor;
+
+    if (!vendor) {
+      alert('Create your store first');
+      window.location.href = '/account/vendor/products.html';
+      return;
+    }
+
+    if (vendor.status === 'pending') {
+      alert('Your store is under review');
+      window.location.href = '/account/vendor/products.html';
+      return;
+    }
+
+    if (vendor.status === 'suspended') {
+      alert('Your store is suspended');
+      window.location.href = '/account/vendor/products.html';
+      return;
+    }
     const res = await fetch(`${API_BASE}/products/${productId}`);
 
-    if (!res.ok) throw new Error('Failed to load product');
+    if (!res.ok) {
+      alert('Product not accessible');
+      window.location.href = '/account/vendor/products.html';
+      return;
+    }
 
     const product = await res.json();
     console.log('Loaded product:', product);
@@ -101,11 +130,9 @@ async function loadProduct() {
     categorySelect.dispatchEvent(new Event('change'));
 
     // 🔥 now set subcategory
-    setTimeout(() => {
-      if (product.subcategory) {
-        subcategorySelect.value = product.subcategory.toLowerCase();
-      }
-    }, 0);
+    if (product.subcategory) {
+      subcategorySelect.value = product.subcategory.toLowerCase();
+    }
   } catch (err) {
     console.error('❌ Could not load product', err);
   }
@@ -151,7 +178,7 @@ if (form) {
       category: categorySelect.value,
       subcategory: subcategorySelect.value || null,
 
-      images: imageValue ? [imageValue] : [],
+      images: imageValue ? [imageValue] : product.images || [],
     };
 
     /* ======================================================
@@ -165,7 +192,7 @@ if (form) {
       return;
     }
 
-    if (isNaN(product.price) || product.price < 0) {
+    if (!Number.isFinite(product.price) || product.price < 0) {
       showToast('Invalid price', 'error');
       button.disabled = false;
       button.textContent = 'Update Product';

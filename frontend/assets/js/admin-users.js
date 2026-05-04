@@ -1,5 +1,4 @@
-import { API_BASE } from './config.js';
-
+const API = window.API_BASE;
 /* ================================
    AUTH GUARD (TOKEN ONLY)
 ================================ */
@@ -9,15 +8,39 @@ if (!token) {
   window.location.href = '/account/admin/signin.html';
 }
 
+// 🔥 decode + validate
+try {
+  const payload = token.split('.')[1];
+  const decoded = JSON.parse(atob(payload));
+
+  // expired token
+  if (decoded.exp && Date.now() >= decoded.exp * 1000) {
+    localStorage.clear();
+    window.location.href = '/account/admin/signin.html';
+  }
+
+  // 🔥 ADMIN CHECK (YOU WERE MISSING THIS)
+  const role = localStorage.getItem('s4l_role');
+  if (role !== 'admin') {
+    window.location.href = '/account/signin.html';
+  }
+} catch (err) {
+  localStorage.clear();
+  window.location.href = '/account/admin/signin.html';
+}
 /* ================================
    LOAD USERS (ADMIN ENFORCED BY API)
 ================================ */
 async function loadUsers(query = '') {
-  let url = `${API_BASE}/admin/users`;
+  const tbody = document.getElementById('usersTable');
+
+  let url = `${API}/admin/users`;
 
   if (query) {
     url += `?q=${encodeURIComponent(query)}`;
   }
+
+  tbody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
 
   const res = await fetch(url, {
     headers: {
@@ -31,8 +54,13 @@ async function loadUsers(query = '') {
   }
 
   const data = await res.json();
-  const tbody = document.getElementById('usersTable');
+
   tbody.innerHTML = '';
+
+  if (!data.users || !Array.isArray(data.users)) {
+    tbody.innerHTML = '<tr><td colspan="3">No users found</td></tr>';
+    return;
+  }
 
   data.users.forEach((user) => {
     const tr = document.createElement('tr');
@@ -40,13 +68,13 @@ async function loadUsers(query = '') {
     tr.innerHTML = `
       <td>${user.email}</td>
       <td>
-        <select class="role-select" data-user-id="${user.id}">
+        <select class="role-select" data-user-id="${user._id}">
           <option value="user" ${user.role === 'user' ? 'selected' : ''}>user</option>
           <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option>
         </select>
       </td>
       <td>
-        <button class="save-btn" data-user-id="${user.id}">
+        <button class="save-btn" data-user-id="${user._id}">
           Save
         </button>
       </td>
@@ -69,7 +97,7 @@ document.addEventListener('click', async (e) => {
   const newRole = select.value;
 
   try {
-    const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+    const res = await fetch(`${API}/admin/users/${userId}/role`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

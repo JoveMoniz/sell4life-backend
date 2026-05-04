@@ -1,4 +1,4 @@
-import { API_BASE } from './config.js';
+const API = window.API_BASE;
 
 /* ================================
    AUTH GUARD
@@ -29,6 +29,7 @@ const result = document.getElementById('result');
 const historyList = document.getElementById('statusHistory');
 const productsTable = document.getElementById('productsTable');
 const refundBtn = document.getElementById('refundBtn');
+const orderStatusEl = document.getElementById('orderStatus');
 
 /* ================================
    STATE
@@ -36,24 +37,76 @@ const refundBtn = document.getElementById('refundBtn');
 let currentOrder = null;
 
 /* ================================
-   STATUS TRANSITIONS (SINGLE SOURCE)
+   PAYMENT LABEL (UNIFIED)
+================================ */
+function getPaymentLabel(state) {
+  switch ((state || '').toLowerCase()) {
+    case 'paid':
+      return 'Paid';
+    case 'refund_scheduled':
+      return 'Refund Scheduled';
+    case 'refunded':
+      return 'Refunded';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Unpaid';
+  }
+}
+
+function getAdminLabel(status) {
+  const labels = {
+    Processing: 'Start Processing',
+    Shipped: 'Mark Shipped',
+    Delivered: 'Mark Delivered',
+    Cancelled: 'Force Cancel',
+
+    'Cancel Requested': 'Approve Cancel',
+    'Return Requested': 'Approve Return',
+
+    'Return Approved': 'Approve Return',
+    'Return Rejected': 'Reject Return',
+
+    Returned: 'Mark Returned',
+    Refunded: 'Issue Refund',
+  };
+
+  return labels[status] || status;
+}
+
+/* ================================
+   STATUS TRANSITIONS (ALIGNED)
 ================================ */
 function getAllowedTransitions(status) {
   const map = {
     pending: ['Processing', 'Cancelled'],
+
     processing: ['Shipped', 'Cancelled'],
+
     shipped: ['Delivered'],
-    delivered: ['Return Requested', 'Refund Requested'],
-    'return requested': ['Return Approved', 'Cancelled'],
+
+    delivered: [],
+
+    'cancel requested': ['Cancelled', 'Processing'],
+
+    'return requested': ['Return Approved', 'Return Rejected'],
+
     'return approved': ['Returned'],
-    returned: ['Cancelled'], // refund comes after this
-    cancelled: [],
+
+    'return rejected': [],
+
+    returned: ['Refunded'],
+
+    'refund requested': ['Refunded'],
+
+    cancelled: ['Refunded'],
+
+    refunded: [],
   };
 
   return map[status] || [];
 }
 
-const FINAL_STATES = ['refunded'];
 /* ================================
    LOAD ORDER
 ================================ */
@@ -68,70 +121,45 @@ async function loadOrder() {
     const order = await res.json();
     currentOrder = order;
 
+    const id = order.id || order._id;
+
     /* ========= SUMMARY ========= */
-    document.getElementById('orderId').textContent = order.shortId;
-    document.getElementById('orderId').textContent = order.shortId
-      ? order.shortId
-      : `S4L-${order.id.slice(0, 10).toUpperCase()}`;
+    document.getElementById('orderId').textContent =
+      order.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
+
     document.getElementById('orderUser').textContent = order.user?.email || '-';
 
     document.getElementById('orderDate').textContent = new Date(order.createdAt).toLocaleString();
 
-    document.getElementById('orderTotal').textContent = Number(order.total).toFixed(2);
+    document.getElementById('orderTotal').textContent = '£' + Number(order.total).toFixed(2);
 
-    document.getElementById('orderStatus').textContent = order.status;
+    /* ========= STATUS + TIMER ========= */
+    orderStatusEl.textContent = order.status;
+
+    if (order.paymentStatus === 'refund_scheduled') {
+      orderStatusEl.textContent += ' • refund pending';
+    }
 
     /* ========= PAYMENT ========= */
+    const paymentState = (order.paymentStatus || 'pending').toLowerCase();
+    const paymentLabel = getPaymentLabel(paymentState);
+
     const paymentStatusEl = document.getElementById('paymentStatus');
     const paymentMethodEl = document.getElementById('paymentMethod');
 
-    const paymentState = order.paymentStatus || 'pending';
-
-    /* ========= BLOCK FULFILLMENT IF PAYMENT NOT PAID ========= */
-    if (paymentState !== 'paid') {
-      statusSelect.disabled = true;
-      updateBtn.disabled = true;
-
-      result.textContent = 'Cannot change status — payment not completed';
-      result.className = 'error';
-    }
-
-    /* ========= PAYMENT LABEL ========= */
-    let paymentLabel =
-      paymentState === 'paid'
-        ? 'Paid'
-        : paymentState === 'failed'
-          ? 'Failed'
-          : paymentState === 'refunded'
-            ? 'Refunded'
-            : 'Unpaid';
-
     if (paymentStatusEl) {
-      paymentStatusEl.textContent = paymentLabel;
       paymentStatusEl.className = `payment-status ${paymentState}`;
+
+      paymentStatusEl.innerHTML = `
+    ${paymentLabel}
+    ${
+      order.paymentStatus === 'refund_scheduled' && order.refundScheduledAt
+        ? `<span class="refund-badge" data-time="${order.refundScheduledAt}">
+             <span class="refund-timer"></span>
+           </span>`
+        : ''
     }
-
-    /* ========= STATUS SELECT (INLINE-MATCHED) ========= */
-    const backendStatus = order.status; // "Processing"
-    const currentStatus = backendStatus.toLowerCase();
-    const isFinal = FINAL_STATES.includes(currentStatus);
-
-    let withinReturnWindow = false;
-
-    if (order.deliveredAt) {
-      const deliveredAt = new Date(order.deliveredAt);
-      const now = new Date();
-
-      const diffDays = (now - deliveredAt) / (1000 * 60 * 60 * 24);
-
-      withinReturnWindow = diffDays <= 30;
-    }
-
-    /* ========= REFUND BUTTON ========= */
-    if (refundBtn) {
-      const allowRefund = paymentState === 'paid';
-
-      refundBtn.style.display = allowRefund ? 'block' : 'none';
+  `;
     }
 
     if (paymentMethodEl) {
@@ -140,47 +168,50 @@ async function loadOrder() {
         : 'Stripe';
     }
 
+    /* ========= BLOCK INVALID ACTIONS ========= */
+    if (paymentState === 'pending' || paymentState === 'failed') {
+      statusSelect.disabled = true;
+      updateBtn.disabled = true;
+
+      result.textContent = 'Cannot change status — payment not completed';
+      result.className = 'error';
+    }
+
+    /* ========= REFUND BUTTON ========= */
+    if (refundBtn) {
+      const allowRefund =
+        paymentState === 'paid' &&
+        order.status.toLowerCase() !== 'cancelled' &&
+        order.status.toLowerCase() !== 'returned';
+
+      refundBtn.style.display = allowRefund ? 'block' : 'none';
+    }
+
+    /* ========= STATUS SELECT ========= */
     statusSelect.innerHTML = '';
 
-    // Always show current state (selected, disabled)
     const currentOption = document.createElement('option');
-    currentOption.value = backendStatus;
-    currentOption.textContent = backendStatus;
+    currentOption.value = order.status;
+    currentOption.textContent = order.status;
     currentOption.selected = true;
     currentOption.disabled = true;
     statusSelect.appendChild(currentOption);
 
-    const allowedStatuses = getAllowedTransitions(currentStatus);
-    allowedStatuses.forEach((status) => {
+    const allowed = getAllowedTransitions(order.status.toLowerCase());
+    allowed.forEach((s) => {
       const option = document.createElement('option');
-      option.value = status;
-      option.textContent = status;
+      option.value = s;
+      option.textContent = getAdminLabel(s);
       statusSelect.appendChild(option);
     });
-
-    statusSelect.disabled = isFinal || paymentState !== 'paid';
-    updateBtn.disabled = isFinal || paymentState !== 'paid';
-
-    if (isFinal) {
-      result.textContent = 'Final state – no further changes';
-      result.className = 'info';
-    } else {
-      result.textContent = '';
-    }
 
     /* ========= PRODUCTS ========= */
     productsTable.innerHTML = '';
 
-    const items = order.items || order.products || [];
+    const items = order.items || [];
 
     if (!items.length) {
-      productsTable.innerHTML = `
-        <tr>
-          <td colspan="4" style="text-align:center; opacity:.6">
-            No products found
-          </td>
-        </tr>
-      `;
+      productsTable.innerHTML = `<tr><td colspan="4">No products found</td></tr>`;
     } else {
       items.forEach((item) => {
         const qty = Number(item.quantity || 0);
@@ -188,17 +219,7 @@ async function loadOrder() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="product-cell">
-            <img
-               src="${item.image || '/assets/images/products/sell4life-placeholder.png'}"
-  alt="${item.name}"
-  width="60"
-  height="60"
-  onerror="this.onerror=null;this.src='/assets/images/products/sell4life-placeholder.png';"
-              class="product-thumb"
-            />
-            <span class="product-name">${item.name}</span>
-          </td>
+          <td>${item.name}</td>
           <td>${qty}</td>
           <td>£${price.toFixed(2)}</td>
           <td>£${(qty * price).toFixed(2)}</td>
@@ -207,13 +228,16 @@ async function loadOrder() {
       });
     }
 
-    /* ========= STATUS HISTORY ========= */
+    /* ========= HISTORY ========= */
     historyList.innerHTML = '';
     (order.statusHistory || []).forEach((h) => {
       const li = document.createElement('li');
       li.textContent = `${h.status} – ${new Date(h.date).toLocaleString()}`;
       historyList.appendChild(li);
     });
+
+    /* ========= TIMER ========= */
+    initRefundTimers();
   } catch (err) {
     console.error(err);
     result.textContent = 'Failed to load order';
@@ -222,25 +246,53 @@ async function loadOrder() {
 }
 
 /* ================================
-   UPDATE STATUS
+   TIMER
 ================================ */
-updateBtn.addEventListener('click', async () => {
-  if (!currentOrder) return;
+function initRefundTimers() {
+  const elements = document.querySelectorAll('.refund-badge');
+  if (!elements.length) return;
 
-  const newStatus = statusSelect.value;
+  function update() {
+    const now = Date.now();
 
-  if (newStatus === currentOrder.status) {
-    result.textContent = 'Already in this state';
-    result.className = 'info';
-    return;
+    elements.forEach((el) => {
+      const target = new Date(el.dataset.time).getTime();
+      const timerEl = el.querySelector('.refund-timer');
+
+      if (!timerEl) return;
+
+      const diff = target - now;
+
+      if (diff <= 0) {
+        timerEl.textContent = ' • processing...';
+        return;
+      }
+
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+      timerEl.textContent = ` • ${h}h ${m}m ${s}s`;
+    });
   }
 
-  updateBtn.disabled = true;
-  updateBtn.textContent = 'Updating…';
-  result.textContent = '';
+  update();
+  setInterval(update, 1000);
+}
+
+/* ================================
+   INIT
+================================ */
+loadOrder();
+
+updateBtn.addEventListener('click', async () => {
+  const newStatus = statusSelect.value;
+
+  if (!newStatus) return;
 
   try {
-    const newStatus = statusSelect.value;
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Updating...';
 
     const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
       method: 'PATCH',
@@ -251,142 +303,24 @@ updateBtn.addEventListener('click', async () => {
       body: JSON.stringify({ status: newStatus }),
     });
 
-    if (!res.ok) throw new Error('Update failed');
+    const data = await res.json();
 
-    await loadOrder();
-
-    const normalized = newStatus.toLowerCase();
-
-    if (!FINAL_STATES.includes(normalized)) {
-      result.textContent = 'Status updated';
-      result.className = 'success';
+    if (!res.ok) {
+      alert(data.error || 'Update failed');
+      return;
     }
+
+    // reload fresh data
+    loadOrder();
   } catch (err) {
     console.error(err);
-    result.textContent = 'Error updating status';
-    result.className = 'error';
+    alert('Something went wrong');
   } finally {
+    updateBtn.disabled = false;
     updateBtn.textContent = 'Update Status';
   }
 });
 
-/* ================================
-   REFUND MODAL LOGIC
-================================ */
-
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = document.getElementById('refundModal');
-  const amountLabel = document.getElementById('refundAmount');
-  const cancelBtn = document.getElementById('cancelRefund');
-  const confirmBtn = document.getElementById('confirmRefund');
-
-  if (!modal) {
-    console.error('Modal not found');
-  } // --------------------------------
-
-  document.addEventListener('click', (e) => {
-    const refundClick = e.target.closest('#refundBtn');
-
-    // ===============================
-    // REFUND CLICK
-    // ===============================
-    if (refundClick) {
-      e.stopPropagation();
-
-      if (!currentOrder) return;
-
-      let warning = '';
-
-      switch (currentOrder.status) {
-        case 'Pending':
-          warning = '⚠ Order not processed yet.';
-          break;
-        case 'Processing':
-          warning = '⚠ Order not shipped yet.';
-          break;
-        case 'Shipped':
-          warning = '⚠ Order is in transit.';
-          break;
-        case 'Delivered':
-          warning = 'Refunding a delivered order.';
-          break;
-        case 'Cancelled':
-          warning = '⚠ Order already cancelled. Possible duplicate refund.';
-          break;
-        default:
-          warning = '⚠ Check order state before refund.';
-
-        case 'Return Requested':
-          warning = '⚠ Customer requested return. Item not received yet.';
-          break;
-
-        case 'Return Approved':
-          warning = '⚠ Return approved but item not yet received.';
-          break;
-
-        case 'Returned':
-          warning = 'Item received back. Safe to refund.';
-          break;
-      }
-
-      const ok = confirm(
-        `${warning}\n\nRefund this order?\n\nThis will return money to the customer.`
-      );
-
-      if (!ok) return;
-
-      amountLabel.textContent = `£${Number(currentOrder.total).toFixed(2)}`;
-      modal.style.display = 'flex';
-    }
-  });
-
-  /* CLOSE MODAL */
-
-  cancelBtn.onclick = () => {
-    modal.style.display = 'none';
-  };
-
-  /* CONFIRM REFUND */
-
-  confirmBtn.onclick = async () => {
-    modal.style.display = 'none';
-
-    refundBtn.disabled = true;
-    refundBtn.textContent = 'Refunding...';
-
-    try {
-      const res = await fetch(`${API_BASE}/admin/orders/${orderId}/refund`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        result.textContent = data.error || 'Refund failed';
-        result.className = 'error';
-        return;
-      }
-
-      await loadOrder();
-
-      result.textContent = 'Payment refunded';
-      result.className = 'success';
-    } catch (err) {
-      console.error(err);
-      result.textContent = 'Refund failed';
-      result.className = 'error';
-    } finally {
-      refundBtn.textContent = 'Refund Payment';
-      refundBtn.disabled = false;
-    }
-  };
+startLiveUpdates(() => {
+  loadOrder();
 });
-
-/* ================================
-   INIT
-================================ */
-loadOrder();

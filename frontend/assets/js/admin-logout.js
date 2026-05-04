@@ -1,21 +1,48 @@
+// ======================================================
+// ADMIN LOGOUT + CACHE GUARD (CLEAN VERSION)
+// ======================================================
+
+let loggingOut = false;
+
+/* ======================================================
+   LOGOUT HANDLER
+====================================================== */
 document.addEventListener('DOMContentLoaded', () => {
   const logoutBtn = document.getElementById('logoutBtn');
   if (!logoutBtn) return;
 
   logoutBtn.addEventListener('click', () => {
-    // Clear auth state
-    localStorage.removeItem('s4l_token');
-    localStorage.removeItem('s4l_role');
-    localStorage.removeItem('s4l_user');
+    if (loggingOut) return;
+    loggingOut = true;
 
-    // IMPORTANT: replace, not href (prevents back-button return)
+    // Clear ALL auth state
+    localStorage.clear();
+
+    // Hard redirect (no back button return)
     window.location.replace('/account/admin/signin.html');
   });
 });
 
-/* =====================================================
-   AUTH GUARD ON BACK / CACHE RESTORE
-   ===================================================== */
+/* ======================================================
+   CACHE / BACK BUTTON PROTECTION
+====================================================== */
+
+// Fires when navigating back/forward (better than visibilitychange)
+window.addEventListener('pageshow', (e) => {
+  // Only act if page is restored from cache (bfcache)
+  if (e.persisted) {
+    const token = localStorage.getItem('s4l_token');
+    const role = localStorage.getItem('s4l_role');
+
+    if (!token || role !== 'admin') {
+      window.location.replace('/account/admin/signin.html');
+    }
+  }
+});
+
+/* ======================================================
+   EXTRA SAFETY (TAB SWITCH / FOCUS)
+====================================================== */
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
@@ -24,7 +51,6 @@ document.addEventListener('visibilitychange', () => {
   const role = localStorage.getItem('s4l_role');
 
   if (!token || role !== 'admin') {
-    // Kill cached admin pages when coming back
     window.location.replace('/account/admin/signin.html');
   }
 });

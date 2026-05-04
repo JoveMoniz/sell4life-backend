@@ -13,6 +13,7 @@ document.addEventListener('click', (e) => {
 
   const token = localStorage.getItem('s4l_token');
   const isVendor = btn.dataset.isVendor === 'true';
+  const vendorStatus = btn.dataset.vendorStatus;
 
   // 🔴 NOT LOGGED IN → SAVE INTENT + GO LOGIN
   if (!token) {
@@ -24,6 +25,17 @@ document.addEventListener('click', (e) => {
   // 🟡 LOGGED IN BUT NOT VENDOR → CREATE STORE
   if (!isVendor) {
     window.location.href = '/account/vendor/create.html';
+    return;
+  }
+
+  // 🔴 NOT APPROVED → BLOCK
+  if (vendorStatus === 'pending') {
+    alert('Your store is under review');
+    return;
+  }
+
+  if (vendorStatus === 'suspended') {
+    alert('Your store is suspended');
     return;
   }
 
@@ -58,10 +70,20 @@ async function initVendorButtons() {
   // ---------------------------
   // 2. FAST CACHE (instant UI)
   // ---------------------------
-  if (cached === 'true') {
+  const cachedStatus = localStorage.getItem('s4l_vendorStatus');
+
+  if (cached === 'true' && cachedStatus) {
     buttons.forEach((btn) => {
-      btn.textContent = 'Go to Dashboard →';
       btn.dataset.isVendor = 'true';
+      btn.dataset.vendorStatus = cachedStatus;
+
+      if (cachedStatus === 'approved') {
+        btn.textContent = 'Go to Dashboard →';
+      } else if (cachedStatus === 'pending') {
+        btn.textContent = 'Store Under Review';
+      } else if (cachedStatus === 'suspended') {
+        btn.textContent = 'Store Suspended';
+      }
     });
   } else {
     buttons.forEach((btn) => {
@@ -80,12 +102,23 @@ async function initVendorButtons() {
 
     const data = await res.json();
 
-    if (data.isVendor) {
+    if (data.isVendor && data.vendor) {
+      const status = data.vendor.status;
+
       localStorage.setItem('s4l_isVendor', 'true');
+      localStorage.setItem('s4l_vendorStatus', status);
 
       buttons.forEach((btn) => {
-        btn.textContent = 'Go to Dashboard →';
         btn.dataset.isVendor = 'true';
+        btn.dataset.vendorStatus = status;
+
+        if (status === 'approved') {
+          btn.textContent = 'Go to Dashboard →';
+        } else if (status === 'pending') {
+          btn.textContent = 'Store Under Review';
+        } else if (status === 'suspended') {
+          btn.textContent = 'Store Suspended';
+        }
       });
     } else {
       localStorage.setItem('s4l_isVendor', 'false');

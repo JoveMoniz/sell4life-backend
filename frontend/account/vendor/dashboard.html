@@ -32,13 +32,38 @@
 
             <div class="stat-card">
               <h3 id="stat-orders">0</h3>
-              <p>Orders</p>
+              <p>Total Orders</p>
             </div>
 
             <div class="stat-card">
-              <h3 id="stat-revenue">£0</h3>
-              <p>Revenue</p>
+              <h3 id="stat-active">0</h3>
+              <p>Active Orders</p>
             </div>
+
+            <div class="stat-card">
+              <h3 id="stat-completed">0</h3>
+              <p>Completed</p>
+            </div>
+
+            <div class="stat-card">
+              <h3 id="stat-refunded">0</h3>
+              <p>Refunded</p>
+            </div>
+
+            <div class="stat-card">
+              <h3 id="stat-revenue">£0.00</h3>
+              <p>Gross revenue</p>
+            </div>
+
+            <div class="stat-card">
+              <h3 id="stat-loss">£0.00</h3>
+              <p>Money refunded</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <h3 id="stat-net">£0.00</h3>
+            <p>Net Revenue</p>
           </div>
 
           <section class="vendor-orders-preview">
@@ -69,8 +94,53 @@
       </main>
     </div>
 
-    <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/config-global.js"></script>
+
+    <script>
+      (async () => {
+        const token = localStorage.getItem('s4l_token');
+
+        if (!token) {
+          window.location.href = '/account/signin.html';
+          return;
+        }
+
+        try {
+          const res = await fetch(`${window.API_BASE}/vendor/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const data = await res.json();
+          const vendor = data.vendor;
+
+          if (!vendor) {
+            window.location.href = '/account/vendor/create.html';
+            return;
+          }
+
+          if (vendor.status === 'pending') {
+            document.getElementById('recent-orders').innerHTML =
+              '<p>Your store is under review</p>';
+
+            document.getElementById('stat-products').textContent = '-';
+            document.getElementById('stat-orders').textContent = '-';
+            document.getElementById('stat-revenue').textContent = '£0.00';
+
+            return;
+          }
+
+          if (vendor.status === 'suspended') {
+            alert('Your store is suspended');
+            window.location.href = '/';
+            return;
+          }
+        } catch {
+          window.location.href = '/account/signin.html';
+        }
+      })();
+    </script>
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/live-updates.js"></script>
     <script src="/assets/js/vendor-dashboard.js"></script>
   </body>
 </html>

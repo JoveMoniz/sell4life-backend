@@ -52,12 +52,17 @@
             <th>Action</th>
           </tr>
         </thead>
-        <tbody id="usersTable"></tbody>
+        <tbody id="usersTable">
+          <tr>
+            <td colspan="3">Loading users...</td>
+          </tr>
+        </tbody>
       </table>
     </div>
 
     <!-- Scripts -->
-
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/require-auth.js"></script>
     <script type="module" src="/assets/js/admin-users.js?v=20260211"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>

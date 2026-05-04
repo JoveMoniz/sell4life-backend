@@ -21,6 +21,7 @@ import rateLimit from 'express-rate-limit';
 // ======================================================
 // ROUTES
 // ======================================================
+import { startRefundWorker } from './jobs/refundWorker.js';
 import authRoute from './routes/auth.js';
 import vendorRoutes from './routes/vendor.js';
 import ordersRoute from './routes/orders.js';
@@ -28,6 +29,7 @@ import productsRoute from './routes/products.js';
 import cartRoutes from './routes/cart.js';
 import adminOrdersRoute from './routes/adminOrders.js';
 import adminUsersRoute from './routes/adminUsers.js';
+import adminVendorsRoutes from './routes/adminVendors.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
 
 // ======================================================
@@ -170,6 +172,8 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/admin/orders', adminOrdersRoute);
 app.use('/api/admin/users', adminUsersRoute);
 
+app.use('/api/admin/vendors', adminVendorsRoutes);
+
 // ======================================================
 // 404 HANDLER
 // ======================================================
@@ -198,6 +202,9 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Sell4Life backend running on port ${PORT}`);
+
+  // 🔥 START WORKER HERE
+  startRefundWorker();
 });
 
 // ======================================================

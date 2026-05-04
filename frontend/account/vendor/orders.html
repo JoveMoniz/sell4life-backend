@@ -26,25 +26,74 @@
           <h1 class="vendor-title">Orders</h1>
 
           <div class="vendor-search">
-            <input type="text" id="vendorOrderSearch" placeholder="Search Order ID (S4L-...)" />
+            <input
+              type="text"
+              id="vendorOrderSearch"
+              placeholder="Search Order ID or Email (e.g. S4L-123)"
+              value="S4L-"
+            />
           </div>
 
-          <div class="vendor-filters">
-            <button class="filter-btn active" data-status="all">All</button>
-            <button class="filter-btn" data-status="active">Active</button>
-            <button class="filter-btn" data-status="issues">Issues</button>
-            <button class="filter-btn" data-status="completed">Completed</button>
+          <div class="vendor-filters" role="group" aria-label="Order filters">
+            <div class="vendor-filters">
+              <button type="button" class="filter-btn active" data-status="all">All</button>
+              <button type="button" class="filter-btn" data-status="active">Active</button>
+              <button type="button" class="filter-btn" data-status="issues">Issues</button>
+              <button type="button" class="filter-btn" data-status="completed">Completed</button>
+            </div>
           </div>
-
           <div id="vendor-orders" class="vendor-orders-list">
             <p class="orders-loading">Loading orders...</p>
           </div>
+
+          <div id="vendor-pagination" class="vendor-pagination"></div>
         </div>
       </main>
     </div>
 
-    <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/config-global.js"></script>
+
+    <script>
+      (async () => {
+        const token = localStorage.getItem('s4l_token');
+
+        if (!token) {
+          window.location.href = '/account/signin.html';
+          return;
+        }
+
+        try {
+          const res = await fetch(`${window.API_BASE}/vendor/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const data = await res.json();
+          const vendor = data.vendor;
+
+          if (!vendor) {
+            window.location.href = '/account/vendor/create.html';
+            return;
+          }
+
+          if (vendor.status === 'pending') {
+            alert('Your store is under review');
+            window.location.href = '/account/vendor/dashboard.html';
+            return;
+          }
+
+          if (vendor.status === 'suspended') {
+            alert('Your store is suspended');
+            window.location.href = '/';
+            return;
+          }
+        } catch {
+          window.location.href = '/account/signin.html';
+        }
+      })();
+    </script>
+
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/live-updates.js"></script>
     <script src="/assets/js/vendor-orders.js"></script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+import { requireApprovedVendor } from '../middleware/vendorMiddleware.js';
 import { Router } from 'express';
 import mongoose from 'mongoose';
 
@@ -26,17 +27,9 @@ function generateSlug(text) {
    CREATE PRODUCT
 ====================================================== */
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
-    if (req.user.role !== 'vendor') {
-      return res.status(403).json({ error: 'Only vendors can create products' });
-    }
-
-    const vendor = await Vendor.findOne({ userId: req.user._id });
-
-    if (!vendor) {
-      return res.status(403).json({ error: 'Vendor profile not found' });
-    }
+    const vendor = req.vendor;
 
     const { name, description, price, images, stock, category, subcategory, tags } = req.body;
 
@@ -251,21 +244,17 @@ router.get('/', async (req, res) => {
    UPDATE PRODUCT
 ====================================================== */
 
-router.patch('/:id', authMiddleware, async (req, res) => {
+router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
   try {
+    const vendor = req.vendor;
     const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
         error: 'Product not found',
-      });
-    }
-
-    const vendor = await Vendor.findOne({ userId: req.user._id });
-
-    if (!vendor) {
-      return res.status(403).json({
-        error: 'Vendor profile not found',
       });
     }
 
@@ -294,8 +283,22 @@ router.patch('/:id', authMiddleware, async (req, res) => {
       updates.slug = uniqueSlug;
     }
 
-    Object.keys(updates).forEach((key) => {
-      product[key] = updates[key];
+    const allowedFields = [
+      'name',
+      'description',
+      'price',
+      'images',
+      'stock',
+      'category',
+      'subcategory',
+      'tags',
+      'slug', // 🔥 include this because you generate it above
+    ];
+
+    allowedFields.forEach((field) => {
+      if (field in updates) {
+        product[field] = updates[field];
+      }
     });
 
     await product.save();
@@ -314,21 +317,17 @@ router.patch('/:id', authMiddleware, async (req, res) => {
    ARCHIVE PRODUCT
 ====================================================== */
 
-router.patch('/:id/archive', authMiddleware, async (req, res) => {
+router.patch('/:id/archive', authMiddleware, requireApprovedVendor, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
   try {
+    const vendor = req.vendor;
     const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
         error: 'Product not found',
-      });
-    }
-
-    const vendor = await Vendor.findOne({ userId: req.user._id });
-
-    if (!vendor) {
-      return res.status(403).json({
-        error: 'Vendor profile not found',
       });
     }
 
@@ -361,6 +360,9 @@ router.patch('/:id/archive', authMiddleware, async (req, res) => {
 ====================================================== */
 
 router.delete('/:id/hard', authMiddleware, adminMiddleware, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
   try {
     const product = await Product.findById(req.params.id);
 

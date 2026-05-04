@@ -1,4 +1,9 @@
+// ======================================================
+// SELL4LIFE – ORDERS ROUTES (CLEAN + CONSISTENT)
+// ======================================================
+
 import { canUpdateStatus, canRequestCancel, canRequestReturn } from '../utils/orderLogic.js';
+import { scheduleRefund } from '../utils/refundLogic.js';
 import express from 'express';
 import mongoose from 'mongoose';
 
@@ -14,8 +19,28 @@ import adminMiddleware from '../middleware/adminMiddleware.js';
 const router = express.Router();
 
 /* ======================================================
-   HELPER: NORMALIZE ORDER OUTPUT
+   HELPER: DERIVED STATUS (GLOBAL VIEW)
 ====================================================== */
+
+function getDerivedOrderStatus(order) {
+  const statuses = Array.isArray(order.vendorOrders)
+    ? order.vendorOrders.map((vo) => vo.status)
+    : [];
+
+  if (!statuses.length) return order.status;
+
+  if (statuses.some((s) => s === 'Cancel Requested')) return 'Cancel Requested';
+  if (statuses.some((s) => s === 'Return Requested')) return 'Return Requested';
+  if (statuses.some((s) => s === 'Return Approved')) return 'Return Approved';
+
+  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
+  if (statuses.every((s) => s === 'Returned')) return 'Returned';
+  if (statuses.every((s) => s === 'Delivered')) return 'Delivered';
+  if (statuses.some((s) => s === 'Shipped')) return 'Shipped';
+  if (statuses.some((s) => s === 'Processing')) return 'Processing';
+
+  return order.status || 'Pending';
+}
 
 function normalizeOrder(order) {
   return {
@@ -27,7 +52,7 @@ function normalizeOrder(order) {
     shipping: order.shipping,
     tax: order.tax,
     total: order.total,
-    status: order.status,
+    status: getDerivedOrderStatus(order),
     paymentStatus: order.paymentStatus,
     paymentIntentId: order.paymentIntentId,
     statusHistory: order.statusHistory || [],
@@ -43,7 +68,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const { items } = req.body;
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Invalid cart data' });
     }
 
@@ -51,13 +76,11 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 
     const normalizedItems = await Promise.all(
       items.map(async (item) => {
-        const productId = item.productId;
-
-        if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+        if (!mongoose.Types.ObjectId.isValid(item.productId)) {
           throw new Error('Invalid productId');
         }
 
-        const product = await Product.findById(productId);
+        const product = await Product.findById(item.productId);
 
         if (!product) throw new Error('Product not found');
         if (!product.vendor) throw new Error('Product has no vendor');
@@ -68,7 +91,6 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
         }
 
         const quantity = Number(item.quantity);
-
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100) {
           throw new Error('Invalid quantity');
         }
@@ -92,8 +114,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
       })
     );
 
-    const subtotal = normalizedItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const total = subtotal;
+    const total = normalizedItems.reduce((sum, i) => sum + i.subtotal, 0);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(total * 100),
@@ -127,29 +148,29 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
     res.json({ orders: orders.map(normalizeOrder) });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 /* ======================================================
    GET ORDER BY PAYMENT INTENT
-   IMPORTANT: must stay before /:id
 ====================================================== */
 
-router.get('/by-payment/:paymentIntentId', async (req, res) => {
+router.get('/by-payment/:paymentIntentId', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findOne({
       paymentIntentId: req.params.paymentIntentId,
     });
 
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    if (order.user.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Not allowed' });
     }
 
     res.json(normalizeOrder(order));
-  } catch (err) {
-    console.error('Fetch by payment error:', err);
+  } catch {
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -185,12 +206,10 @@ router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order id' });
   }
-
   try {
     const order = await Order.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.user.toString() !== req.user.id) {
+    if (!order || order.user.toString() !== req.user.id) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
@@ -198,7 +217,10 @@ router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
     if (!check.ok) return res.status(400).json({ error: check.error });
 
     order.cancelRequestedAt = new Date();
-    order.status = 'Cancel Requested';
+
+    order.vendorOrders.forEach((vo) => {
+      vo.status = 'Cancel Requested';
+    });
 
     order.statusHistory.push({
       status: 'Cancel Requested',
@@ -221,20 +243,21 @@ router.patch('/:id/request-return', authMiddleware, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order id' });
   }
-
   try {
     const order = await Order.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.user.toString() !== req.user.id) {
+    if (!order || order.user.toString() !== req.user.id) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
     const check = canRequestReturn(order);
     if (!check.ok) return res.status(400).json({ error: check.error });
 
-    order.status = 'Return Requested';
     order.returnRequestedAt = new Date();
+
+    order.vendorOrders.forEach((vo) => {
+      vo.status = 'Return Requested';
+    });
 
     order.statusHistory.push({
       status: 'Return Requested',
@@ -246,58 +269,6 @@ router.patch('/:id/request-return', authMiddleware, async (req, res) => {
     res.json(normalizeOrder(order));
   } catch {
     res.status(500).json({ error: 'Return request failed' });
-  }
-});
-
-/* ======================================================
-   ADMIN UPDATE STATUS
-====================================================== */
-
-router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid order id' });
-  }
-
-  try {
-    const { status } = req.body;
-    const order = await Order.findById(req.params.id);
-
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.paymentStatus !== 'paid') {
-      return res.status(400).json({ error: 'Cannot update unpaid order' });
-    }
-
-    const check = canUpdateStatus(order, status, 'admin');
-    if (!check.ok) return res.status(400).json({ error: check.error });
-
-    if (status === 'Returned') {
-      order.statusHistory.push({
-        status: 'Returned',
-        note: 'Item received back',
-        date: new Date(),
-      });
-
-      order.status = 'Refund Scheduled';
-      order.refundScheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      order.statusHistory.push({
-        status: 'Refund Scheduled',
-        note: 'Auto refund scheduled in 24h',
-        date: new Date(),
-      });
-    } else {
-      order.status = status;
-
-      order.statusHistory.push({
-        status,
-        date: new Date(),
-      });
-    }
-
-    await order.save();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Status update failed' });
   }
 });
 

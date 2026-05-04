@@ -9,6 +9,15 @@ const vendorSchema = new mongoose.Schema(
       unique: true,
     },
 
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'suspended'],
+      default: 'pending',
+    },
+
+    approvedAt: Date,
+    suspendedAt: Date,
+
     storeName: {
       type: String,
       required: true,
