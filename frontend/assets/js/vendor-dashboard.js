@@ -156,16 +156,27 @@ async function loadRecentOrders() {
         // VENDOR TOTAL
         // ------------------------------
         const vendorTotal = (o.items || [])
+
           .filter((item) => String(item.vendorId) === String(vendorId))
           .reduce((sum, item) => {
             return sum + Number(item.price) * Number(item.quantity);
           }, 0);
 
+        // =====================================================
+        // VENDOR-SCOPED STATUS
+        // =====================================================
+
+        const vendorOrder = (o.vendorOrders || []).find(
+          (vo) => String(vo.vendorId) === String(vendorId)
+        );
+
+        const vendorStatus = vendorOrder?.status || o.status || 'Unknown';
+        const vendorRefundScheduledAt =
+          vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
         // ------------------------------
         // ACTION BUTTONS
         // ------------------------------
-        const allowed = o.paymentStatus === 'paid' ? getAllowedTransitions(o.status) : [];
-
+        const allowed = o.paymentStatus === 'paid' ? getAllowedTransitions(vendorStatus) : [];
         const buttons = allowed
           .map((s) => {
             const map = {
@@ -188,11 +199,28 @@ async function loadRecentOrders() {
 
             const cls = map[s] || '';
 
+            let itemId = '';
+
+            if (['Return Approved', 'Return Rejected', 'Returned'].includes(s)) {
+              const returnItem = (o.items || []).find(
+                (item) =>
+                  String(item.vendorId) === String(vendorId) &&
+                  (item.returnStatus === 'requested' || item.returnStatus === 'approved')
+              );
+
+              itemId = returnItem?._id || '';
+            }
+
             return `
-              <button class="${cls}" data-id="${id}" data-label="${s}">
-                ${labelMap[s] || s}
-              </button>
-            `;
+  <button
+    class="${cls}"
+    data-id="${id}"
+    data-item="${itemId}"
+    data-label="${s}"
+  >
+    ${labelMap[s] || s}
+  </button>
+`;
           })
           .join('');
 
@@ -204,12 +232,16 @@ async function loadRecentOrders() {
   </a>
 
   <span class="order-status">
-    ${getDisplayStatus(o)}
+    ${getDisplayStatus({
+      ...o,
+      status: vendorStatus,
+      refundScheduledAt: vendorRefundScheduledAt,
+    })}
 
     ${
-      o.paymentStatus === 'refund_scheduled' && o.refundScheduledAt
+      o.paymentStatus === 'refund_scheduled' && vendorRefundScheduledAt
         ? `
-        <span class="refund-badge" data-time="${o.refundScheduledAt}">
+        <span class="refund-badge" data-time="${vendorRefundScheduledAt}"">
           <span class="refund-timer"></span>
         </span>
       `
@@ -238,24 +270,73 @@ async function loadRecentOrders() {
 /* ======================================================
    UPDATE STATUS
 ====================================================== */
-async function updateStatus(id, status) {
+async function updateStatus(orderId, itemId, status) {
   const token = localStorage.getItem('s4l_token');
 
-  const res = await fetch(`${API_BASE}/vendor/orders/${id}/status`, {
+  let url = '';
+  let body = {};
+
+  // ====================================================
+  // RETURN APPROVAL
+  // ====================================================
+
+  if (status === 'Return Approved') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/approve-return`;
+
+    body = {
+      quantity: 1,
+    };
+  }
+
+  // ====================================================
+  // RETURN REJECTION
+  // ====================================================
+  else if (status === 'Return Rejected') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/reject-return`;
+
+    body = {
+      reason: 'Rejected by vendor',
+    };
+  }
+
+  // ====================================================
+  // MARK RETURNED
+  // ====================================================
+  else if (status === 'Returned') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/mark-returned`;
+
+    body = {
+      quantity: 1,
+      condition: 'used',
+    };
+  }
+
+  // ====================================================
+  // NORMAL FULFILLMENT
+  // ====================================================
+  else {
+    url = `${API_BASE}/vendor/orders/${orderId}/status`;
+
+    body = {
+      status,
+    };
+  }
+
+  const res = await fetch(url, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const data = await res.json();
+
     throw new Error(data.error || 'Update failed');
   }
 }
-
 /* ======================================================
    ACTION HANDLER
 ====================================================== */
@@ -264,6 +345,7 @@ document.addEventListener('click', async (e) => {
   if (!btn) return;
 
   const id = btn.dataset.id;
+  const itemId = btn.dataset.item;
   const label = btn.dataset.label;
 
   if (!id || !label) return;
@@ -272,7 +354,7 @@ document.addEventListener('click', async (e) => {
     btn.disabled = true;
     btn.textContent = 'Updating...';
 
-    await updateStatus(id, label);
+    await updateStatus(id, itemId, label);
 
     setTimeout(() => {
       loadRecentOrders();

@@ -1,3 +1,6 @@
+let currentPage = 1;
+let currentQuery = '';
+
 const API = window.API_BASE;
 /* ================================
    AUTH GUARD (TOKEN ONLY)
@@ -31,16 +34,19 @@ try {
 /* ================================
    LOAD USERS (ADMIN ENFORCED BY API)
 ================================ */
-async function loadUsers(query = '') {
+async function loadUsers(query = '', page = 1) {
   const tbody = document.getElementById('usersTable');
 
-  let url = `${API}/admin/users`;
+  currentPage = page;
+  currentQuery = query;
+
+  let url = `${API}/admin/users?page=${page}`;
 
   if (query) {
-    url += `?q=${encodeURIComponent(query)}`;
+    url += `&q=${encodeURIComponent(query)}`;
   }
 
-  tbody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
 
   const res = await fetch(url, {
     headers: {
@@ -55,33 +61,53 @@ async function loadUsers(query = '') {
 
   const data = await res.json();
 
-  tbody.innerHTML = '';
+  console.log('API RESPONSE:', data);
 
   if (!data.users || !Array.isArray(data.users)) {
-    tbody.innerHTML = '<tr><td colspan="3">No users found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6">No users found</td></tr>';
     return;
   }
 
   data.users.forEach((user) => {
     const tr = document.createElement('tr');
 
+    const type = user.role === 'admin' ? 'Admin' : user.isVendor ? 'Vendor' : 'User';
+
+    const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB') : '—';
+
+    const status = user.isDisabled ? 'Disabled' : 'Active';
+
     tr.innerHTML = `
-      <td>${user.email}</td>
-      <td>
-        <select class="role-select" data-user-id="${user._id}">
-          <option value="user" ${user.role === 'user' ? 'selected' : ''}>user</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option>
-        </select>
-      </td>
-      <td>
-        <button class="save-btn" data-user-id="${user._id}">
-          Save
-        </button>
-      </td>
-    `;
+  <td>${user.email || '—'}</td>
+
+  <td>
+    <select class="role-select" data-user-id="${user._id}">
+      <option value="user" ${user.role === 'user' ? 'selected' : ''}>user</option>
+      <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option>
+    </select>
+  </td>
+
+  <td>${type}</td>
+
+  <td>
+    <span class="status-pill ${status.toLowerCase()}">
+      ${status}
+    </span>
+  </td>
+
+  <td>${createdDate}</td>
+
+  <td>
+    <button class="save-btn" data-user-id="${user._id}">
+      Save
+    </button>
+  </td>
+`;
 
     tbody.appendChild(tr);
   });
+
+  renderPagination(data.pagination);
 }
 /* ================================
    SAVE ROLE (DELEGATED)
@@ -150,3 +176,40 @@ if (searchInput) {
    INIT
 ================================ */
 loadUsers();
+
+function renderPagination(pagination) {
+  const container = document.getElementById('pagination');
+
+  if (!container || !pagination) return;
+
+  const { page, pages } = pagination;
+
+  container.innerHTML = '';
+
+  // Prev
+  const prev = document.createElement('button');
+  prev.textContent = '← Prev';
+  prev.disabled = page <= 1;
+
+  prev.onclick = () => {
+    loadUsers(currentQuery, page - 1);
+  };
+
+  container.appendChild(prev);
+
+  // Info
+  const info = document.createElement('span');
+  info.textContent = ` Page ${page} of ${pages} `;
+  container.appendChild(info);
+
+  // Next
+  const next = document.createElement('button');
+  next.textContent = 'Next →';
+  next.disabled = page >= pages;
+
+  next.onclick = () => {
+    loadUsers(currentQuery, page + 1);
+  };
+
+  container.appendChild(next);
+}

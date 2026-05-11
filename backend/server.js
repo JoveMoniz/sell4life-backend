@@ -1,3 +1,4 @@
+import './config/env.js';
 // ======================================================
 // DEPLOY TEST
 // ======================================================
@@ -6,8 +7,6 @@ console.log('🚀 Backend redeployed at:', new Date().toISOString());
 // ======================================================
 // LOAD ENVIRONMENT VARIABLES
 // ======================================================
-import dotenv from 'dotenv';
-dotenv.config();
 
 // ======================================================
 // CORE IMPORTS
@@ -103,7 +102,7 @@ app.options('*', cors(corsOptions));
 // Simple request log for debugging
 // ======================================================
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.originalUrl}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
 });
 
@@ -123,6 +122,20 @@ app.use((req, res, next) => {
   }
 
   return express.json({ limit: '1mb' })(req, res, next);
+});
+
+// ======================================================
+// INVALID JSON HANDLER
+// ======================================================
+
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      error: 'Invalid JSON payload',
+    });
+  }
+
+  next(err);
 });
 
 // ======================================================
@@ -204,7 +217,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Sell4Life backend running on port ${PORT}`);
 
   // 🔥 START WORKER HERE
-  startRefundWorker();
 });
 
 // ======================================================
@@ -218,7 +230,10 @@ mongoose
   })
   .then(() => {
     console.log('✅ MongoDB connected');
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+
+    // ======================================================
+    // START REFUND WORKER
+    // ======================================================
+
+    startRefundWorker();
   });

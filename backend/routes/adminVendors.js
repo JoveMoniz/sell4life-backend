@@ -1,8 +1,11 @@
+import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
+
 import express from 'express';
 import mongoose from 'mongoose';
 
 import Vendor from '../models/vendor.js';
 import User from '../models/user.js';
+import Order from '../models/order.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
@@ -18,13 +21,71 @@ router.use(adminMiddleware);
 /* ======================================================
    GET ALL VENDORS
 ====================================================== */
+
 router.get('/', async (req, res) => {
   try {
-    const vendors = await Vendor.find()
-      .populate('userId', 'name email role active banned')
-      .sort({ createdAt: -1 });
+    const { q, status } = req.query;
 
-    res.json({ vendors });
+    const page = Number(req.query.page) || 1;
+    const limit = 5;
+    const skip = (page - 1) * limit;
+
+    /* ===============================
+       FILTER BUILD
+    =============================== */
+    const filter = {};
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
+    if (q) {
+      const users = await User.find({
+        email: { $regex: q, $options: 'i' },
+      }).select('_id');
+
+      filter.$or = [
+        { storeName: { $regex: q, $options: 'i' } },
+        { userId: { $in: users.map((u) => u._id) } },
+      ];
+    }
+
+    /* ===============================
+       FETCH VENDORS
+    =============================== */
+    const vendorsRaw = await Vendor.find(filter)
+      .populate('userId', 'email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    /* ===============================
+       ADD STATS (ORDERS / REVENUE)
+    =============================== */
+    const vendors = await Promise.all(
+      vendorsRaw.map(async (v) => {
+        const ordersRaw = await Order.find({
+          'vendorOrders.vendorId': v._id,
+        });
+
+        const metrics = calculateVendorMetrics(ordersRaw, v._id);
+
+        return {
+          ...v.toObject(),
+          ...metrics,
+        };
+      })
+    );
+
+    const total = await Vendor.countDocuments(filter);
+
+    res.json({
+      vendors,
+      pagination: {
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('❌ Admin vendors fetch error:', error);
     res.status(500).json({ message: 'Failed to fetch vendors' });
@@ -56,8 +117,6 @@ router.patch('/:id/approve', async (req, res) => {
         message: 'Vendor not found or not in pending state',
       });
     }
-    const existing = await Vendor.findById(id);
-    console.log('STATUS RAW:', JSON.stringify(existing.status));
     // Sync user role
     await User.findByIdAndUpdate(vendor.userId, {
       role: 'vendor',
@@ -127,6 +186,10 @@ router.patch('/:id/reactivate', async (req, res) => {
         message: 'Vendor not found or not in suspended state',
       });
     }
+
+    await User.findByIdAndUpdate(vendor.userId, {
+      role: 'vendor',
+    });
 
     res.json({ message: 'Vendor reactivated', vendor });
   } catch (error) {

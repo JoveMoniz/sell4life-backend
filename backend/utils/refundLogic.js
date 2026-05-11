@@ -1,4 +1,6 @@
-const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 300000);
+import { pushUniqueHistory } from './historyLogic.js';
+
+const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 15000);
 
 export function scheduleRefund(order) {
   // 🚫 Prevent duplicate scheduling FIRST
@@ -20,11 +22,12 @@ export function scheduleRefund(order) {
   // ========================
   // HISTORY (single source of truth)
   // ========================
-  order.statusHistory.push({
-    status: 'Refund Scheduled',
-    note: 'Auto refund scheduled',
-    date: new Date(now.getTime() + 1000), // slight offset → guarantees order
-  });
+  pushUniqueHistory(
+    order,
+    'Refund Scheduled',
+    'Auto refund scheduled',
+    new Date(now.getTime() + 1000)
+  );
 
   // ========================
   // VENDOR SYNC

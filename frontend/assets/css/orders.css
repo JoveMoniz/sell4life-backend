@@ -355,6 +355,37 @@ body {
   opacity: 1;
 }
 
+.order-actions-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.order-actions-menu {
+  display: none;
+
+  position: absolute;
+  top: 50px;
+  left: 0;
+
+  min-width: 220px;
+
+  background: #ffffff;
+
+  border-radius: 12px;
+
+  padding: 10px;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+
+  z-index: 50;
+}
+
+.order-actions-menu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* =========================================
    ORDER DETAILS – MOBILE FIX
    Make it readable with thumbs, not mice

@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 
+import Vendor from '../models/vendor.js';
 import User from '../models/user.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
@@ -12,8 +13,7 @@ const router = express.Router();
    ROLE CONSTANTS
 ====================================================== */
 
-const ALLOWED_ROLES = ['user', 'admin'];
-
+const ALLOWED_ROLES = ['user', 'vendor', 'admin'];
 /* ======================================================
    GET USERS (ADMIN)
 ====================================================== */
@@ -41,20 +41,45 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
     }
 
     /* ========================================
-       FETCH USERS
-    ======================================== */
+   FETCH USERS
+======================================== */
 
-    const users = await User.find(filter)
+    const usersRaw = await User.find(filter)
       .select('email role createdAt')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
+    /* ========================================
+   FETCH VENDORS (only for these users)
+======================================== */
+
+    const userIds = usersRaw.map((u) => u._id);
+
+    const vendors = await Vendor.find({
+      userId: { $in: userIds },
+    }).select('userId');
+
+    /* ========================================
+   MAP USERS WITH isVendor
+======================================== */
+
+    const users = usersRaw.map((user) => {
+      const isVendor = vendors.some((v) => String(v.userId) === String(user._id));
+
+      return {
+        _id: user._id,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        isVendor,
+      };
+    });
+
     const total = await User.countDocuments(filter);
 
     res.json({
       users,
-
       pagination: {
         page,
         limit,
@@ -138,6 +163,20 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
     /* ========================================
          UPDATE ROLE
       ======================================== */
+    // ========================================
+    // PREVENT REMOVING VENDOR ROLE
+    // WHEN ACTIVE VENDOR EXISTS
+    // ========================================
+
+    const existingVendor = await Vendor.findOne({
+      userId: targetUser._id,
+    });
+
+    if (existingVendor && role === 'user') {
+      return res.status(400).json({
+        error: 'Vendor account must be removed before changing role to user',
+      });
+    }
 
     targetUser.role = role;
 

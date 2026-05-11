@@ -29,6 +29,7 @@ const result = document.getElementById('result');
 const historyList = document.getElementById('statusHistory');
 const productsTable = document.getElementById('productsTable');
 const refundBtn = document.getElementById('refundBtn');
+const cancelRefundBtn = document.getElementById('cancelRefundBtn');
 const orderStatusEl = document.getElementById('orderStatus');
 
 /* ================================
@@ -177,14 +178,22 @@ async function loadOrder() {
       result.className = 'error';
     }
 
-    /* ========= REFUND BUTTON ========= */
+    /* ========= REFUND CONTROLS ========= */
+
+    // manual refund button
     if (refundBtn) {
       const allowRefund =
-        paymentState === 'paid' &&
-        order.status.toLowerCase() !== 'cancelled' &&
-        order.status.toLowerCase() !== 'returned';
+        paymentState === 'paid' && ['cancelled', 'returned'].includes(order.status.toLowerCase());
 
       refundBtn.style.display = allowRefund ? 'block' : 'none';
+    }
+
+    // cancel scheduled refund button
+    if (cancelRefundBtn) {
+      const allowCancelRefund =
+        paymentState === 'refund_scheduled' || order.refundStatus === 'scheduled';
+
+      cancelRefundBtn.style.display = allowCancelRefund ? 'block' : 'none';
     }
 
     /* ========= STATUS SELECT ========= */
@@ -320,6 +329,42 @@ updateBtn.addEventListener('click', async () => {
     updateBtn.textContent = 'Update Status';
   }
 });
+
+/* ================================
+   CANCEL REFUND SCHEDULE
+================================ */
+if (cancelRefundBtn) {
+  cancelRefundBtn.addEventListener('click', async () => {
+    try {
+      cancelRefundBtn.disabled = true;
+      cancelRefundBtn.textContent = 'Cancelling...';
+
+      const res = await fetch(`${API_BASE}/admin/orders/${orderId}/cancel-refund`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to cancel refund');
+        return;
+      }
+
+      alert('Refund schedule cancelled');
+
+      loadOrder();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong');
+    } finally {
+      cancelRefundBtn.disabled = false;
+      cancelRefundBtn.textContent = 'Cancel Refund';
+    }
+  });
+}
 
 startLiveUpdates(() => {
   loadOrder();

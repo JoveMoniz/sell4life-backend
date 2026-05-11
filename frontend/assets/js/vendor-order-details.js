@@ -157,11 +157,30 @@ function buildActions(order, id) {
     .map((s) => {
       const cls = map[s] || '';
 
+      // ============================================
+      // RETURN ACTIONS NEED ITEM ID
+      // ============================================
+
+      let itemId = '';
+
+      if (['Return Approved', 'Return Rejected', 'Returned'].includes(s)) {
+        const returnItem = (order.items || []).find(
+          (item) => item.returnStatus === 'requested' || item.returnStatus === 'approved'
+        );
+
+        itemId = returnItem?._id || '';
+      }
+
       return `
-        <button class="${cls}" data-id="${id}" data-label="${s}">
-          ${getVendorLabel(s)}
-        </button>
-      `;
+      <button
+        class="${cls}"
+        data-id="${id}"
+        data-item="${itemId}"
+        data-label="${s}"
+      >
+        ${getVendorLabel(s)}
+      </button>
+    `;
     })
     .join('');
 
@@ -214,6 +233,19 @@ async function loadOrder() {
 
     const vendorId = vendorData.vendor?._id;
 
+    // =====================================================
+    // VENDOR-SCOPED ORDER VIEW
+    // =====================================================
+
+    const vendorOrder = (order.vendorOrders || []).find(
+      (vo) => String(vo.vendorId) === String(vendorId)
+    );
+
+    const vendorStatus = order.status || vendorOrder?.status || 'Unknown';
+
+    const vendorRefundScheduledAt =
+      vendorOrder?.refundScheduledAt || order.refundScheduledAt || null;
+
     const vendorItems = (order.items || []).filter(
       (item) => String(item.vendorId) === String(vendorId)
     );
@@ -231,11 +263,17 @@ async function loadOrder() {
   <div class="order-status">
     <div>
       Status:
-      <strong>${getDisplayStatus(order)}</strong>
+      <strong>
+  ${getDisplayStatus({
+    ...order,
+    status: vendorStatus,
+    refundScheduledAt: vendorRefundScheduledAt,
+  })}
+</strong>
     </div>
 
     ${
-      paymentStatus === 'refund_scheduled' && order.refundScheduledAt
+      paymentStatus === 'refund_scheduled' && vendorRefundScheduledAt
         ? `
         <div class="refund-info">
           <div>Refund scheduled at: ${new Date(order.refundScheduledAt).toLocaleString()}</div>
@@ -247,7 +285,14 @@ async function loadOrder() {
   </div>
 
   <div class="order-actions">
-    ${buildActions(order, id)}
+    ${buildActions(
+      {
+        ...order,
+        status: vendorStatus,
+        refundScheduledAt: vendorRefundScheduledAt,
+      },
+      id
+    )}
   </div>
 
   <div class="order-items">
@@ -333,6 +378,7 @@ document.addEventListener('click', async (e) => {
   if (!btn) return;
 
   const id = btn.dataset.id;
+  const itemId = btn.dataset.item;
   const status = btn.dataset.label;
 
   if (!status) return;
@@ -341,8 +387,7 @@ document.addEventListener('click', async (e) => {
     btn.disabled = true;
     btn.textContent = 'Updating...';
 
-    await updateStatus(id, status);
-
+    await updateStatus(id, itemId, status);
     location.reload();
   } catch (err) {
     alert(err.message || 'Action failed');
@@ -355,22 +400,73 @@ document.addEventListener('click', async (e) => {
    UPDATE STATUS
 ====================================================== */
 
-async function updateStatus(id, status) {
-  const res = await fetch(`${API_BASE}/vendor/orders/${id}/status`, {
+async function updateStatus(orderId, itemId, status) {
+  const token = localStorage.getItem('s4l_token');
+
+  let url = '';
+  let body = {};
+
+  // ====================================================
+  // RETURN APPROVAL
+  // ====================================================
+
+  if (status === 'Return Approved') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/approve-return`;
+
+    body = {
+      quantity: 1,
+    };
+  }
+
+  // ====================================================
+  // RETURN REJECTION
+  // ====================================================
+  else if (status === 'Return Rejected') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/reject-return`;
+
+    body = {
+      reason: 'Rejected by vendor',
+    };
+  }
+
+  // ====================================================
+  // MARK RETURNED
+  // ====================================================
+  else if (status === 'Returned') {
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/mark-returned`;
+
+    body = {
+      quantity: 1,
+      condition: 'used',
+    };
+  }
+
+  // ====================================================
+  // NORMAL FULFILLMENT
+  // ====================================================
+  else {
+    url = `${API_BASE}/vendor/orders/${orderId}/status`;
+
+    body = {
+      status,
+    };
+  }
+
+  const res = await fetch(url, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const data = await res.json();
+
     throw new Error(data.error || 'Update failed');
   }
 }
-
 /* ======================================================
    INIT
 ====================================================== */

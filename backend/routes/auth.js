@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import User from '../models/user.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -38,11 +39,11 @@ function generateBaseUsername(name) {
 }
 
 async function createUniqueUsername(base) {
-  let username = base;
+  let username = base.toLowerCase();
   let counter = 1;
 
   while (await User.findOne({ username })) {
-    username = base + counter;
+    username = base.toLowerCase() + counter;
 
     counter++;
   }
@@ -59,6 +60,7 @@ function createToken(user) {
     {
       id: user._id,
       role: user.role,
+      type: 'access',
     },
 
     JWT_SECRET,
@@ -84,6 +86,15 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({
+        ok: false,
+        msg: 'Password must be at least 6 characters',
+      });
+    }
+
+    const cleanName = name.trim();
+
     const normalizedEmail = email.toLowerCase().trim();
 
     const existingUser = await User.findOne({
@@ -107,7 +118,7 @@ router.post('/register', async (req, res) => {
        USERNAME GENERATION
     ====================================================== */
 
-    const baseUsername = generateBaseUsername(name);
+    const baseUsername = generateBaseUsername(cleanName);
 
     const username = await createUniqueUsername(baseUsername);
 
@@ -116,7 +127,7 @@ router.post('/register', async (req, res) => {
     ====================================================== */
 
     const user = await User.create({
-      name,
+      name: cleanName,
       username,
       email: normalizedEmail,
       password: hashedPassword,
@@ -197,16 +208,20 @@ router.post('/login', async (req, res) => {
     ====================================================== */
 
     if (user.banned) {
+      console.warn('LOGIN BLOCKED: banned account', user._id);
+
       return res.status(403).json({
         ok: false,
-        msg: 'Account suspended',
+        msg: 'Invalid credentials',
       });
     }
 
     if (!user.active) {
+      console.warn('LOGIN BLOCKED: inactive account', user._id);
+
       return res.status(403).json({
         ok: false,
-        msg: 'Account inactive',
+        msg: 'Invalid credentials',
       });
     }
 
@@ -256,6 +271,38 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       ok: false,
       msg: 'Server error',
+    });
+  }
+});
+
+/* ======================================================
+   CURRENT USER
+====================================================== */
+
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+      });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('AUTH ME ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to load user',
     });
   }
 });

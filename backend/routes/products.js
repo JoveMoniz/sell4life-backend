@@ -33,6 +33,17 @@ router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
 
     const { name, description, price, images, stock, category, subcategory, tags } = req.body;
 
+    if (!name?.trim()) {
+      return res.status(400).json({
+        error: 'Product name is required',
+      });
+    }
+
+    if (price == null || Number(price) < 0) {
+      return res.status(400).json({
+        error: 'Invalid product price',
+      });
+    }
     /* ======================================================
        🔥 SLUG CREATION + UNIQUE CHECK (NEW)
     ====================================================== */
@@ -123,45 +134,6 @@ router.get('/category/list', async (req, res) => {
 });
 
 /* ======================================================
-   GET SINGLE PRODUCT BY ID
-====================================================== */
-
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        error: 'Invalid product ID',
-      });
-    }
-
-    const product = await Product.findById(id).populate({
-      path: 'vendor',
-      select: 'storeName storeLogo',
-      populate: {
-        path: 'userId',
-        select: 'username email',
-      },
-    });
-
-    if (!product) {
-      return res.status(404).json({
-        error: 'Product not found',
-      });
-    }
-
-    res.json(product);
-  } catch (err) {
-    console.error('GET PRODUCT BY ID ERROR:', err);
-
-    res.status(500).json({
-      error: 'Failed to fetch product',
-    });
-  }
-});
-
-/* ======================================================
    GET ALL PRODUCTS
 ====================================================== */
 
@@ -204,7 +176,7 @@ router.get('/', async (req, res) => {
         },
       })
       /* 🔥 SMART SORT (text relevance OR newest) */
-      .sort({ createdAt: -1 })
+      .sort({ featured: -1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
 
@@ -239,6 +211,44 @@ router.get('/', async (req, res) => {
     });
   }
 });
+/* ======================================================
+   GET SINGLE PRODUCT BY ID
+====================================================== */
+
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: 'Invalid product ID',
+      });
+    }
+
+    const product = await Product.findById(id).populate({
+      path: 'vendor',
+      select: 'storeName storeLogo',
+      populate: {
+        path: 'userId',
+        select: 'username email',
+      },
+    });
+
+    if (!product || !product.active || product.archived) {
+      return res.status(404).json({
+        error: 'Product not found',
+      });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error('GET PRODUCT BY ID ERROR:', err);
+
+    res.status(500).json({
+      error: 'Failed to fetch product',
+    });
+  }
+});
 
 /* ======================================================
    UPDATE PRODUCT
@@ -266,6 +276,12 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
 
     const updates = req.body;
 
+    if ('price' in updates && Number(updates.price) < 0) {
+      return res.status(400).json({
+        error: 'Invalid product price',
+      });
+    }
+
     /* ======================================================
        🔥 REGENERATE SLUG IF NAME CHANGED (NEW)
     ====================================================== */
@@ -292,7 +308,6 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'category',
       'subcategory',
       'tags',
-      'slug', // 🔥 include this because you generate it above
     ];
 
     allowedFields.forEach((field) => {

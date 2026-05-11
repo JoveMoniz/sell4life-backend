@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 /* =================================
-   VARIANT SCHEMA (size, color etc.)
+   VARIANT SCHEMA
 ================================= */
 
 const variantSchema = new mongoose.Schema(
@@ -35,7 +35,7 @@ const variantSchema = new mongoose.Schema(
 );
 
 /* =================================
-   MAIN PRODUCT SCHEMA
+   PRODUCT SCHEMA
 ================================= */
 
 const productSchema = new mongoose.Schema(
@@ -56,7 +56,9 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
 
-    /* PRICING */
+    /* ==============================
+       PRICING
+    ============================== */
 
     price: {
       type: Number,
@@ -74,14 +76,18 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
-    /* IMAGES */
+    /* ==============================
+       IMAGES
+    ============================== */
 
     images: {
       type: [String],
       default: [],
     },
 
-    /* INVENTORY */
+    /* ==============================
+       INVENTORY
+    ============================== */
 
     stock: {
       type: Number,
@@ -104,23 +110,29 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
-    /* VARIANTS */
+    /* ==============================
+       VARIANTS
+    ============================== */
 
     variants: {
       type: [variantSchema],
       default: [],
     },
 
-    /* CATEGORY */
+    /* ==============================
+       CATEGORY
+    ============================== */
 
     category: {
       type: String,
       index: true,
+      default: '',
     },
 
     subcategory: {
       type: String,
       index: true,
+      default: '',
     },
 
     tags: {
@@ -128,20 +140,31 @@ const productSchema = new mongoose.Schema(
       default: [],
     },
 
-    /* SEO */
+    /* ==============================
+       SEO
+    ============================== */
 
     slug: {
       type: String,
       required: true,
-      unique: true, // 🔥 IMPORTANT
+      unique: true,
       index: true,
       trim: true,
     },
 
-    seoTitle: String,
-    seoDescription: String,
+    seoTitle: {
+      type: String,
+      default: '',
+    },
 
-    /* OWNER */
+    seoDescription: {
+      type: String,
+      default: '',
+    },
+
+    /* ==============================
+       OWNER
+    ============================== */
 
     vendor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -150,7 +173,9 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
-    /* STATUS */
+    /* ==============================
+       STATUS
+    ============================== */
 
     active: {
       type: Boolean,
@@ -163,9 +188,14 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
-    /* SHIPPING */
+    /* ==============================
+       SHIPPING
+    ============================== */
 
-    weight: Number,
+    weight: {
+      type: Number,
+      default: 0,
+    },
 
     dimensions: {
       width: Number,
@@ -173,7 +203,9 @@ const productSchema = new mongoose.Schema(
       length: Number,
     },
 
-    /* ANALYTICS */
+    /* ==============================
+       ANALYTICS
+    ============================== */
 
     views: {
       type: Number,
@@ -185,7 +217,9 @@ const productSchema = new mongoose.Schema(
       default: 0,
     },
 
-    /* FLAGS */
+    /* ==============================
+       FLAGS
+    ============================== */
 
     featured: {
       type: Boolean,
@@ -197,7 +231,9 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
-    /* FLEX */
+    /* ==============================
+       FLEX
+    ============================== */
 
     metadata: {
       type: mongoose.Schema.Types.Mixed,
@@ -206,8 +242,12 @@ const productSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    toJSON: {
+      virtuals: true,
+    },
+    toObject: {
+      virtuals: true,
+    },
   }
 );
 
@@ -237,6 +277,7 @@ productSchema.index({
   category: 'text',
   subcategory: 'text',
 });
+
 productSchema.index({ vendor: 1 });
 productSchema.index({ category: 1, subcategory: 1 });
 productSchema.index({ slug: 1 });

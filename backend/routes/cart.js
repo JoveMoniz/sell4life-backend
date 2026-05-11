@@ -55,22 +55,51 @@ router.post('/validate', async (req, res) => {
 
       if (!product) continue;
 
-      const quantity = Math.max(1, Number(item.quantity) || 1);
+      // =====================================
+      // SAFE QUANTITY
+      // =====================================
 
-      const price = product.price;
+      const quantity = Math.min(99, Math.max(1, parseInt(item.quantity, 10) || 1));
 
-      const subtotal = price * quantity;
+      // =====================================
+      // STOCK VALIDATION
+      // =====================================
 
-      total += subtotal;
+      let finalQuantity = quantity;
+
+      if (product.trackInventory && !product.allowBackorder) {
+        finalQuantity = Math.min(quantity, product.stock || 0);
+      }
+
+      // skip out of stock
+      if (finalQuantity <= 0) continue;
+
+      // =====================================
+      // PRICING
+      // =====================================
+
+      const price = Number(product.price || 0);
+
+      const subtotal = Number((price * finalQuantity).toFixed(2));
+
+      total = Number((total + subtotal).toFixed(2));
+
+      // =====================================
+      // NORMALIZED ITEM
+      // =====================================
 
       normalized.push({
         productId: product._id,
+
+        vendorId: product.vendor,
+
+        variantSku: item.variantSku || '',
 
         name: product.name,
 
         price,
 
-        quantity,
+        quantity: finalQuantity,
 
         subtotal,
 

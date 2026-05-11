@@ -571,7 +571,7 @@ button {
 =============================== */
 .admin-users-table {
   width: 100%;
-  min-width: 360px;
+  min-width: 700px; /* 👈 increased for more columns */
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -585,6 +585,7 @@ button {
   white-space: nowrap;
 }
 
+/* Email (flexible) */
 .admin-users-table th:nth-child(1),
 .admin-users-table td:nth-child(1) {
   width: auto;
@@ -592,27 +593,34 @@ button {
   word-break: break-word;
 }
 
+/* Role */
 .admin-users-table th:nth-child(2),
 .admin-users-table td:nth-child(2) {
   width: 90px;
 }
 
+/* Type */
 .admin-users-table th:nth-child(3),
 .admin-users-table td:nth-child(3) {
-  width: 90px;
+  width: 110px;
 }
 
-.admin-search-bar {
-  padding: 16px 0;
+/* Status */
+.admin-users-table th:nth-child(4),
+.admin-users-table td:nth-child(4) {
+  width: 110px;
 }
 
-.admin-search-bar input {
-  width: 320px;
-  max-width: 100%;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  font-size: 14px;
+/* Created */
+.admin-users-table th:nth-child(5),
+.admin-users-table td:nth-child(5) {
+  width: 140px;
+}
+
+/* Actions */
+.admin-users-table th:nth-child(6),
+.admin-users-table td:nth-child(6) {
+  width: 160px;
 }
 
 /* ===============================

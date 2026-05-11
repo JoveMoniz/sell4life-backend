@@ -1,5 +1,14 @@
-import { canUpdateStatus, canRefund, getDerivedOrderStatus } from '../utils/orderLogic.js';
 import { scheduleRefund } from '../utils/refundLogic.js';
+import { canUpdateItemStatus, getDerivedOrderStatus } from '../utils/orderLogic.js';
+import { canRefund } from '../utils/refundGuard.js';
+
+import {
+  findOrderItem,
+  validateItemRefund,
+  calculateItemRefundAmount,
+} from '../utils/returnLogic.js';
+import { pushItemHistory, pushUniqueHistory } from '../utils/historyLogic.js';
+
 import express from 'express';
 import mongoose from 'mongoose';
 
@@ -163,114 +172,381 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 /* ======================================================
-   UPDATE ORDER STATUS (CLEAN & CORRECT)
+   UPDATE ORDER STATUS (ADMIN)
 ====================================================== */
 router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid order id' });
     }
+
     const { status } = req.body;
+
     const order = await Order.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
 
-    const currentStatus = getDerivedOrderStatus(order);
+    // =====================================================
+    // FINANCIAL FINAL STATE PROTECTION
+    // =====================================================
 
-    const check = canUpdateStatus({ ...order.toObject(), status: currentStatus }, status, 'admin');
-
-    if (!check.ok) return res.status(400).json({ error: check.error });
-
-    const alreadyHas = (s) => order.statusHistory.some((h) => h.status === s);
-
-    // ---------------------------
-    // UPDATE VENDOR ORDERS (SMART)
-    // ---------------------------
-    order.vendorOrders.forEach((vo) => {
-      // 🔥 SPECIAL CASE: RETURN REJECTED
-      if (status === 'Return Rejected') {
-        vo.status = 'Delivered'; // revert back
-        return;
-      }
-
-      // NORMAL FLOW
-      vo.status = status;
-
-      if (status === 'Delivered') vo.deliveredAt = new Date();
-      if (status === 'Cancelled') vo.cancelledAt = new Date();
-      if (status === 'Returned') vo.returnedAt = new Date();
-    });
-
-    // ---------------------------
-    // HISTORY (ONLY BUSINESS EVENTS)
-    // ---------------------------
-    if (!alreadyHas(status)) {
-      order.statusHistory.push({
-        status,
-        date: new Date(),
+    if (order.paymentStatus === 'refunded') {
+      return res.status(400).json({
+        error: 'Cannot modify a fully refunded order',
       });
     }
 
-    // ---------------------------
-    // PAYMENT SIDE (SEPARATE)
-    // ---------------------------
-    if (
-      (status === 'Returned' || status === 'Cancelled') &&
-      order.paymentStatus === 'paid' &&
-      !order.refundScheduledAt
-    ) {
-      scheduleRefund(order); // 🔥 this now handles its own history
+    const now = new Date();
+
+    // =====================================================
+    // CANCELLED
+    // =====================================================
+
+    if (status === 'Cancelled') {
+      order.vendorOrders.forEach((vo) => {
+        vo.status = 'Cancelled';
+        vo.cancelledAt = now;
+      });
+
+      order.items.forEach((item) => {
+        if (['Pending', 'Processing', 'Cancel Requested'].includes(item.status)) {
+          item.status = 'Cancelled';
+          item.cancelledAt = now;
+        }
+      });
     }
+
+    // =====================================================
+    // RETURNED
+    // =====================================================
+
+    if (status === 'Returned') {
+      order.vendorOrders.forEach((vo) => {
+        vo.status = 'Returned';
+        vo.returnedAt = now;
+      });
+
+      order.items.forEach((item) => {
+        if (item.status === 'Delivered') {
+          item.returnStatus = 'returned';
+          item.returnQuantity = item.quantity;
+          item.returnedAt = now;
+        }
+      });
+    }
+
+    // =====================================================
+    // RETURN REJECTED
+    // =====================================================
+
+    if (status === 'Return Rejected') {
+      order.vendorOrders.forEach((vo) => {
+        if (vo.status === 'Return Requested') {
+          vo.status = 'Delivered';
+        }
+      });
+
+      order.items.forEach((item) => {
+        if (item.returnStatus === 'requested') {
+          item.returnStatus = 'rejected';
+        }
+      });
+    }
+
+    // =====================================================
+    // ORDER HISTORY
+    // =====================================================
+
+    pushUniqueHistory(order, status);
+
+    // =====================================================
+    // AUTO REFUND SCHEDULING
+    // =====================================================
+
+    const derivedStatus = getDerivedOrderStatus(order);
+
+    const alreadyScheduled =
+      order.refundStatus === 'scheduled' ||
+      order.paymentStatus === 'refund_scheduled' ||
+      !!order.refundScheduledAt;
+
+    const alreadyRefunded =
+      order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
+
+    if (
+      ['Cancelled', 'Returned'].includes(derivedStatus) &&
+      order.paymentStatus === 'paid' &&
+      !alreadyScheduled &&
+      !alreadyRefunded
+    ) {
+      scheduleRefund(order);
+
+      order.vendorOrders.forEach((vo) => {
+        if (vo.status === 'Cancelled' || vo.status === 'Returned') {
+          vo.refundStatus = 'scheduled';
+          vo.refundScheduledAt = order.refundScheduledAt;
+          vo.status = 'Refund Scheduled';
+        }
+      });
+
+      order.items.forEach((item) => {
+        if (item.status === 'Cancelled' || item.returnStatus === 'returned') {
+          item.refundStatus = 'scheduled';
+          item.refundScheduledAt = order.refundScheduledAt;
+        }
+      });
+
+      pushUniqueHistory(order, 'Refund Scheduled', 'Automatic refund scheduled');
+    }
+
+    // =====================================================
+    // DERIVED STATUS
+    // =====================================================
+
+    order.status = getDerivedOrderStatus(order);
 
     await order.save();
 
     res.json({
       success: true,
-      status: getDerivedOrderStatus(order),
+      status: order.status,
       paymentStatus: order.paymentStatus,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Status update failed' });
+    console.error('ADMIN STATUS UPDATE ERROR:', err);
+
+    res.status(500).json({
+      error: 'Status update failed',
+    });
+  }
+});
+/* ======================================================
+   CANCEL SCHEDULED REFUND (ADMIN)
+====================================================== */
+router.patch('/:id/cancel-refund', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const hasScheduledRefund =
+      order.paymentStatus === 'refund_scheduled' ||
+      order.refundStatus === 'scheduled' ||
+      !!order.refundScheduledAt ||
+      order.vendorOrders?.some((vo) => !!vo.refundScheduledAt);
+
+    if (!hasScheduledRefund) {
+      return res.status(400).json({
+        error: 'No scheduled refund to cancel',
+      });
+    }
+
+    if (order.paymentStatus === 'refunded') {
+      return res.status(400).json({
+        error: 'Refund already processed',
+      });
+    }
+
+    // clear order-level refund schedule
+    order.refundScheduledAt = null;
+    order.refundStatus = 'none';
+
+    // restore payment state
+    if (order.paymentStatus === 'refund_scheduled') {
+      order.paymentStatus = 'paid';
+    }
+
+    // clear vendor-level refund schedules
+    if (Array.isArray(order.vendorOrders)) {
+      order.vendorOrders.forEach((vo) => {
+        vo.refundScheduledAt = null;
+
+        if (vo.status === 'Refund Scheduled') {
+          vo.status = 'Returned';
+        }
+      });
+    }
+
+    order.items.forEach((item) => {
+      item.refundScheduledAt = null;
+
+      if (item.refundStatus === 'scheduled') {
+        item.refundStatus = 'none';
+      }
+    });
+
+    pushUniqueHistory(order, 'Refund Schedule Cancelled', 'Scheduled refund cancelled by admin');
+
+    // keep parent fulfillment status derived from vendor orders
+    order.status = getDerivedOrderStatus(order);
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Scheduled refund cancelled',
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      refundStatus: order.refundStatus,
+    });
+  } catch (err) {
+    console.error('Cancel scheduled refund error:', err);
+    res.status(500).json({ error: 'Failed to cancel scheduled refund' });
   }
 });
 
 /* ======================================================
    REFUND ORDER (MANUAL)
 ====================================================== */
-router.post('/:id/refund', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const { id, itemId } = req.params;
+    const { quantity } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid order id' });
     }
-    const order = await Order.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid item id' });
+    }
 
-    const check = canRefund(order);
-    if (!check.ok) return res.status(400).json({ error: check.error });
+    const order = await Order.findById(id);
 
-    await stripe.refunds.create({
-      payment_intent: order.paymentIntentId,
-      amount: Math.round(order.total * 100),
-    });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
 
-    order.paymentStatus = 'refunded';
-    order.refundScheduledAt = null;
+    const refundCheck = canRefund(order);
 
-    if (!order.statusHistory.some((h) => h.status === 'Refunded')) {
-      order.statusHistory.push({
-        status: 'Refunded',
-        date: new Date(),
+    if (!refundCheck.ok) {
+      return res.status(400).json({
+        error: refundCheck.error,
+      });
+    }
+    const item = findOrderItem(order, itemId);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const check = validateItemRefund(order, item, quantity);
+
+    if (!check.ok) {
+      return res.status(400).json({ error: check.error });
+    }
+
+    const refundQty = Number(quantity);
+
+    const alreadyRefundedQty = Number(item.refundedQuantity || 0);
+
+    if (alreadyRefundedQty >= item.quantity) {
+      return res.status(400).json({
+        error: 'Item already fully refunded',
       });
     }
 
+    if (refundQty + alreadyRefundedQty > item.quantity) {
+      return res.status(400).json({
+        error: 'Refund quantity exceeds remaining refundable quantity',
+      });
+    }
+
+    const refund = calculateItemRefundAmount(item, refundQty);
+
+    const stripeRefund = await stripe.refunds.create({
+      payment_intent: order.paymentIntentId,
+
+      amount: Math.round(refund.total * 100),
+
+      metadata: {
+        orderId: String(order._id),
+        itemId: String(item._id),
+        productId: String(item.productId),
+        vendorId: String(item.vendorId),
+        quantity: String(refundQty),
+      },
+    });
+
+    item.refundedQuantity = Number(item.refundedQuantity || 0) + refundQty;
+
+    item.refundedAmount = Number(item.refundedAmount || 0) + refund.total;
+
+    item.refundedAt = new Date();
+
+    if (item.refundedQuantity >= item.quantity) {
+      item.refundStatus = 'processed';
+    } else {
+      item.refundStatus = 'partially_refunded';
+    }
+
+    order.paymentStatus = order.items.every((i) => i.refundStatus === 'processed')
+      ? 'refunded'
+      : 'partially_refunded';
+
+    order.refundStatus = order.paymentStatus === 'refunded' ? 'processed' : 'partially_refunded';
+
+    // =====================================================
+    // ORDER HISTORY
+    // =====================================================
+
+    pushUniqueHistory(
+      order,
+
+      item.refundStatus === 'processed' ? 'Refunded' : 'Partially Refunded',
+
+      `Refunded ${item.name} x${refundQty}`
+    );
+
+    // =====================================================
+    // ITEM HISTORY
+    // =====================================================
+
+    pushItemHistory(item, {
+      type: item.refundStatus === 'processed' ? 'refund_processed' : 'partial_refund',
+
+      stripeRefundId: stripeRefund.id,
+
+      status: item.refundStatus,
+
+      quantity: refundQty,
+
+      amount: refund.total,
+
+      note: `Refund processed for ${item.name}`,
+
+      by: req.user._id,
+    });
+
+    // =====================================================
+    // DERIVED STATUS
+    // =====================================================
+
+    order.status = getDerivedOrderStatus(order);
+
     await order.save();
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      refundId: stripeRefund.id,
+      refundedAmount: refund.total,
+      paymentStatus: order.paymentStatus,
+      refundStatus: item.refundStatus,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Refund failed' });
+    console.error('ITEM REFUND ERROR:', err);
+
+    res.status(500).json({
+      error: 'Item refund failed',
+    });
   }
 });
 

@@ -1,12 +1,29 @@
 // ======================================================
-// VENDOR ROUTES (UNIFIED + FIXED)
+// VENDOR ROUTES (UNIFIED + ITEM-LEVEL RETURNS)
 // ======================================================
 
 import mongoose from 'mongoose';
 import express from 'express';
 
 import { requireApprovedVendor } from '../middleware/vendorMiddleware.js';
-import { canUpdateStatus } from '../utils/orderLogic.js';
+
+import {
+  canUpdateItemStatus,
+  getDerivedOrderStatus,
+  getDerivedVendorStatus,
+} from '../utils/orderLogic.js';
+
+import {
+  findOrderItem,
+  validateReturnApproval,
+  applyReturnApproval,
+  validateReturnRejection,
+  applyReturnRejection,
+  validateMarkItemReturned,
+  applyMarkItemReturned,
+} from '../utils/returnLogic.js';
+
+import { pushUniqueHistory } from '../utils/historyLogic.js';
 import { scheduleRefund } from '../utils/refundLogic.js';
 
 import User from '../models/user.js';
@@ -27,16 +44,23 @@ router.post('/create', authMiddleware, async (req, res) => {
     const { storeName, storeSlug } = req.body;
 
     if (!storeName || !storeSlug) {
-      return res.status(400).json({ error: 'Missing fields' });
+      return res.status(400).json({
+        error: 'Missing fields',
+      });
     }
 
     // prevent duplicate vendor per user
-    const existing = await Vendor.findOne({ userId: req.user._id });
+    const existing = await Vendor.findOne({
+      userId: req.user._id,
+    });
+
     if (existing) {
-      return res.status(400).json({ error: 'Vendor already exists' });
+      return res.status(400).json({
+        error: 'Vendor already exists',
+      });
     }
 
-    // ensure slug is unique
+    // unique slug
     let slug = storeSlug.toLowerCase();
     let counter = 1;
 
@@ -51,43 +75,61 @@ router.post('/create', authMiddleware, async (req, res) => {
       status: 'pending',
     });
 
-    res.json({ success: true, vendor });
+    res.json({
+      success: true,
+      vendor,
+    });
   } catch (err) {
     console.error('Vendor create error:', err);
-    res.status(500).json({ error: 'Failed to create vendor' });
+
+    res.status(500).json({
+      error: 'Failed to create vendor',
+    });
   }
 });
 
 /* ======================================================
-   VENDOR ROLE CHECK
+   REQUIRE VENDOR
 ====================================================== */
+
 function requireVendor(req, res, next) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({
+      error: 'Authentication required',
+    });
   }
 
   if (req.user.role !== 'vendor' && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Vendor access required' });
+    return res.status(403).json({
+      error: 'Vendor access required',
+    });
   }
 
   next();
 }
 
 /* ======================================================
-   HELPER: GET VENDOR PROFILE
+   HELPER: GET VENDOR
 ====================================================== */
+
 async function getVendor(req) {
-  return await Vendor.findOne({ userId: req.user._id });
+  return await Vendor.findOne({
+    userId: req.user._id,
+  });
 }
 
 /* ======================================================
    DASHBOARD
 ====================================================== */
+
 router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
   try {
     const vendor = await getVendor(req);
+
     if (!vendor) {
-      return res.status(403).json({ error: 'Vendor profile not found' });
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
     }
 
     const vendorId = vendor._id;
@@ -106,8 +148,8 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
     let refundedOrders = 0;
     let activeOrders = 0;
 
-    let grossRevenue = 0; // 💰 all money that ever came in
-    let revenueLoss = 0; // 💸 all refunded / scheduled refunds
+    let grossRevenue = 0;
+    let revenueLoss = 0;
 
     ordersRaw.forEach((order) => {
       const vendorOrder = order.vendorOrders.find((vo) => String(vo.vendorId) === String(vendorId));
@@ -117,10 +159,12 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       totalOrders++;
 
       const status = vendorOrder.status;
+
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
+
       const subtotal = Number(vendorOrder.subtotal || 0);
 
-      // 📊 STATUS METRICS (pure logic, no finance mixing)
+      // metrics
 
       if (status === 'Delivered') {
         completedOrders++;
@@ -130,40 +174,35 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
         activeOrders++;
       }
 
-      // 💰 FINANCIAL STATES
-
       const isPaid =
         paymentStatus === 'paid' ||
         paymentStatus === 'refunded' ||
-        paymentStatus === 'refund_scheduled';
+        paymentStatus === 'refund_scheduled' ||
+        paymentStatus === 'partially_refunded';
 
-      const isRefunded = paymentStatus === 'refunded' || paymentStatus === 'refund_scheduled';
-
-      // 📊 Refund count (order-level metric)
+      const isRefunded =
+        paymentStatus === 'refunded' ||
+        paymentStatus === 'refund_scheduled' ||
+        paymentStatus === 'partially_refunded';
 
       if (isRefunded) {
         refundedOrders++;
       }
 
-      // 💰 Gross = everything that was ever paid
-
       if (isPaid) {
         grossRevenue += subtotal;
       }
-
-      // 💸 Loss = everything refunded or scheduled
 
       if (isRefunded) {
         revenueLoss += subtotal;
       }
     });
 
-    // 🧠 REAL MONEY LEFT
-
     const netRevenue = grossRevenue - revenueLoss;
 
     res.json({
       products,
+
       totalOrders,
       completedOrders,
       refundedOrders,
@@ -175,13 +214,17 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
     });
   } catch (err) {
     console.error('Vendor dashboard error:', err);
-    res.status(500).json({ error: 'Server error' });
+
+    res.status(500).json({
+      error: 'Server error',
+    });
   }
 });
 
 /* ======================================================
    PRODUCTS
 ====================================================== */
+
 router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
@@ -189,37 +232,55 @@ router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) 
     const products = await Product.find({
       vendor: vendor._id,
       archived: false,
-    }).sort({ createdAt: -1 });
+    }).sort({
+      createdAt: -1,
+    });
 
     res.json(products);
   } catch {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({
+      error: 'Server error',
+    });
   }
 });
 
 /* ======================================================
-   GET ORDERS (🔥 RESTORED)
+   GET ORDERS
 ====================================================== */
+
 router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
   try {
     const vendor = await getVendor(req);
-    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    if (!vendor) {
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
 
     const { status, q } = req.query;
 
     const filter = {
       vendorOrders: {
-        $elemMatch: { vendorId: vendor._id },
+        $elemMatch: {
+          vendorId: vendor._id,
+        },
       },
     };
 
     if (status && status !== 'all') {
       if (status === 'active') {
-        filter['vendorOrders.status'] = { $in: ['Pending', 'Processing', 'Shipped'] };
+        filter['vendorOrders.status'] = {
+          $in: ['Pending', 'Processing', 'Shipped'],
+        };
       } else if (status === 'issues') {
-        filter['vendorOrders.status'] = { $in: ['Cancel Requested', 'Return Requested'] };
+        filter['vendorOrders.status'] = {
+          $in: ['Cancel Requested', 'Return Requested'],
+        };
       } else if (status === 'completed') {
-        filter['vendorOrders.status'] = { $in: ['Delivered', 'Returned', 'Cancelled'] };
+        filter['vendorOrders.status'] = {
+          $in: ['Delivered', 'Returned', 'Cancelled'],
+        };
       } else {
         filter['vendorOrders.status'] = status;
       }
@@ -233,27 +294,42 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
       }
 
       const users = await User.find({
-        email: { $regex: search, $options: 'i' },
+        email: {
+          $regex: search,
+          $options: 'i',
+        },
       }).select('_id');
 
       const userIds = users.map((u) => u._id);
 
       filter.$or = [
-        { shortId: { $regex: search, $options: 'i' } },
+        {
+          shortId: {
+            $regex: search,
+            $options: 'i',
+          },
+        },
+
         ...(userIds.length ? [{ user: { $in: userIds } }] : []),
       ];
     }
 
-    const ordersRaw = await Order.find(filter).populate('user', 'email').sort({ createdAt: -1 });
+    const ordersRaw = await Order.find(filter).populate('user', 'email').sort({
+      createdAt: -1,
+    });
 
     const orders = ordersRaw.map((order) => {
       const vendorOrder = order.vendorOrders.find(
         (vo) => String(vo.vendorId) === String(vendor._id)
       );
 
+      const derivedVendorStatus = getDerivedVendorStatus(vendorOrder, order.items || []);
+
       return {
         ...order.toObject(),
-        status: vendorOrder?.status || order.status,
+
+        status: derivedVendorStatus,
+
         refundScheduledAt: vendorOrder?.refundScheduledAt || null,
       };
     });
@@ -261,134 +337,438 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
     res.json({ orders });
   } catch (err) {
     console.error('Vendor orders fetch error:', err);
-    res.status(500).json({ error: 'Server error' });
+
+    res.status(500).json({
+      error: 'Server error',
+    });
   }
 });
 
 /* ======================================================
    GET SINGLE ORDER
 ====================================================== */
+
 router.get('/orders/:id', authMiddleware, requireVendor, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid order id' });
+    return res.status(400).json({
+      error: 'Invalid order id',
+    });
   }
 
   try {
     const vendor = await getVendor(req);
-    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    if (!vendor) {
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
 
     const order = await Order.findById(req.params.id).populate('user', 'email');
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found',
+      });
+    }
 
     const vendorOrder = order.vendorOrders.find((vo) => String(vo.vendorId) === String(vendor._id));
 
     if (!vendorOrder) {
-      return res.status(403).json({ error: 'Not your order' });
+      return res.status(403).json({
+        error: 'Not your order',
+      });
     }
 
     res.json({
       ...order.toObject(),
-      status: vendorOrder.status,
+
+      status: getDerivedVendorStatus(vendorOrder, order.items),
+
       refundScheduledAt: vendorOrder.refundScheduledAt || null,
     });
   } catch (err) {
     console.error('Vendor order fetch error:', err);
-    res.status(500).json({ error: 'Server error' });
+
+    res.status(500).json({
+      error: 'Server error',
+    });
   }
 });
 
 /* ======================================================
-   GET VENDOR STATUS (🔥 REQUIRED)
+   GET VENDOR STATUS
 ====================================================== */
+
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const vendor = await Vendor.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
+    const vendor = await Vendor.findOne({
+      userId: req.user._id,
+    }).sort({
+      createdAt: -1,
+    });
+
     res.json({
       isVendor: !!vendor,
       vendor: vendor || null,
     });
   } catch (err) {
     console.error('Vendor /me error:', err);
-    res.status(500).json({ error: 'Server error' });
+
+    res.status(500).json({
+      error: 'Server error',
+    });
   }
 });
 
 /* ======================================================
-   UPDATE STATUS (UNIFIED)
+   UPDATE FULFILLMENT STATUS
 ====================================================== */
+
 router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid order id' });
+    return res.status(400).json({
+      error: 'Invalid order id',
+    });
   }
 
   try {
     const { status } = req.body;
 
     const order = await Order.findById(req.params.id);
+
     const vendor = req.vendor;
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found',
+      });
+    }
+
+    if (!vendor) {
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
 
     const vendorOrder = order.vendorOrders.find((vo) => String(vo.vendorId) === String(vendor._id));
 
     if (!vendorOrder) {
-      return res.status(403).json({ error: 'Not your order' });
+      return res.status(403).json({
+        error: 'Not your order',
+      });
     }
 
-    // 🚫 BLOCK if refund scheduled
+    // block scheduled refund
     if (vendorOrder.refundScheduledAt && new Date(vendorOrder.refundScheduledAt) > new Date()) {
-      return res.status(400).json({ error: 'Refund already scheduled' });
+      return res.status(400).json({
+        error: 'Refund already scheduled',
+      });
     }
 
-    const check = canUpdateStatus(
-      { ...order.toObject(), status: vendorOrder.status },
-      status,
-      'vendor'
-    );
+    const vendorItems = order.items.filter((item) => String(item.vendorId) === String(vendor._id));
 
-    if (!check.ok) {
-      return res.status(400).json({ error: check.error });
+    const itemChecks = vendorItems.map((item) => canUpdateItemStatus(item, status, 'vendor'));
+
+    const failedCheck = itemChecks.find((c) => !c.ok);
+
+    if (failedCheck) {
+      return res.status(400).json({
+        error: failedCheck.error,
+      });
     }
 
     const now = new Date();
 
-    // 🔥 SMART STATUS HANDLING
-    if (status === 'Return Rejected') {
-      vendorOrder.status = 'Delivered';
-    } else {
-      vendorOrder.status = status;
-    }
+    vendorItems.forEach((item) => {
+      if (['Pending', 'Processing', 'Shipped'].includes(item.status)) {
+        item.status = status;
+      }
 
-    // timestamps
-    if (status === 'Delivered') vendorOrder.deliveredAt = now;
-    if (status === 'Cancelled') vendorOrder.cancelledAt = now;
-    if (status === 'Returned') vendorOrder.returnedAt = now;
+      if (status === 'Delivered') {
+        item.deliveredAt = now;
+      }
 
-    // 1️⃣ FIRST → write business event
-    order.statusHistory.push({
-      status,
-      note: `Vendor ${vendor._id} updated`,
-      date: now,
+      if (status === 'Cancelled') {
+        item.cancelledAt = now;
+
+        item.refundStatus = 'scheduled';
+      }
     });
 
-    // 2️⃣ THEN → trigger refund logic
-    if ((status === 'Returned' || status === 'Cancelled') && !order.refundScheduledAt) {
+    if (status === 'Cancelled') {
       scheduleRefund(order);
     }
+
+    pushUniqueHistory(order, status, `${vendor.storeName} updated order`);
+
+    vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+
+    order.status = getDerivedOrderStatus(order);
 
     await order.save();
 
     res.json({
       success: true,
+
       vendorStatus: vendorOrder.status,
-      refundScheduledAt: order.refundScheduledAt || null,
+
+      orderStatus: order.status,
     });
   } catch (err) {
     console.error('Vendor status update error:', err);
-    res.status(500).json({ error: err.message || 'Update failed' });
+
+    res.status(500).json({
+      error: err.message || 'Update failed',
+    });
   }
 });
+
+/* ======================================================
+   APPROVE ITEM RETURN
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/approve-return',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+    const { quantity } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        error: 'Invalid order id',
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({
+        error: 'Invalid item id',
+      });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        return res.status(404).json({
+          error: 'Order not found',
+        });
+      }
+
+      const vendor = req.vendor;
+
+      const item = findOrderItem(order, itemId);
+
+      if (!item) {
+        return res.status(404).json({
+          error: 'Item not found',
+        });
+      }
+
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({
+          error: 'Not your item',
+        });
+      }
+
+      const check = validateReturnApproval(order, item, quantity);
+
+      if (!check.ok) {
+        return res.status(400).json({
+          error: check.error,
+        });
+      }
+
+      applyReturnApproval(order, item, quantity, req.user._id);
+
+      const vendorOrder = order.vendorOrders.find(
+        (vo) => String(vo.vendorId) === String(vendor._id)
+      );
+
+      if (vendorOrder) {
+        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+      }
+
+      order.status = getDerivedOrderStatus(order);
+
+      await order.save();
+
+      res.json({
+        success: true,
+        status: item.returnStatus,
+      });
+    } catch (err) {
+      console.error('Approve return error:', err);
+
+      res.status(500).json({
+        error: 'Failed to approve return',
+      });
+    }
+  }
+);
+
+/* ======================================================
+   REJECT ITEM RETURN
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/reject-return',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+    const { reason } = req.body;
+
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        return res.status(404).json({
+          error: 'Order not found',
+        });
+      }
+
+      const vendor = req.vendor;
+
+      const item = findOrderItem(order, itemId);
+
+      if (!item) {
+        return res.status(404).json({
+          error: 'Item not found',
+        });
+      }
+
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({
+          error: 'Not your item',
+        });
+      }
+
+      const check = validateReturnRejection(order, item);
+
+      if (!check.ok) {
+        return res.status(400).json({
+          error: check.error,
+        });
+      }
+
+      applyReturnRejection(order, item, reason, req.user._id);
+
+      const vendorOrder = order.vendorOrders.find(
+        (vo) => String(vo.vendorId) === String(vendor._id)
+      );
+
+      if (vendorOrder) {
+        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+      }
+
+      order.status = getDerivedOrderStatus(order);
+
+      await order.save();
+
+      res.json({
+        success: true,
+        status: item.returnStatus,
+      });
+    } catch (err) {
+      console.error('Reject return error:', err);
+
+      res.status(500).json({
+        error: 'Failed to reject return',
+      });
+    }
+  }
+);
+
+/* ======================================================
+   MARK ITEM RETURNED
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/mark-returned',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    const { quantity, condition } = req.body;
+
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        return res.status(404).json({
+          error: 'Order not found',
+        });
+      }
+
+      const vendor = req.vendor;
+
+      const item = findOrderItem(order, itemId);
+
+      if (!item) {
+        return res.status(404).json({
+          error: 'Item not found',
+        });
+      }
+
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({
+          error: 'Not your item',
+        });
+      }
+
+      const check = validateMarkItemReturned(order, item, quantity);
+
+      if (!check.ok) {
+        return res.status(400).json({
+          error: check.error,
+        });
+      }
+
+      applyMarkItemReturned(order, item, quantity, condition, req.user._id);
+
+      item.refundStatus = 'scheduled';
+
+      item.refundScheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      const vendorOrder = order.vendorOrders.find(
+        (vo) => String(vo.vendorId) === String(vendor._id)
+      );
+
+      if (vendorOrder) {
+        vendorOrder.refundStatus = 'scheduled';
+
+        vendorOrder.refundScheduledAt = item.refundScheduledAt;
+
+        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+      }
+
+      scheduleRefund(order);
+
+      order.status = getDerivedOrderStatus(order);
+
+      await order.save();
+
+      res.json({
+        success: true,
+
+        returnStatus: item.returnStatus,
+
+        refundStatus: item.refundStatus,
+
+        refundScheduledAt: item.refundScheduledAt,
+      });
+    } catch (err) {
+      console.error('Mark returned error:', err);
+
+      res.status(500).json({
+        error: 'Failed to mark item returned',
+      });
+    }
+  }
+);
 
 export default router;

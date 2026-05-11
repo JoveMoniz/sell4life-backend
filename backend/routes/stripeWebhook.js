@@ -1,7 +1,7 @@
 // ======================================================
 // SELL4LIFE – STRIPE WEBHOOK (HARDENED VERSION)
 // ======================================================
-
+import { pushUniqueHistory } from '../utils/historyLogic.js';
 import express from 'express';
 import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
@@ -76,13 +76,20 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       // BUILD ITEMS FROM DATABASE
       // -----------------------------
       for (const raw of rawItems) {
-        const product = await Product.findById(raw.productId);
+        const product = await Product.findOne({
+          _id: raw.productId,
+          active: true,
+          archived: { $ne: true },
+        });
 
         if (!product) {
           throw new Error(`Product not found: ${raw.productId}`);
         }
 
         const quantity = Number(raw.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new Error('Invalid quantity');
+        }
         const price = Number(product.price);
         const subtotal = price * quantity;
 
@@ -164,14 +171,12 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         status: 'Pending',
         paymentStatus: 'paid',
         paymentIntentId: paymentIntent.id,
-        statusHistory: [
-          {
-            status: 'Pending',
-            note: 'Payment successful',
-            date: new Date(),
-          },
-        ],
+        statusHistory: [],
       });
+
+      pushUniqueHistory(order, 'Pending', 'Payment successful');
+
+      await order.save();
 
       console.log('🎉 Order created:', order._id);
     }
@@ -179,7 +184,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     /* ======================================================
        REFUND EVENT
     ====================================================== */
-    if (event.type.startsWith('refund.')) {
+    if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
       const refund = event.data.object;
 
       const paymentIntentId = refund.payment_intent;
@@ -197,13 +202,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       // MONEY STATE
       order.paymentStatus = 'refunded';
+      order.refundScheduledAt = null;
+
+      order.refundStatus = 'processed';
+      order.refundedAt = new Date();
 
       // HISTORY
-      order.statusHistory.push({
-        status: 'Refunded',
-        note: 'Refund confirmed by Stripe',
-        date: new Date(),
-      });
+
+      const alreadyRefunded = order.statusHistory.some((h) => h.status === 'Refunded');
+
+      if (!alreadyRefunded) {
+        pushUniqueHistory(order, 'Refunded', 'Refund confirmed by Stripe');
+      }
 
       await order.save();
 

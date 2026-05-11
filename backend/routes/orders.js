@@ -1,11 +1,19 @@
 // ======================================================
-// SELL4LIFE – ORDERS ROUTES (CLEAN + CONSISTENT)
+// SELL4LIFE – ORDERS ROUTES
+// CLEAN + CONSISTENT + ITEM-LEVEL RETURN FOUNDATION
 // ======================================================
 
-import { canUpdateStatus, canRequestCancel, canRequestReturn } from '../utils/orderLogic.js';
-import { scheduleRefund } from '../utils/refundLogic.js';
 import express from 'express';
 import mongoose from 'mongoose';
+
+import {
+  canRequestCancel,
+  getDerivedOrderStatus,
+  getDerivedVendorStatus,
+  getDerivedPaymentStatus,
+} from '../utils/orderLogic.js';
+
+import { findOrderItem, validateReturnRequest, applyReturnRequest } from '../utils/returnLogic.js';
 
 import Vendor from '../models/vendor.js';
 import Order from '../models/order.js';
@@ -14,49 +22,44 @@ import Product from '../models/product.js';
 import stripe from '../config/stripe.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
-import adminMiddleware from '../middleware/adminMiddleware.js';
 
 const router = express.Router();
 
 /* ======================================================
-   HELPER: DERIVED STATUS (GLOBAL VIEW)
+   NORMALIZE ORDER
 ====================================================== */
-
-function getDerivedOrderStatus(order) {
-  const statuses = Array.isArray(order.vendorOrders)
-    ? order.vendorOrders.map((vo) => vo.status)
-    : [];
-
-  if (!statuses.length) return order.status;
-
-  if (statuses.some((s) => s === 'Cancel Requested')) return 'Cancel Requested';
-  if (statuses.some((s) => s === 'Return Requested')) return 'Return Requested';
-  if (statuses.some((s) => s === 'Return Approved')) return 'Return Approved';
-
-  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
-  if (statuses.every((s) => s === 'Returned')) return 'Returned';
-  if (statuses.every((s) => s === 'Delivered')) return 'Delivered';
-  if (statuses.some((s) => s === 'Shipped')) return 'Shipped';
-  if (statuses.some((s) => s === 'Processing')) return 'Processing';
-
-  return order.status || 'Pending';
-}
 
 function normalizeOrder(order) {
   return {
     id: order._id.toString(),
     shortId: order.shortId,
+
     user: order.user,
+    email: order.email,
+
     items: order.items,
+    vendorOrders: order.vendorOrders,
+
     subtotal: order.subtotal,
     shipping: order.shipping,
     tax: order.tax,
+    discount: order.discount,
+    platformFee: order.platformFee,
     total: order.total,
+
+    currency: order.currency,
+
     status: getDerivedOrderStatus(order),
-    paymentStatus: order.paymentStatus,
+
+    paymentStatus: getDerivedPaymentStatus(order),
+
+    refundStatus: order.refundStatus,
     paymentIntentId: order.paymentIntentId,
+
     statusHistory: order.statusHistory || [],
+
     createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
   };
 }
 
@@ -84,13 +87,15 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 
         if (!product) throw new Error('Product not found');
         if (!product.vendor) throw new Error('Product has no vendor');
-        if (!product.active || product.archived) throw new Error('Product not available');
+        if (!product.active || product.archived) {
+          throw new Error('Product not available');
+        }
 
         if (vendor && String(product.vendor) === String(vendor._id)) {
           throw new Error('You cannot buy your own product');
         }
 
-        const quantity = Number(item.quantity);
+        const quantity = Math.min(99, Math.max(1, parseInt(item.quantity, 10) || 1));
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100) {
           throw new Error('Invalid quantity');
         }
@@ -100,22 +105,27 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
         }
 
         const price = Number(product.price);
-        const subtotal = price * quantity;
-
+        const subtotal = Number((price * quantity).toFixed(2));
         return {
           productId: product._id,
           vendorId: product.vendor,
+
+          variantSku: item.variantSku || '',
+          sku: product.sku || '',
+
           name: product.name,
           price,
           quantity,
           subtotal,
+
           image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+
+          attributes: item.attributes || {},
         };
       })
     );
 
-    const total = normalizedItems.reduce((sum, i) => sum + i.subtotal, 0);
-
+    const total = Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(total * 100),
       currency: 'gbp',
@@ -123,20 +133,24 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
       metadata: {
         userId: String(req.user._id),
         items: JSON.stringify(
-          normalizedItems.map((i) => ({
-            productId: String(i.productId),
-            quantity: i.quantity,
-            vendorId: String(i.vendorId),
-            price: i.price,
+          normalizedItems.map((item) => ({
+            productId: String(item.productId),
+            vendorId: String(item.vendorId),
+            quantity: item.quantity,
+            price: item.price,
           }))
         ),
       },
     });
 
-    res.json({ clientSecret: paymentIntent.client_secret });
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+    });
   } catch (err) {
     console.error('PAYMENT ERROR:', err);
-    res.status(500).json({ error: err.message || 'Payment error' });
+    res.status(500).json({
+      error: err.message || 'Payment error',
+    });
   }
 });
 
@@ -146,9 +160,15 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
-    res.json({ orders: orders.map(normalizeOrder) });
-  } catch {
+    const orders = await Order.find({ user: req.user.id }).sort({
+      createdAt: -1,
+    });
+
+    res.json({
+      orders: orders.map(normalizeOrder),
+    });
+  } catch (err) {
+    console.error('GET ORDERS ERROR:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -163,14 +183,17 @@ router.get('/by-payment/:paymentIntentId', authMiddleware, async (req, res) => {
       paymentIntentId: req.params.paymentIntentId,
     });
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
 
-    if (order.user.toString() !== req.user.id) {
+    if (String(order.user) !== String(req.user.id)) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
     res.json(normalizeOrder(order));
-  } catch {
+  } catch (err) {
+    console.error('GET ORDER BY PAYMENT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -190,36 +213,56 @@ router.get('/:id', authMiddleware, async (req, res) => {
       user: req.user.id,
     });
 
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
 
     res.json(normalizeOrder(order));
-  } catch {
+  } catch (err) {
+    console.error('GET ORDER ERROR:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 /* ======================================================
    CUSTOMER REQUEST CANCEL
+   ORDER-LEVEL FOR NOW
 ====================================================== */
 
 router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order id' });
   }
+
   try {
     const order = await Order.findById(req.params.id);
 
-    if (!order || order.user.toString() !== req.user.id) {
+    if (!order || String(order.user) !== String(req.user.id)) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
     const check = canRequestCancel(order);
-    if (!check.ok) return res.status(400).json({ error: check.error });
+
+    if (!check.ok) {
+      return res.status(400).json({ error: check.error });
+    }
 
     order.cancelRequestedAt = new Date();
 
-    order.vendorOrders.forEach((vo) => {
-      vo.status = 'Cancel Requested';
+    if (order.paymentStatus === 'refunded') {
+      return res.status(400).json({
+        error: 'Refunded orders cannot be cancelled',
+      });
+    }
+
+    order.vendorOrders.forEach((vendorOrder) => {
+      vendorOrder.status = 'Cancel Requested';
+    });
+
+    order.items.forEach((item) => {
+      if (['Pending', 'Processing'].includes(item.status)) {
+        item.status = 'Cancel Requested';
+      }
     });
 
     order.statusHistory.push({
@@ -228,46 +271,133 @@ router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
       date: new Date(),
     });
 
+    order.status = getDerivedOrderStatus(order);
+
     await order.save();
+
     res.json(normalizeOrder(order));
-  } catch {
+  } catch (err) {
+    console.error('REQUEST CANCEL ERROR:', err);
     res.status(500).json({ error: 'Cancel request failed' });
   }
 });
 
 /* ======================================================
-   CUSTOMER REQUEST RETURN
+   CUSTOMER REQUEST ITEM RETURN
+   NEW ITEM-LEVEL PARTIAL RETURN ROUTE
+====================================================== */
+
+router.post('/:id/items/:itemId/return-request', authMiddleware, async (req, res) => {
+  const { id, itemId } = req.params;
+  const { quantity, reason } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(itemId)) {
+    return res.status(400).json({ error: 'Invalid item id' });
+  }
+
+  try {
+    const order = await Order.findById(id);
+
+    if (!order || String(order.user) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    const item = findOrderItem(order, itemId);
+
+    if (!item) {
+      return res.status(404).json({
+        error: 'Item not found',
+      });
+    }
+
+    if (item.refundStatus === 'processed') {
+      return res.status(400).json({
+        error: 'Item already refunded',
+      });
+    }
+
+    const check = validateReturnRequest(order, item, quantity);
+
+    if (!check.ok) {
+      return res.status(400).json({ error: check.error });
+    }
+
+    applyReturnRequest(order, item, quantity, reason, req.user._id);
+
+    // =====================================================
+    // RECALCULATE VENDOR STATUS
+    // =====================================================
+
+    order.vendorOrders.forEach((vendorOrder) => {
+      vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+    });
+
+    // =====================================================
+    // RECALCULATE GLOBAL ORDER STATUS
+    // =====================================================
+
+    order.status = getDerivedOrderStatus(order);
+
+    await order.save();
+
+    res.json(normalizeOrder(order));
+  } catch (err) {
+    console.error('ITEM RETURN REQUEST ERROR:', err);
+    res.status(500).json({ error: 'Return request failed' });
+  }
+});
+
+/* ======================================================
+   LEGACY CUSTOMER REQUEST WHOLE ORDER RETURN
+   TEMPORARY SUPPORT
 ====================================================== */
 
 router.patch('/:id/request-return', authMiddleware, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid order id' });
   }
+
   try {
     const order = await Order.findById(req.params.id);
 
-    if (!order || order.user.toString() !== req.user.id) {
+    if (!order || String(order.user) !== String(req.user.id)) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    const check = canRequestReturn(order);
-    if (!check.ok) return res.status(400).json({ error: check.error });
+    const deliveredItems = order.items.filter((item) => item.status === 'Delivered');
 
-    order.returnRequestedAt = new Date();
+    if (!deliveredItems.length) {
+      return res.status(400).json({
+        error: 'No delivered items available for return',
+      });
+    }
 
-    order.vendorOrders.forEach((vo) => {
-      vo.status = 'Return Requested';
-    });
+    for (const item of deliveredItems) {
+      const availableQty =
+        Number(item.quantity || 0) -
+        Number(item.returnQuantity || 0) -
+        Number(item.returnRequestedQuantity || 0);
 
-    order.statusHistory.push({
-      status: 'Return Requested',
-      note: 'Requested by customer',
-      date: new Date(),
-    });
+      if (availableQty <= 0) continue;
+
+      const check = validateReturnRequest(order, item, availableQty);
+
+      if (check.ok) {
+        applyReturnRequest(order, item, availableQty, 'Whole order return requested', req.user._id);
+      }
+    }
+
+    order.status = getDerivedOrderStatus(order);
 
     await order.save();
+
     res.json(normalizeOrder(order));
-  } catch {
+  } catch (err) {
+    console.error('WHOLE ORDER RETURN REQUEST ERROR:', err);
     res.status(500).json({ error: 'Return request failed' });
   }
 });

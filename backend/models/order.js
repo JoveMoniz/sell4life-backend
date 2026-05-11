@@ -1,62 +1,223 @@
 import mongoose from 'mongoose';
 
 /* ==============================
-ORDER ITEM
+   ORDER ITEM
 ============================== */
 
-const orderItemSchema = new mongoose.Schema(
-  {
-    _id: false,
-
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true,
-    },
-
-    vendorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-
-    sku: { type: String, default: '' },
-
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    image: {
-      type: String,
-      default: '/assets/images/products/sell4life-placeholder.png',
-    },
-
-    price: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
-
-    subtotal: { type: Number, min: 0 },
-
-    attributes: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
-    },
+const orderItemSchema = new mongoose.Schema({
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+    index: true,
   },
-  { _id: false }
-);
+
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    required: true,
+    index: true,
+  },
+
+  variantSku: { type: String, default: '' },
+  sku: { type: String, default: '' },
+
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  image: {
+    type: String,
+    default: '/assets/images/products/sell4life-placeholder.png',
+  },
+
+  attributes: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
+
+  price: { type: Number, required: true, min: 0 },
+  quantity: { type: Number, required: true, min: 1 },
+  subtotal: { type: Number, min: 0 },
+
+  taxAmount: { type: Number, default: 0, min: 0 },
+  shippingAmount: { type: Number, default: 0, min: 0 },
+  discountAmount: { type: Number, default: 0, min: 0 },
+  platformFeeAmount: { type: Number, default: 0, min: 0 },
+
+  status: {
+    type: String,
+    enum: [
+      'Pending',
+      'Processing',
+      'Shipped',
+      'Delivered',
+      'Cancel Requested',
+      'Cancel Approved',
+      'Cancel Rejected',
+      'Cancelled',
+    ],
+    default: 'Pending',
+    index: true,
+  },
+
+  returnStatus: {
+    type: String,
+    enum: ['none', 'requested', 'approved', 'rejected', 'partially_returned', 'returned'],
+    default: 'none',
+    index: true,
+  },
+
+  returnReason: { type: String, trim: true, default: '' },
+  customerReturnNote: { type: String, default: '' },
+  vendorReturnNote: { type: String, default: '' },
+  adminReturnNote: { type: String, default: '' },
+
+  returnRequestedQuantity: { type: Number, default: 0, min: 0 },
+  returnApprovedQuantity: { type: Number, default: 0, min: 0 },
+  returnQuantity: { type: Number, default: 0, min: 0 },
+
+  returnedCondition: {
+    type: String,
+    enum: ['new', 'opened', 'used', 'damaged', 'not_returned'],
+    default: 'not_returned',
+  },
+
+  returnRequestedAt: Date,
+  returnApprovedAt: Date,
+  returnedAt: Date,
+
+  returnApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
+  returnRejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
+  returnRejectionReason: { type: String, default: '' },
+
+  refundStatus: {
+    type: String,
+    enum: [
+      'none',
+      'requested',
+      'approved',
+      'scheduled',
+      'processing',
+      'partially_refunded',
+      'processed',
+      'failed',
+      'cancelled',
+    ],
+    default: 'none',
+    index: true,
+  },
+
+  refundedQuantity: { type: Number, default: 0, min: 0 },
+  refundedAmount: { type: Number, default: 0, min: 0 },
+
+  refundReason: { type: String, default: '' },
+  refundAttempts: { type: Number, default: 0 },
+
+  refundRequestedAt: Date,
+  refundScheduledAt: Date,
+  refundedAt: Date,
+
+  refundApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
+  refundProcessedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
+  refundCancelledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
+  refundFailedReason: { type: String, default: '' },
+  stripeRefundId: { type: String, default: '' },
+
+  returnHistory: [
+    {
+      _id: false,
+
+      type: {
+        type: String,
+        enum: [
+          'return_requested',
+          'return_approved',
+          'return_rejected',
+          'returned',
+
+          'refund_requested',
+          'refund_scheduled',
+          'refund_processed',
+          'partial_refund',
+          'refund_failed',
+          'refund_cancelled',
+        ],
+      },
+
+      stripeRefundId: {
+        type: String,
+        default: '',
+      },
+
+      status: String,
+
+      quantity: {
+        type: Number,
+        default: 0,
+      },
+
+      amount: {
+        type: Number,
+        default: 0,
+      },
+
+      note: String,
+
+      by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+
+      at: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
+
+  trackingNumber: { type: String, default: '' },
+  carrier: { type: String, default: '' },
+
+  shippedAt: Date,
+  deliveredAt: Date,
+  cancelledAt: Date,
+
+  archived: {
+    type: Boolean,
+    default: false,
+  },
+
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
+});
 
 /* ==============================
-ADDRESS
+   ADDRESS
 ============================== */
 
 const addressSchema = new mongoose.Schema(
@@ -75,13 +236,14 @@ const addressSchema = new mongoose.Schema(
       type: String,
       default: 'GB',
       uppercase: true,
+      trim: true,
     },
   },
   { _id: false }
 );
 
 /* ==============================
-VENDOR SPLIT ORDER
+   VENDOR SPLIT ORDER
 ============================== */
 
 const vendorOrderSchema = new mongoose.Schema(
@@ -90,13 +252,20 @@ const vendorOrderSchema = new mongoose.Schema(
 
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Vendor',
       required: true,
+      index: true,
     },
+
+    vendorName: { type: String, default: '' },
+    vendorSlug: { type: String, default: '' },
+    vendorStoreName: { type: String, default: '' },
 
     subtotal: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    platformFee: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
 
     status: {
@@ -106,33 +275,66 @@ const vendorOrderSchema = new mongoose.Schema(
         'Processing',
         'Shipped',
         'Delivered',
+        'Partially Delivered',
 
         'Cancel Requested',
+        'Cancel Approved',
+        'Cancel Rejected',
         'Cancelled',
 
         'Return Requested',
         'Return Approved',
+        'Return Rejected',
+        'Partially Returned',
         'Returned',
 
-        'Refund Scheduled',
         'Refund Requested',
+        'Partially Refunded',
+        'Refund Scheduled',
       ],
       default: 'Pending',
+      index: true,
     },
 
-    // refund scheduling per vendor
-    refundScheduledAt: Date,
+    refundStatus: {
+      type: String,
+      enum: [
+        'none',
+        'requested',
+        'approved',
+        'scheduled',
+        'processing',
+        'partially_refunded',
+        'processed',
+        'failed',
+        'cancelled',
+      ],
+      default: 'none',
+      index: true,
+    },
 
-    trackingNumber: String,
-    carrier: String,
+    refundAmount: { type: Number, default: 0 },
+    refundScheduledAt: Date,
+    refundedAt: Date,
+
+    trackingNumber: { type: String, default: '' },
+    carrier: { type: String, default: '' },
+
     shippedAt: Date,
     deliveredAt: Date,
+    cancelledAt: Date,
+    returnedAt: Date,
+
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { _id: false }
 );
 
 /* ==============================
-STATUS HISTORY
+   STATUS HISTORY
 ============================== */
 
 const statusHistorySchema = new mongoose.Schema(
@@ -151,15 +353,11 @@ const statusHistorySchema = new mongoose.Schema(
 );
 
 /* ==============================
-ORDER SCHEMA
+   ORDER SCHEMA
 ============================== */
 
 const orderSchema = new mongoose.Schema(
   {
-    /* ==============================
-       CUSTOMER
-    ============================== */
-
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -178,10 +376,6 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
-    /* ==============================
-       ITEMS
-    ============================== */
-
     items: {
       type: [orderItemSchema],
       required: true,
@@ -192,16 +386,11 @@ const orderSchema = new mongoose.Schema(
       default: [],
     },
 
-    /* ==============================
-       PRICING
-    ============================== */
-
     subtotal: { type: Number, required: true },
     shipping: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
-
     total: { type: Number, required: true },
 
     currency: {
@@ -211,10 +400,6 @@ const orderSchema = new mongoose.Schema(
     },
 
     couponCode: String,
-
-    /* ==============================
-       PAYMENT
-    ============================== */
 
     paymentProvider: {
       type: String,
@@ -230,19 +415,34 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'refund_scheduled', 'refunded', 'partially_refunded'],
+      enum: [
+        'pending',
+        'paid',
+        'failed',
+        'refund_scheduled',
+        'refund_processing',
+        'refunded',
+        'partially_refunded',
+      ],
       default: 'pending',
       index: true,
     },
 
-    /* ==============================
-       REFUND SYSTEM (NEW CLEAN LAYER)
-    ============================== */
-
     refundStatus: {
       type: String,
-      enum: ['none', 'requested', 'scheduled', 'processed'],
+      enum: [
+        'none',
+        'requested',
+        'approved',
+        'scheduled',
+        'processing',
+        'partially_refunded',
+        'processed',
+        'failed',
+        'cancelled',
+      ],
       default: 'none',
+      index: true,
     },
 
     refundType: {
@@ -255,20 +455,34 @@ const orderSchema = new mongoose.Schema(
       enum: ['customer', 'vendor', 'admin', 'system'],
     },
 
-    refundAmount: {
-      type: Number,
-      default: 0,
-    },
-
+    refundAmount: { type: Number, default: 0 },
     refundReason: String,
 
     refundRequestedAt: Date,
     refundScheduledAt: Date,
     refundedAt: Date,
 
-    /* ==============================
-       ORDER STATUS (FULFILLMENT)
-    ============================== */
+    stripeRefundId: {
+      type: String,
+      default: '',
+    },
+
+    refundCancelledAt: Date,
+
+    refundCancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+
+    refundProcessedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+
+    refundApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
 
     status: {
       type: String,
@@ -277,62 +491,50 @@ const orderSchema = new mongoose.Schema(
         'Processing',
         'Shipped',
         'Delivered',
+        'Partially Delivered',
 
         'Cancel Requested',
+        'Cancel Approved',
+        'Cancel Rejected',
         'Cancelled',
 
         'Return Requested',
         'Return Approved',
+        'Return Rejected',
+        'Partially Returned',
         'Returned',
 
         'Refund Requested',
+        'Partially Refunded',
       ],
       default: 'Pending',
       index: true,
     },
-
-    /* ==============================
-       TIMESTAMPS
-    ============================== */
 
     shippedAt: Date,
     deliveredAt: Date,
     cancelledAt: Date,
 
     cancelRequestedAt: Date,
+    cancelApprovedAt: Date,
+    cancelRejectedAt: Date,
 
     returnRequestedAt: Date,
     returnApprovedAt: Date,
     returnedAt: Date,
 
-    /* ==============================
-       ADDRESSES
-    ============================== */
-
     shippingAddress: addressSchema,
     billingAddress: addressSchema,
-
-    /* ==============================
-       SHIPPING
-    ============================== */
 
     shippingMethod: String,
     trackingNumber: String,
     carrier: String,
     estimatedDelivery: Date,
 
-    /* ==============================
-       HISTORY
-    ============================== */
-
     statusHistory: {
       type: [statusHistorySchema],
       default: [],
     },
-
-    /* ==============================
-       NOTES & INTERNAL
-    ============================== */
 
     customerNote: String,
     adminNote: String,
@@ -361,15 +563,20 @@ const orderSchema = new mongoose.Schema(
 );
 
 /* ==============================
-INDEXES
+   INDEXES
 ============================== */
 
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ 'items.vendorId': 1 });
+orderSchema.index({ 'items.status': 1 });
+orderSchema.index({ 'items.returnStatus': 1 });
+orderSchema.index({ 'items.refundStatus': 1 });
+orderSchema.index({ 'vendorOrders.vendorId': 1 });
 orderSchema.index({ status: 1, paymentStatus: 1 });
+orderSchema.index({ paymentIntentId: 1 });
 
 /* ==============================
-SHORT ID + SUBTOTAL FIX
+   SHORT ID + SUBTOTAL FIX
 ============================== */
 
 orderSchema.pre('validate', function () {
@@ -380,10 +587,14 @@ orderSchema.pre('validate', function () {
   if (Array.isArray(this.items)) {
     this.items.forEach((item) => {
       if (!item.subtotal) {
-        item.subtotal = item.price * item.quantity;
+        item.subtotal = Number(item.price || 0) * Number(item.quantity || 0);
       }
     });
   }
 });
+
+/* ==============================
+   EXPORT
+============================== */
 
 export default mongoose.models.Order || mongoose.model('Order', orderSchema);

@@ -154,11 +154,47 @@ async function loadOrderDetails() {
         ${itemsHTML || '<p>No items found.</p>'}
       </div>
 
-      <div class="order-actions">
-        <button id="requestCancelBtn" style="display:none">Request Cancel</button>
-        <button id="requestReturnBtn" style="display:none">Request Return</button>
-        <button id="requestRefundBtn" style="display:none">Request Refund</button>
-      </div>
+<div class="order-actions-wrapper">
+
+  <button class="order-actions-toggle" id="orderActionsToggle">
+    Actions ▼
+  </button>
+
+  <div class="order-actions-menu" id="orderActionsMenu">
+
+    <button id="requestCancelBtn" style="display:none">
+      Request Cancel
+    </button>
+
+    <button id="requestReturnBtn" style="display:none">
+      Request Return
+    </button>
+
+    <button id="requestRefundBtn" style="display:none">
+      Refund Pending Review
+    </button>
+
+    <!-- FUTURE ACTIONS -->
+
+    <button id="trackOrderBtn" style="display:none">
+      Track Order
+    </button>
+
+    <button id="contactVendorBtn" style="display:none">
+      Contact Vendor
+    </button>
+
+    <button id="downloadInvoiceBtn" style="display:none">
+      Download Invoice
+    </button>
+
+    <button id="reportIssueBtn" style="display:none">
+      Report Issue
+    </button>
+
+  </div>
+
+</div>
 
       <div class="order-total">
         <h3>£${Number(order.total ?? 0).toFixed(2)}</h3>
@@ -238,32 +274,23 @@ function setupButtons(order, id, token) {
     };
   }
 
+  // ======================================================
+  // REFUND FALLBACK / STATUS MESSAGE
+  // ======================================================
+
   if (
     requestRefundBtn &&
-    ['cancelled', 'returned'].includes(status) &&
+    status === 'returned' &&
     !['refund_scheduled', 'refunded'].includes(paymentStatus)
   ) {
     requestRefundBtn.style.display = 'inline-block';
 
-    requestRefundBtn.onclick = async () => {
-      if (!confirm('Request refund for this order?')) return;
+    requestRefundBtn.textContent = 'Refund Pending Review';
 
-      const res = await fetch(`${API}/orders/${id}/request-refund`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || 'Refund request failed');
-        return;
-      }
-
-      location.reload();
+    requestRefundBtn.onclick = () => {
+      alert(
+        'Your return was completed, but refund has not started yet. Please contact support if this status does not update shortly.'
+      );
     };
   }
 }
@@ -316,6 +343,30 @@ async function refreshOrderStatus() {
     console.error('Live update failed:', err);
   }
 }
+
+/* ======================================================
+   ACTION DROPDOWN
+====================================================== */
+
+document.addEventListener('click', (e) => {
+  const toggle = e.target.closest('#orderActionsToggle');
+
+  if (toggle) {
+    const menu = document.getElementById('orderActionsMenu');
+
+    if (menu) {
+      menu.classList.toggle('open');
+    }
+
+    return;
+  }
+
+  const menu = document.getElementById('orderActionsMenu');
+
+  if (menu && !e.target.closest('.order-actions-wrapper')) {
+    menu.classList.remove('open');
+  }
+});
 
 /* ======================================================
    INIT

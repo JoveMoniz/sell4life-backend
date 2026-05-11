@@ -1,5 +1,5 @@
 // ======================================================
-// VENDOR ORDERS (CLEAN + ALIGNED + FIXED DISPLAY)
+// VENDOR ORDERS (CLEAN + ALIGNED + ITEM RETURN SUPPORT)
 // ======================================================
 
 console.log('vendor orders loaded');
@@ -7,10 +7,10 @@ console.log('vendor orders loaded');
 let currentStatus = 'all';
 let currentQuery = '';
 
-let timerInterval; // 🔥 prevent multiple intervals
+let timerInterval;
 
 /* ======================================================
-   DISPLAY STATUS (WITH TIMER SUPPORT)
+   DISPLAY STATUS
 ====================================================== */
 function getDisplayStatus(o) {
   const payment = (o.paymentStatus || '').toLowerCase();
@@ -31,7 +31,7 @@ function getDisplayStatus(o) {
 }
 
 /* ======================================================
-   SHARED STATUS LOGIC (FRONTEND MIRROR)
+   STATUS TRANSITIONS
 ====================================================== */
 function getAllowedTransitions(status) {
   if (!status) return [];
@@ -40,9 +40,12 @@ function getAllowedTransitions(status) {
     Pending: ['Processing'],
     Processing: ['Shipped'],
     Shipped: ['Delivered'],
-    'Return Requested': ['Return Approved'],
+
+    'Return Requested': ['Return Approved', 'Return Rejected'],
     'Return Approved': ['Returned'],
+
     'Cancel Requested': ['Cancelled'],
+
     Cancelled: [],
     Returned: [],
   };
@@ -64,7 +67,6 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
   });
 
   const vendorData = await vendorRes.json();
-
   const vendor = vendorData.vendor;
 
   if (!vendor) {
@@ -82,12 +84,13 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
     return;
   }
 
-  const vendorId = vendorData.vendor?._id;
+  const vendorId = vendor._id;
 
   try {
     let url = `${API_BASE}/vendor/orders`;
 
     const params = [];
+
     if (status !== 'all') params.push(`status=${status}`);
     if (q) params.push(`q=${encodeURIComponent(q)}`);
     params.push(`page=${page}`);
@@ -115,7 +118,6 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
       return;
     }
 
-    // 🔥 RENDER FIRST
     container.innerHTML = orders
       .map((o) => {
         const id = o._id || o.id;
@@ -127,13 +129,24 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 
         const displayId = o.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
 
-        const vendorTotal = (o.items || [])
-          .filter((item) => String(item.vendorId) === String(vendorId))
-          .reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+        const vendorItems = (o.items || []).filter(
+          (item) => String(item.vendorId) === String(vendorId)
+        );
 
-        const safeStatus = o.status || 'Unknown';
+        const vendorTotal = vendorItems.reduce(
+          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+          0
+        );
 
-        const isRefundLocked = o.refundScheduledAt && new Date(o.refundScheduledAt) > new Date();
+        const vendorOrder = (o.vendorOrders || []).find(
+          (vo) => String(vo.vendorId) === String(vendorId)
+        );
+
+        const safeStatus = o.status || vendorOrder?.status || 'Unknown';
+
+        const refundScheduledAt = vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
+
+        const isRefundLocked = refundScheduledAt && new Date(refundScheduledAt) > new Date();
 
         const allowed =
           o.paymentStatus === 'paid' && !isRefundLocked ? getAllowedTransitions(safeStatus) : [];
@@ -144,8 +157,12 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
               Processing: 'btn-process',
               Shipped: 'btn-ship',
               Delivered: 'btn-deliver',
+
               'Return Approved': 'btn-approve-return',
+              'Return Rejected': 'btn-reject-return',
+
               Returned: 'btn-mark-returned',
+
               Cancelled: 'btn-approve-cancel',
             };
 
@@ -153,15 +170,34 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
               Processing: 'Start Processing',
               Shipped: 'Mark Shipped',
               Delivered: 'Mark Delivered',
+
               'Return Approved': 'Approve Return',
+              'Return Rejected': 'Reject Return',
+
               Returned: 'Mark Returned',
+
               Cancelled: 'Approve Cancel',
             };
 
             const cls = map[s] || '';
 
+            let itemId = '';
+
+            if (['Return Approved', 'Return Rejected', 'Returned'].includes(s)) {
+              const returnItem = vendorItems.find(
+                (item) => item.returnStatus === 'requested' || item.returnStatus === 'approved'
+              );
+
+              itemId = returnItem?._id || '';
+            }
+
             return `
-              <button class="${cls}" data-id="${id}" data-label="${s}">
+              <button
+                class="${cls}"
+                data-id="${id}"
+                data-item="${itemId}"
+                data-label="${s}"
+              >
                 ${labelMap[s] || s}
               </button>
             `;
@@ -188,7 +224,11 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
   </div>
 
   <span class="order-status">
-    ${getDisplayStatus(o)}
+    ${getDisplayStatus({
+      ...o,
+      status: safeStatus,
+      refundScheduledAt,
+    })}
   </span>
 
   <div class="order-actions">
@@ -202,9 +242,7 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
       })
       .join('');
 
-    // 🔥 THEN START TIMER (CORRECT PLACE)
     initRefundTimers();
-
     renderPagination(currentPage, totalPages);
   } catch (err) {
     console.error(err);
@@ -213,13 +251,12 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 }
 
 /* ======================================================
-   REFUND TIMER (SAFE SINGLE INSTANCE)
+   REFUND TIMER
 ====================================================== */
 function initRefundTimers() {
   const timers = document.querySelectorAll('.refund-timer');
   if (!timers.length) return;
 
-  // 🔥 prevent stacking intervals
   if (timerInterval) clearInterval(timerInterval);
 
   function update() {
@@ -254,6 +291,7 @@ document.addEventListener('click', async (e) => {
   if (!btn) return;
 
   const id = btn.dataset.id;
+  const itemId = btn.dataset.item;
   const label = btn.dataset.label;
 
   if (!id || !label) return;
@@ -262,7 +300,7 @@ document.addEventListener('click', async (e) => {
     btn.disabled = true;
     btn.textContent = 'Updating...';
 
-    await updateStatus(id, label);
+    await updateStatus(id, itemId, label);
 
     setTimeout(() => {
       loadVendorOrders(currentStatus, currentQuery, 1);
@@ -284,6 +322,7 @@ document.addEventListener('click', (e) => {
   currentStatus = btn.dataset.status;
 
   document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+
   btn.classList.add('active');
 
   loadVendorOrders(currentStatus, currentQuery, 1);
@@ -320,16 +359,52 @@ if (searchInput) {
 /* ======================================================
    UPDATE STATUS
 ====================================================== */
-async function updateStatus(id, status) {
+async function updateStatus(orderId, itemId, status) {
   const token = localStorage.getItem('s4l_token');
 
-  const res = await fetch(`${API_BASE}/vendor/orders/${id}/status`, {
+  let url = '';
+  let body = {};
+
+  if (status === 'Return Approved') {
+    if (!itemId) throw new Error('Missing return item');
+
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/approve-return`;
+
+    body = {
+      quantity: 1,
+    };
+  } else if (status === 'Return Rejected') {
+    if (!itemId) throw new Error('Missing return item');
+
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/reject-return`;
+
+    body = {
+      reason: 'Rejected by vendor',
+    };
+  } else if (status === 'Returned') {
+    if (!itemId) throw new Error('Missing return item');
+
+    url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/mark-returned`;
+
+    body = {
+      quantity: 1,
+      condition: 'used',
+    };
+  } else {
+    url = `${API_BASE}/vendor/orders/${orderId}/status`;
+
+    body = {
+      status,
+    };
+  }
+
+  const res = await fetch(url, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

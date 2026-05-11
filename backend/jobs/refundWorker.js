@@ -1,17 +1,17 @@
 // ======================================================
 // REFUND WORKER (FINAL CLEAN VERSION)
 // ======================================================
+import { pushUniqueHistory } from '../utils/historyLogic.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
 
 export function startRefundWorker() {
-  const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 60000);
-
   const START_TIME = new Date('2026-04-25T21:00:00Z');
 
   setInterval(async () => {
     const now = new Date();
+
     console.log('⏱ Worker tick:', now.toISOString());
 
     try {
@@ -27,6 +27,10 @@ export function startRefundWorker() {
         console.log('👉 Processing order:', order._id);
 
         try {
+          // ============================================
+          // SAFETY CHECKS
+          // ============================================
+
           if (!order.paymentIntentId) {
             console.log('❌ Missing paymentIntentId');
             continue;
@@ -37,7 +41,30 @@ export function startRefundWorker() {
             continue;
           }
 
+          // ============================================
+          // PREVENT DUPLICATE REFUNDS
+          // ============================================
+
+          if (order.refundedAt || order.stripeRefundId) {
+            console.log('⚠ Refund already processed');
+            continue;
+          }
+
           console.log('🚀 Sending refund to Stripe...');
+
+          // ============================================
+          // LOCK REFUND PROCESSING
+          // ============================================
+
+          order.paymentStatus = 'refund_processing';
+
+          await order.save();
+
+          console.log('🚀 Sending refund to Stripe...');
+
+          // ============================================
+          // STRIPE REFUND
+          // ============================================
 
           const refund = await stripe.refunds.create({
             payment_intent: order.paymentIntentId,
@@ -45,28 +72,49 @@ export function startRefundWorker() {
 
           console.log('✅ Stripe refund SUCCESS:', refund.id);
 
-          // ============================
+          // ============================================
           // UPDATE ORDER
-          // ============================
+          // ============================================
 
           order.paymentStatus = 'refunded';
           order.refundStatus = 'processed';
+
           order.refundedAt = new Date();
+
           order.refundScheduledAt = null;
 
-          // ============================
-          // HISTORY (NO DUPLICATE)
-          // ============================
+          // save stripe refund id
+          order.stripeRefundId = refund.id;
 
-          const alreadyRefunded = order.statusHistory?.some((h) => h.status === 'Refunded');
+          // ============================================
+          // CLEAN VENDOR ORDERS
+          // ============================================
 
-          if (!alreadyRefunded) {
-            order.statusHistory.push({
-              status: 'Refunded',
-              note: 'Processed by worker',
-              date: new Date(),
-            });
-          }
+          order.vendorOrders.forEach((vo) => {
+            vo.refundScheduledAt = null;
+
+            if (vo.refundStatus === 'scheduled') {
+              vo.refundStatus = 'processed';
+            }
+          });
+
+          // ============================================
+          // CLEAN ITEMS
+          // ============================================
+
+          order.items.forEach((item) => {
+            item.refundScheduledAt = null;
+
+            if (item.refundStatus === 'scheduled') {
+              item.refundStatus = 'processed';
+            }
+          });
+
+          // ============================================
+          // HISTORY (NO DUPLICATES)
+          // ============================================
+
+          pushUniqueHistory(order, 'Refunded', 'Processed by worker');
 
           await order.save();
 

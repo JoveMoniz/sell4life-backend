@@ -69,8 +69,21 @@ export default async function authMiddleware(req, res, next) {
     }
 
     /* ======================================================
-       ATTACH USER TO REQUEST
-    ====================================================== */
+   OWNER FAILSAFE
+====================================================== */
+
+    const OWNER_ID = process.env.OWNER_USER_ID;
+
+    if (String(user._id) === OWNER_ID) {
+      user.role = 'admin'; // force admin
+      req.isOwner = true;
+    } else {
+      req.isOwner = false;
+    }
+
+    /* ======================================================
+   ATTACH USER
+====================================================== */
 
     req.user = user;
 
