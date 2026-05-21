@@ -488,14 +488,8 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const refundCheck = canRefund(order);
-    console.log('REFUND CHECK:', refundCheck);
-
-    if (!refundCheck.ok) {
-      return res.status(400).json({
-        error: refundCheck.error,
-      });
-    }
+    // canRefund() is for whole-order refunds and blocks once any item is refunded.
+    // Per-item validation is handled by validateItemRefund() below.
     const item = findOrderItem(order, itemId);
 
     if (!item) {
