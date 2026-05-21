@@ -73,7 +73,8 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
-app.use('/api/auth', authLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // ======================================================
 // CORS CONFIGURATION
