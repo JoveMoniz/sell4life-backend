@@ -12,6 +12,12 @@ import {
   findOrderItem,
   validateItemRefund,
   calculateItemRefundAmount,
+  validateReturnApproval,
+  applyReturnApproval,
+  validateReturnRejection,
+  applyReturnRejection,
+  validateMarkItemReturned,
+  applyMarkItemReturned,
 } from '../utils/returnLogic.js';
 import { pushItemHistory, pushUniqueHistory } from '../utils/historyLogic.js';
 
@@ -577,6 +583,109 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
     res.status(500).json({
       error: 'Item refund failed',
     });
+  }
+});
+
+/* ======================================================
+   APPROVE ITEM RETURN (ADMIN)
+====================================================== */
+router.patch('/:id/items/:itemId/approve-return', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const { quantity } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid order id' });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) return res.status(400).json({ error: 'Invalid item id' });
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const check = validateReturnApproval(order, item, quantity);
+    if (!check.ok) return res.status(400).json({ error: check.error });
+
+    applyReturnApproval(order, item, quantity, req.user._id);
+    await order.save();
+
+    res.json({ success: true, returnStatus: item.returnStatus });
+  } catch (err) {
+    console.error('Admin approve return error:', err);
+    res.status(500).json({ error: 'Failed to approve return' });
+  }
+});
+
+/* ======================================================
+   REJECT ITEM RETURN (ADMIN)
+====================================================== */
+router.patch('/:id/items/:itemId/reject-return', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const { reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid order id' });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) return res.status(400).json({ error: 'Invalid item id' });
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const check = validateReturnRejection(order, item);
+    if (!check.ok) return res.status(400).json({ error: check.error });
+
+    applyReturnRejection(order, item, reason, req.user._id);
+    await order.save();
+
+    res.json({ success: true, returnStatus: item.returnStatus });
+  } catch (err) {
+    console.error('Admin reject return error:', err);
+    res.status(500).json({ error: 'Failed to reject return' });
+  }
+});
+
+/* ======================================================
+   MARK ITEM RETURNED (ADMIN)
+====================================================== */
+router.patch('/:id/items/:itemId/mark-returned', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const { quantity, condition } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid order id' });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) return res.status(400).json({ error: 'Invalid item id' });
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const check = validateMarkItemReturned(order, item, quantity);
+    if (!check.ok) return res.status(400).json({ error: check.error });
+
+    applyMarkItemReturned(order, item, quantity, condition, req.user._id);
+
+    const alreadyScheduled =
+      order.refundStatus === 'scheduled' ||
+      order.paymentStatus === 'refund_scheduled' ||
+      !!order.refundScheduledAt;
+    const alreadyRefunded =
+      order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
+
+    if (!alreadyScheduled && !alreadyRefunded) {
+      scheduleRefund(order);
+    }
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({ success: true, returnStatus: item.returnStatus });
+  } catch (err) {
+    console.error('Admin mark returned error:', err);
+    res.status(500).json({ error: 'Failed to mark item returned' });
   }
 });
 
