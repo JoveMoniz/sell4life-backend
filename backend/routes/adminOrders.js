@@ -692,16 +692,8 @@ router.patch('/:id/items/:itemId/mark-returned', authMiddleware, adminMiddleware
 
     applyMarkItemReturned(order, item, quantity, condition, req.user._id);
 
-    const alreadyScheduled =
-      order.refundStatus === 'scheduled' ||
-      order.paymentStatus === 'refund_scheduled' ||
-      !!order.refundScheduledAt;
-    const alreadyRefunded =
-      order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
-
-    if (!alreadyScheduled && !alreadyRefunded) {
-      scheduleRefund(order);
-    }
+    // Do NOT scheduleRefund here — per-item returns are refunded via the
+    // per-item refund button on admin order details, not the whole-order worker.
 
     order.markModified('items');
     await order.save();
