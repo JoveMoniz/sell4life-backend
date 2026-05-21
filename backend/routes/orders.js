@@ -280,6 +280,56 @@ router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
 });
 
 /* ======================================================
+   CUSTOMER REQUEST ITEM CANCEL (PER-ITEM)
+====================================================== */
+
+router.patch('/:id/items/:itemId/cancel-request', authMiddleware, async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id))
+    return res.status(400).json({ error: 'Invalid order id' });
+  if (!mongoose.Types.ObjectId.isValid(itemId))
+    return res.status(400).json({ error: 'Invalid item id' });
+
+  try {
+    const order = await Order.findById(id);
+
+    if (!order || String(order.user) !== String(req.user.id))
+      return res.status(403).json({ error: 'Not allowed' });
+
+    if (order.paymentStatus === 'refunded')
+      return res.status(400).json({ error: 'Refunded orders cannot be modified' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (!['Pending', 'Processing'].includes(item.status))
+      return res.status(400).json({ error: `Cannot cancel item with status: ${item.status}` });
+
+    item.status = 'Cancel Requested';
+
+    const vendorOrder = order.vendorOrders.find(
+      vo => String(vo.vendorId) === String(item.vendorId)
+    );
+    if (vendorOrder) {
+      const vendorItems = order.items.filter(
+        i => String(i.vendorId) === String(item.vendorId)
+      );
+      vendorOrder.status = getDerivedVendorStatus(vendorOrder, vendorItems);
+    }
+
+    pushUniqueHistory(order, 'Cancel Requested', `Cancel requested for ${item.name}`);
+    order.status = getDerivedOrderStatus(order);
+
+    await order.save();
+    res.json(normalizeOrder(order));
+  } catch (err) {
+    console.error('ITEM CANCEL REQUEST ERROR:', err);
+    res.status(500).json({ error: 'Cancel request failed' });
+  }
+});
+
+/* ======================================================
    CUSTOMER REQUEST ITEM RETURN
    NEW ITEM-LEVEL PARTIAL RETURN ROUTE
 ====================================================== */
