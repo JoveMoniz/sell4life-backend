@@ -28,6 +28,7 @@ import stripe from '../config/stripe.js';
 
 import Order from '../models/order.js';
 import User from '../models/user.js';
+import Vendor from '../models/vendor.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
@@ -183,8 +184,31 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req, res) => {
       (a, b) => new Date(a.date) - new Date(b.date)
     );
 
+    // Enrich vendorOrders with live account status + email
+    const vendorIds = (orderObj.vendorOrders || []).map(vo => vo.vendorId).filter(Boolean);
+    const vendors = vendorIds.length
+      ? await Vendor.find({ _id: { $in: vendorIds } })
+          .populate('userId', 'email')
+          .select('_id storeName storeSlug status type verified userId')
+      : [];
+
+    const vendorMap = {};
+    vendors.forEach(v => { vendorMap[String(v._id)] = v; });
+
+    const vendorOrdersEnriched = (orderObj.vendorOrders || []).map(vo => {
+      const v = vendorMap[String(vo.vendorId)];
+      return {
+        ...vo,
+        accountStatus: v?.status || null,
+        accountType:   v?.type   || null,
+        verified:      v?.verified || false,
+        email:         v?.userId?.email || null,
+      };
+    });
+
     res.json({
       ...orderObj,
+      vendorOrders: vendorOrdersEnriched,
 
       status: getDerivedOrderStatus(order),
 
