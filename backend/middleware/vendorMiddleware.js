@@ -5,7 +5,15 @@ export async function requireApprovedVendor(req, res, next) {
     const vendor = await Vendor.findOne({ userId: req.user._id });
 
     if (!vendor) {
-      return res.status(403).json({ error: 'Vendor profile not found' });
+      return res.status(403).json({
+        error: 'Vendor profile not found',
+      });
+    }
+
+    if (!['vendor', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'Vendor access required',
+      });
     }
 
     if (vendor.status === 'suspended') {

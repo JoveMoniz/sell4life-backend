@@ -11,6 +11,8 @@ import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
   getDerivedVendorStatus,
+  getAllowedVendorActions,
+  buildVendorAllowedActions,
 } from '../utils/orderLogic.js';
 
 import {
@@ -158,8 +160,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
       totalOrders++;
 
-      const status = vendorOrder.status;
-
+      const status = getDerivedVendorStatus(vendorOrder, order.items || []);
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
 
       const subtotal = Number(vendorOrder.subtotal || 0);
@@ -268,24 +269,6 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
       },
     };
 
-    if (status && status !== 'all') {
-      if (status === 'active') {
-        filter['vendorOrders.status'] = {
-          $in: ['Pending', 'Processing', 'Shipped'],
-        };
-      } else if (status === 'issues') {
-        filter['vendorOrders.status'] = {
-          $in: ['Cancel Requested', 'Return Requested'],
-        };
-      } else if (status === 'completed') {
-        filter['vendorOrders.status'] = {
-          $in: ['Delivered', 'Returned', 'Cancelled'],
-        };
-      } else {
-        filter['vendorOrders.status'] = status;
-      }
-    }
-
     if (q) {
       let search = q.trim();
 
@@ -331,10 +314,32 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
         status: derivedVendorStatus,
 
         refundScheduledAt: vendorOrder?.refundScheduledAt || null,
+
+        allowedActions: buildVendorAllowedActions(order, vendor._id),
       };
     });
 
-    res.json({ orders });
+    let filteredOrders = orders;
+
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        filteredOrders = orders.filter((o) =>
+          ['Pending', 'Processing', 'Shipped'].includes(o.status)
+        );
+      } else if (status === 'issues') {
+        filteredOrders = orders.filter((o) =>
+          ['Cancel Requested', 'Return Requested', 'Return Approved'].includes(o.status)
+        );
+      } else if (status === 'completed') {
+        filteredOrders = orders.filter((o) =>
+          ['Delivered', 'Returned', 'Cancelled', 'Refund Scheduled', 'Refunded'].includes(o.status)
+        );
+      } else {
+        filteredOrders = orders.filter((o) => o.status === status);
+      }
+    }
+
+    res.json({ orders: filteredOrders });
   } catch (err) {
     console.error('Vendor orders fetch error:', err);
 
@@ -386,6 +391,8 @@ router.get('/orders/:id', authMiddleware, requireVendor, async (req, res) => {
       status: getDerivedVendorStatus(vendorOrder, order.items),
 
       refundScheduledAt: vendorOrder.refundScheduledAt || null,
+
+      allowedActions: buildVendorAllowedActions(order, vendor._id),
     });
   } catch (err) {
     console.error('Vendor order fetch error:', err);
@@ -502,10 +509,6 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
 
     pushUniqueHistory(order, status, `${vendor.storeName} updated order`);
 
-    vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
-
-    order.status = getDerivedOrderStatus(order);
-
     await order.save();
 
     res.json({
@@ -587,12 +590,6 @@ router.patch(
         (vo) => String(vo.vendorId) === String(vendor._id)
       );
 
-      if (vendorOrder) {
-        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
-      }
-
-      order.status = getDerivedOrderStatus(order);
-
       await order.save();
 
       res.json({
@@ -660,12 +657,6 @@ router.patch(
         (vo) => String(vo.vendorId) === String(vendor._id)
       );
 
-      if (vendorOrder) {
-        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
-      }
-
-      order.status = getDerivedOrderStatus(order);
-
       await order.save();
 
       res.json({
@@ -730,25 +721,28 @@ router.patch(
 
       applyMarkItemReturned(order, item, quantity, condition, req.user._id);
 
-      item.refundStatus = 'scheduled';
-
-      item.refundScheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
       const vendorOrder = order.vendorOrders.find(
         (vo) => String(vo.vendorId) === String(vendor._id)
       );
 
-      if (vendorOrder) {
-        vendorOrder.refundStatus = 'scheduled';
+      // =====================================================
+      // AUTO REFUND SCHEDULING
+      // =====================================================
 
-        vendorOrder.refundScheduledAt = item.refundScheduledAt;
+      const alreadyScheduled =
+        order.refundStatus === 'scheduled' ||
+        order.paymentStatus === 'refund_scheduled' ||
+        !!order.refundScheduledAt;
 
-        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+      const alreadyRefunded =
+        order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
+
+      if (!alreadyScheduled && !alreadyRefunded) {
+        scheduleRefund(order);
       }
 
-      scheduleRefund(order);
-
-      order.status = getDerivedOrderStatus(order);
+      order.markModified('items');
+      order.markModified('vendorOrders');
 
       await order.save();
 

@@ -3,7 +3,7 @@
 // ITEM-LEVEL PARTIAL RETURNS / PARTIAL REFUNDS FOUNDATION
 // ======================================================
 
-import { pushUniqueHistory, pushReturnHistory } from './historyLogic.js';
+import { pushUniqueHistory, pushItemHistory } from './historyLogic.js';
 import { getDerivedOrderStatus } from './orderLogic.js';
 
 // ======================================================
@@ -96,9 +96,8 @@ export function applyReturnRequest(order, item, quantity, reason, userId) {
   item.returnReason = reason || '';
   item.returnRequestedAt = new Date();
 
-  item.returnHistory = item.returnHistory || [];
-
-  pushReturnHistory(item, {
+  pushItemHistory(item, {
+    type: 'return_requested',
     status: 'requested',
     quantity: requestedQty,
     amount: Number(item.price || 0) * requestedQty,
@@ -167,9 +166,8 @@ export function applyReturnApproval(order, item, quantity, adminOrVendorId) {
   item.returnApprovedAt = new Date();
   item.returnApprovedBy = adminOrVendorId;
 
-  item.returnHistory = item.returnHistory || [];
-
-  pushReturnHistory(item, {
+  pushItemHistory(item, {
+    type: 'return_approved',
     status: 'approved',
     quantity: approvedQty,
     amount: Number(item.price || 0) * approvedQty,
@@ -216,9 +214,8 @@ export function applyReturnRejection(order, item, reason, adminOrVendorId) {
   item.returnRejectedBy = adminOrVendorId;
   item.returnRejectionReason = reason || 'Return rejected';
 
-  item.returnHistory = item.returnHistory || [];
-
-  pushReturnHistory(item, {
+  pushItemHistory(item, {
+    type: 'return_rejected',
     status: 'rejected',
     quantity: Number(item.returnRequestedQuantity || 0),
     amount: 0,
@@ -292,9 +289,8 @@ export function applyMarkItemReturned(order, item, quantity, condition, adminOrV
   item.returnedCondition = condition || 'not_returned';
   item.returnedAt = new Date();
 
-  item.returnHistory = item.returnHistory || [];
-
-  pushReturnHistory(item, {
+  pushItemHistory(item, {
+    type: 'returned',
     status: item.returnStatus,
     quantity: returnedQty,
     amount: Number(item.price || 0) * returnedQty,

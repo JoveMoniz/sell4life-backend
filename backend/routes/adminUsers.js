@@ -13,7 +13,7 @@ const router = express.Router();
    ROLE CONSTANTS
 ====================================================== */
 
-const ALLOWED_ROLES = ['user', 'vendor', 'admin'];
+const ALLOWED_ROLES = ['user', 'admin'];
 /* ======================================================
    GET USERS (ADMIN)
 ====================================================== */
@@ -67,12 +67,20 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
     const users = usersRaw.map((user) => {
       const isVendor = vendors.some((v) => String(v.userId) === String(user._id));
 
+      let accountType = 'User';
+
+      if (user.role === 'admin') {
+        accountType = 'Admin';
+      } else if (isVendor) {
+        accountType = 'Vendor';
+      }
+
       return {
         _id: user._id,
         email: user.email,
         role: user.role,
+        accountType,
         createdAt: user.createdAt,
-        isVendor,
       };
     });
 
@@ -104,7 +112,11 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { role } = req.body;
 
-    if (!ALLOWED_ROLES.includes(role)) {
+    const normalizedRole = String(role || '')
+      .trim()
+      .toLowerCase();
+
+    if (!ALLOWED_ROLES.includes(normalizedRole)) {
       return res.status(400).json({
         error: 'Invalid role',
       });
@@ -128,13 +140,24 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
       });
     }
 
+    if (targetUser.role === 'vendor' && normalizedRole === 'admin') {
+      return res.status(403).json({
+        error: 'Vendor accounts cannot become admin',
+      });
+    }
+
+    if (targetUser.role === 'admin' && normalizedRole === 'vendor') {
+      return res.status(403).json({
+        error: 'Admin accounts cannot become vendor',
+      });
+    }
     /* ========================================
          OWNER PROTECTION
       ======================================== */
 
     const ownerId = process.env.OWNER_USER_ID;
 
-    if (ownerId && String(targetUser._id) === String(ownerId) && role !== 'admin') {
+    if (ownerId && String(targetUser._id) === String(ownerId) && normalizedRole !== 'admin') {
       return res.status(403).json({
         error: 'Owner role cannot be changed',
       });
@@ -144,7 +167,7 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
          ADMIN PROMOTION RULE
       ======================================== */
 
-    if (role === 'admin' && !req.isOwner) {
+    if (normalizedRole === 'admin' && !req.isOwner) {
       return res.status(403).json({
         error: 'Only the site owner can assign admin role',
       });
@@ -154,7 +177,7 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
          PREVENT SELF LOCKOUT
       ======================================== */
 
-    if (String(targetUser._id) === String(req.user._id) && role !== 'admin') {
+    if (String(targetUser._id) === String(req.user._id) && normalizedRole !== 'admin') {
       return res.status(400).json({
         error: 'You cannot remove your own admin role',
       });
@@ -163,22 +186,24 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
     /* ========================================
          UPDATE ROLE
       ======================================== */
+
     // ========================================
-    // PREVENT REMOVING VENDOR ROLE
-    // WHEN ACTIVE VENDOR EXISTS
+    // PREVENT REMOVING LAST ADMIN
     // ========================================
 
-    const existingVendor = await Vendor.findOne({
-      userId: targetUser._id,
-    });
-
-    if (existingVendor && role === 'user') {
-      return res.status(400).json({
-        error: 'Vendor account must be removed before changing role to user',
+    if (targetUser.role === 'admin' && normalizedRole !== 'admin') {
+      const adminCount = await User.countDocuments({
+        role: 'admin',
       });
+
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          error: 'Cannot remove the last admin account',
+        });
+      }
     }
 
-    targetUser.role = role;
+    targetUser.role = normalizedRole;
 
     await targetUser.save();
 
@@ -186,6 +211,8 @@ router.patch('/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
       success: true,
       userId: targetUser._id,
       role: targetUser.role,
+
+      requiresReauth: String(targetUser._id) === String(req.user._id),
     });
   } catch (err) {
     console.error('ADMIN ROLE UPDATE ERROR:', err);

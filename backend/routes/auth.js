@@ -20,6 +20,13 @@ if (!JWT_SECRET) {
 
 const TOKEN_EXPIRES = '3d';
 
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 3 * 24 * 60 * 60 * 1000,
+};
+
 /* ======================================================
    USERNAME HELPERS
 ====================================================== */
@@ -144,23 +151,20 @@ router.post('/register', async (req, res) => {
        RESPONSE
     ====================================================== */
 
-    res.status(201).json({
-      ok: true,
-
-      token,
-
-      user: {
-        id: user._id,
-
-        name: user.name,
-
-        username: user.username,
-
-        email: user.email,
-
-        role: user.role,
-      },
-    });
+    res
+      .status(201)
+      .cookie('s4l_token', token, COOKIE_OPTS)
+      .json({
+        ok: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
   } catch (err) {
     console.error('REGISTER ERROR:', err);
 
@@ -248,23 +252,19 @@ router.post('/login', async (req, res) => {
        RESPONSE
     ====================================================== */
 
-    res.json({
-      ok: true,
-
-      token,
-
-      user: {
-        id: user._id,
-
-        name: user.name,
-
-        username: user.username,
-
-        email: user.email,
-
-        role: user.role,
-      },
-    });
+    res
+      .cookie('s4l_token', token, COOKIE_OPTS)
+      .json({
+        ok: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
   } catch (err) {
     console.error('LOGIN ERROR:', err);
 
@@ -305,6 +305,16 @@ router.get('/me', authMiddleware, async (req, res) => {
       error: 'Failed to load user',
     });
   }
+});
+
+/* ======================================================
+   LOGOUT
+====================================================== */
+
+router.post('/logout', (req, res) => {
+  res
+    .clearCookie('s4l_token', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' })
+    .json({ ok: true });
 });
 
 /* ======================================================

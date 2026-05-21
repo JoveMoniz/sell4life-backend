@@ -2,6 +2,7 @@
 // REFUND WORKER (FINAL CLEAN VERSION)
 // ======================================================
 import { pushUniqueHistory } from '../utils/historyLogic.js';
+import { getDerivedOrderStatus } from '../utils/orderLogic.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
@@ -56,7 +57,25 @@ export function startRefundWorker() {
           // LOCK REFUND PROCESSING
           // ============================================
 
+          const alreadyRefundedItems = order.items.some(
+            (item) =>
+              Number(item.refundedQuantity || 0) > 0 ||
+              Number(item.refundedAmount || 0) > 0 ||
+              ['processed', 'partially_refunded', 'processing'].includes(item.refundStatus)
+          );
+
+          if (alreadyRefundedItems) {
+            console.log('⚠ Item-level refunds already exist. Skipping worker refund.');
+
+            order.paymentStatus = 'partially_refunded';
+
+            await order.save();
+
+            continue;
+          }
+
           order.paymentStatus = 'refund_processing';
+          order.refundStatus = 'processing';
 
           await order.save();
 
@@ -90,11 +109,19 @@ export function startRefundWorker() {
           // CLEAN VENDOR ORDERS
           // ============================================
 
-          order.vendorOrders.forEach((vo) => {
-            vo.refundScheduledAt = null;
+          order.items.forEach((item) => {
+            item.refundScheduledAt = null;
 
-            if (vo.refundStatus === 'scheduled') {
-              vo.refundStatus = 'processed';
+            if (item.refundStatus === 'scheduled') {
+              item.refundStatus = 'processed';
+            }
+
+            // =========================================
+            // FINALIZE CANCELLED ITEMS
+            // =========================================
+
+            if (item.status === 'Cancel Requested') {
+              item.status = 'Cancelled';
             }
           });
 
@@ -114,7 +141,12 @@ export function startRefundWorker() {
           // HISTORY (NO DUPLICATES)
           // ============================================
 
+          order.status = getDerivedOrderStatus(order);
+
           pushUniqueHistory(order, 'Refunded', 'Processed by worker');
+
+          order.markModified('vendorOrders');
+          order.markModified('items');
 
           await order.save();
 

@@ -15,6 +15,7 @@ export const FULFILLMENT_STATUSES = [
 
   'Cancel Requested',
   'Cancelled',
+  'Returned',
 ];
 
 // ======================================================
@@ -298,10 +299,29 @@ export function canRefund(order, { force = false } = {}) {
     };
   }
 
+  // =========================================
+  // BLOCK ALREADY REFUNDED
+  // =========================================
+
   if (order.paymentStatus === 'refunded') {
     return {
       ok: false,
       error: 'Order already refunded',
+    };
+  }
+
+  // =========================================
+  // BLOCK SCHEDULED REFUNDS
+  // =========================================
+
+  if (
+    order.paymentStatus === 'refund_scheduled' ||
+    order.refundStatus === 'scheduled' ||
+    order.refundScheduledAt
+  ) {
+    return {
+      ok: false,
+      error: 'Refund already scheduled',
     };
   }
 
@@ -393,31 +413,23 @@ export function getDerivedVendorStatus(vendorOrder, items = []) {
     return 'Returned';
   }
 
-  // ====================================================
-  // REFUND STATES
-  // ====================================================
-
-  if (refundStatuses.some((s) => s === 'scheduled')) {
-    return 'Refund Scheduled';
-  }
-
-  if (refundStatuses.some((s) => s === 'partially_refunded')) {
-    return 'Partially Refunded';
-  }
-
-  if (refundStatuses.length > 0 && refundStatuses.every((s) => s === 'processed')) {
-    return 'Refunded';
-  }
-
-  // ====================================================
-  // CANCEL STATES
-  // ====================================================
+  // =========================================
+  // CANCEL / RETURN STATES
+  // =========================================
 
   if (fulfillmentStatuses.some((s) => s === 'Cancel Requested')) {
     return 'Cancel Requested';
   }
 
-  if (fulfillmentStatuses.length > 0 && fulfillmentStatuses.every((s) => s === 'Cancelled')) {
+  if (returnStatuses.some((s) => s === 'requested')) {
+    return 'Return Requested';
+  }
+
+  if (returnStatuses.some((s) => s === 'approved')) {
+    return 'Return Approved';
+  }
+
+  if (fulfillmentStatuses.every((s) => s === 'Cancelled')) {
     return 'Cancelled';
   }
 
@@ -502,50 +514,69 @@ export function getDerivedOrderStatus(order) {
 
   const refundStatuses = items.map((item) => item.refundStatus);
 
-  if (fulfillmentStatuses.some((s) => s === 'Cancel Requested')) {
-    return 'Cancel Requested';
-  }
+  // ====================================================
+  // FINAL STATES FIRST
+  // ====================================================
 
-  if (returnStatuses.some((s) => ['requested', 'approved'].includes(s))) {
-    return 'Return Requested';
-  }
-
-  if (fulfillmentStatuses.every((s) => s === 'Cancelled')) {
-    return 'Cancelled';
-  }
-
+  // FULLY RETURNED
   if (returnStatuses.length > 0 && returnStatuses.every((s) => s === 'returned')) {
     return 'Returned';
   }
 
+  // PARTIALLY RETURNED
   if (returnStatuses.some((s) => ['partially_returned', 'returned'].includes(s))) {
     return 'Partially Returned';
   }
 
-  if (refundStatuses.some((s) => s === 'partially_refunded')) {
-    return 'Partially Refunded';
+  // FULLY CANCELLED
+  if (fulfillmentStatuses.every((s) => s === 'Cancelled')) {
+    return 'Cancelled';
   }
 
-  if (refundStatuses.some((s) => s === 'scheduled')) {
-    return 'Refund Scheduled';
+  // ====================================================
+  // TRANSITIONAL STATES
+  // ====================================================
+
+  // RETURN APPROVED
+  if (returnStatuses.some((s) => s === 'approved')) {
+    return 'Return Approved';
   }
 
+  // RETURN REQUESTED
+  if (returnStatuses.some((s) => s === 'requested')) {
+    return 'Return Requested';
+  }
+
+  // CANCEL REQUESTED
+  if (fulfillmentStatuses.some((s) => s === 'Cancel Requested')) {
+    return 'Cancel Requested';
+  }
+
+  // ====================================================
+  // FULFILLMENT FLOW
+  // ====================================================
+
+  // FULLY DELIVERED
   if (fulfillmentStatuses.every((s) => s === 'Delivered')) {
     return 'Delivered';
   }
 
+  // PARTIALLY DELIVERED
   if (fulfillmentStatuses.some((s) => s === 'Delivered')) {
     return 'Partially Delivered';
   }
 
+  // SHIPPED
   if (fulfillmentStatuses.some((s) => s === 'Shipped')) {
     return 'Shipped';
   }
 
+  // PROCESSING
   if (fulfillmentStatuses.some((s) => s === 'Processing')) {
     return 'Processing';
   }
 
+  // DEFAULT
   return 'Pending';
 }
 
@@ -567,4 +598,189 @@ export function getDerivedPaymentStatus(order) {
   }
 
   return order.paymentStatus || 'paid';
+}
+
+// ======================================================
+// ADMIN ACTIONS
+// SINGLE SOURCE OF TRUTH
+// ======================================================
+
+export function getAllowedAdminActions(order) {
+  const status = getDerivedOrderStatus(order);
+
+  const map = {
+    Pending: ['Processing', 'Cancelled'],
+
+    Processing: ['Shipped', 'Cancelled'],
+
+    Shipped: [],
+
+    Delivered: [],
+
+    'Cancel Requested': ['Cancelled'],
+
+    'Return Requested': ['Return Approved', 'Return Rejected'],
+
+    'Return Approved': [],
+
+    'Return Rejected': [],
+
+    Returned: [],
+
+    Cancelled: [],
+
+    Refunded: [],
+
+    'Refund Scheduled': [],
+
+    'Partially Refunded': [],
+  };
+
+  return map[status] || [];
+}
+
+// ======================================================
+// VENDOR ACTIONS
+// SINGLE SOURCE OF TRUTH
+// ======================================================
+
+export function getAllowedVendorActions(order, vendorId) {
+  if (!order || !vendorId) return [];
+
+  const vendorOrder = (order.vendorOrders || []).find(
+    (vo) => String(vo.vendorId) === String(vendorId)
+  );
+
+  const status = getDerivedVendorStatus(vendorOrder, order.items || []);
+
+  const map = {
+    Pending: ['Processing'],
+    Processing: ['Shipped'],
+    Shipped: ['Delivered'],
+
+    'Return Requested': ['Return Approved', 'Return Rejected'],
+    'Return Approved': ['Returned'],
+
+    'Cancel Requested': ['Cancelled'],
+
+    Delivered: [],
+    Cancelled: [],
+    Returned: [],
+    Refunded: [],
+    'Refund Scheduled': [],
+    'Partially Refunded': [],
+  };
+
+  return map[status] || [];
+}
+
+export function buildVendorAllowedActions(order, vendorId) {
+  if (!order || !vendorId) return [];
+
+  const actions = [];
+
+  const vendorItems = (order.items || []).filter(
+    (item) => String(item.vendorId) === String(vendorId)
+  );
+
+  const vendorOrder = (order.vendorOrders || []).find(
+    (vo) => String(vo.vendorId) === String(vendorId)
+  );
+
+  const status = getDerivedVendorStatus(vendorOrder, order.items || []);
+
+  // ====================================================
+  // NORMAL FULFILLMENT
+  // ====================================================
+
+  if (status === 'Pending') {
+    actions.push({ type: 'Processing' });
+  }
+
+  if (status === 'Processing') {
+    actions.push({ type: 'Shipped' });
+  }
+
+  if (status === 'Shipped') {
+    actions.push({ type: 'Delivered' });
+  }
+
+  // ====================================================
+  // RETURN REQUESTED
+  // ====================================================
+
+  if (status === 'Return Requested') {
+    vendorItems.forEach((item) => {
+      if (item.returnStatus === 'requested') {
+        actions.push({
+          type: 'Return Approved',
+          itemId: item._id,
+        });
+
+        actions.push({
+          type: 'Return Rejected',
+          itemId: item._id,
+        });
+      }
+    });
+  }
+
+  // ====================================================
+  // RETURN APPROVED
+  // ====================================================
+
+  if (status === 'Return Approved') {
+    vendorItems.forEach((item) => {
+      if (item.returnStatus === 'approved') {
+        actions.push({
+          type: 'Returned',
+          itemId: item._id,
+        });
+      }
+    });
+  }
+
+  // ====================================================
+  // CANCEL REQUESTED
+  // ====================================================
+
+  if (status === 'Cancel Requested') {
+    actions.push({
+      type: 'Cancelled',
+    });
+  }
+
+  return actions;
+}
+
+// ======================================================
+// FINAL ORDER CHECK
+// SINGLE SOURCE OF TRUTH
+// ======================================================
+
+export function isFinalOrder(order) {
+  if (order.paymentStatus === 'refunded') {
+    return true;
+  }
+
+  const status = getDerivedOrderStatus(order);
+
+  return ['Cancelled', 'Refunded', 'Returned', 'Delivered'].includes(status);
+}
+
+// ======================================================
+// ADMIN LABELS
+// SINGLE SOURCE OF TRUTH
+// ======================================================
+
+export function getAdminActionLabel(status) {
+  const labels = {
+    Cancelled: 'Force Cancel',
+
+    'Return Approved': 'Override Approve Return',
+
+    'Return Rejected': 'Override Reject Return',
+  };
+
+  return labels[status] || status;
 }

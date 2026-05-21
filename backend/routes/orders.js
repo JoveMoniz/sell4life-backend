@@ -13,6 +13,8 @@ import {
   getDerivedPaymentStatus,
 } from '../utils/orderLogic.js';
 
+import { pushUniqueHistory } from '../utils/historyLogic.js';
+
 import { findOrderItem, validateReturnRequest, applyReturnRequest } from '../utils/returnLogic.js';
 
 import Vendor from '../models/vendor.js';
@@ -265,12 +267,7 @@ router.patch('/:id/request-cancel', authMiddleware, async (req, res) => {
       }
     });
 
-    order.statusHistory.push({
-      status: 'Cancel Requested',
-      note: 'Requested by customer',
-      date: new Date(),
-    });
-
+    pushUniqueHistory(order, 'Cancel Requested', 'Requested by customer');
     order.status = getDerivedOrderStatus(order);
 
     await order.save();

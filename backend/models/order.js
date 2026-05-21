@@ -291,6 +291,8 @@ const vendorOrderSchema = new mongoose.Schema(
         'Refund Requested',
         'Partially Refunded',
         'Refund Scheduled',
+        'Refund Processing',
+        'Refunded',
       ],
       default: 'Pending',
       index: true,
@@ -505,6 +507,9 @@ const orderSchema = new mongoose.Schema(
         'Returned',
 
         'Refund Requested',
+        'Refund Scheduled',
+        'Refund Processing',
+        'Refunded',
         'Partially Refunded',
       ],
       default: 'Pending',

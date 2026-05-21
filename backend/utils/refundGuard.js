@@ -6,26 +6,60 @@
 export function canRefund(order) {
   const payment = (order.paymentStatus || '').toLowerCase();
 
-  const refund = (order.refundStatus || '').toLowerCase();
+  const orderRefund = (order.refundStatus || '').toLowerCase();
 
-  const hasScheduledRefund =
-    !!order.refundScheduledAt ||
-    order.vendorOrders?.some((vo) => !!vo.refundScheduledAt) ||
-    order.items?.some(
-      (item) =>
-        !!item.refundScheduledAt ||
-        ['scheduled', 'processing', 'processed'].includes((item.refundStatus || '').toLowerCase())
+  // ====================================================
+  // ITEM LOCKS
+  // ====================================================
+
+  const itemLocked = (order.items || []).some((item) => {
+    const status = (item.refundStatus || '').toLowerCase();
+
+    return (
+      !!item.refundScheduledAt ||
+      ['scheduled', 'processing', 'processed', 'partially_refunded'].includes(status)
     );
+  });
 
-  const financiallyLocked =
-    hasScheduledRefund ||
-    ['refunded', 'refund_scheduled', 'refund_processing'].includes(payment) ||
-    ['scheduled', 'processing', 'processed'].includes(refund);
+  // ====================================================
+  // VENDOR LOCKS
+  // ====================================================
 
-  if (financiallyLocked) {
+  const vendorLocked = (order.vendorOrders || []).some((vo) => {
+    const status = (vo.refundStatus || '').toLowerCase();
+
+    return (
+      !!vo.refundScheduledAt ||
+      ['scheduled', 'processing', 'processed', 'partially_refunded'].includes(status)
+    );
+  });
+
+  // ====================================================
+  // ORDER LOCKS
+  // ====================================================
+
+  const orderLocked =
+    !!order.refundScheduledAt ||
+    ['scheduled', 'processing', 'processed', 'partially_refunded'].includes(orderRefund);
+
+  // ====================================================
+  // PAYMENT LOCKS
+  // ====================================================
+
+  const paymentLocked = [
+    'refund_scheduled',
+    'refund_processing',
+    'refunded',
+    'partially_refunded',
+  ].includes(payment);
+
+  // ====================================================
+  // FINAL DECISION
+  // ====================================================
+
+  if (itemLocked || vendorLocked || orderLocked || paymentLocked) {
     return {
       ok: false,
-
       error: 'Refund already scheduled, processing, or completed',
     };
   }

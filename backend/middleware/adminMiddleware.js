@@ -19,7 +19,7 @@ export default function adminMiddleware(req, res, next) {
      ROLE CHECK
   ====================================================== */
 
-  if (req.user.role !== 'admin') {
+  if (String(req.user.role).toLowerCase() !== 'admin') {
     return res.status(403).json({
       error: 'Admin access required',
     });
@@ -32,8 +32,7 @@ export default function adminMiddleware(req, res, next) {
 
   const ownerId = process.env.OWNER_USER_ID;
 
-  req.isOwner = Boolean(ownerId) && String(req.user.id) === String(ownerId);
-
+  req.isOwner = Boolean(ownerId) && String(req.user._id) === String(ownerId);
   /* ======================================================
      CONTINUE
   ====================================================== */

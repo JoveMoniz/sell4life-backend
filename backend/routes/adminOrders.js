@@ -1,5 +1,11 @@
 import { scheduleRefund } from '../utils/refundLogic.js';
-import { canUpdateItemStatus, getDerivedOrderStatus } from '../utils/orderLogic.js';
+import {
+  canUpdateItemStatus,
+  getDerivedOrderStatus,
+  getAllowedAdminActions,
+  getAdminActionLabel,
+  isFinalOrder,
+} from '../utils/orderLogic.js';
 import { canRefund } from '../utils/refundGuard.js';
 
 import {
@@ -118,6 +124,10 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
         ...obj,
         status: getDerivedOrderStatus(o),
         displayId,
+
+        allowedActions: getAllowedAdminActions(o),
+        isFinal: isFinalOrder(o),
+        canRefund: canRefund(o).ok,
       };
     });
 
@@ -161,9 +171,24 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
+    const orderObj = order.toObject();
+
+    orderObj.statusHistory = (orderObj.statusHistory || []).sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+
     res.json({
-      ...order.toObject(),
+      ...orderObj,
+
       status: getDerivedOrderStatus(order),
+
+      allowedActions: getAllowedAdminActions(order),
+
+      isFinal: isFinalOrder(order),
+
+      canRefund: canRefund(order).ok,
+
+      canCancelRefund: order.paymentStatus === 'refund_scheduled',
     });
   } catch (err) {
     console.error(err);
@@ -229,9 +254,18 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
       });
 
       order.items.forEach((item) => {
-        if (item.status === 'Delivered') {
+        if (
+          item.status === 'Delivered' ||
+          item.returnStatus === 'approved' ||
+          item.returnStatus === 'requested'
+        ) {
+          item.status = 'Returned';
+
+          // FORCE FINAL RETURN STATE
           item.returnStatus = 'returned';
+
           item.returnQuantity = item.quantity;
+
           item.returnedAt = now;
         }
       });
@@ -265,8 +299,6 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     // AUTO REFUND SCHEDULING
     // =====================================================
 
-    const derivedStatus = getDerivedOrderStatus(order);
-
     const alreadyScheduled =
       order.refundStatus === 'scheduled' ||
       order.paymentStatus === 'refund_scheduled' ||
@@ -275,8 +307,10 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     const alreadyRefunded =
       order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
 
+    const shouldScheduleRefund = status === 'Cancelled' || status === 'Returned';
+
     if (
-      ['Cancelled', 'Returned'].includes(derivedStatus) &&
+      shouldScheduleRefund &&
       order.paymentStatus === 'paid' &&
       !alreadyScheduled &&
       !alreadyRefunded
@@ -301,10 +335,9 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
       pushUniqueHistory(order, 'Refund Scheduled', 'Automatic refund scheduled');
     }
 
-    // =====================================================
-    // DERIVED STATUS
-    // =====================================================
+    // AUTO REFUND SCHEDULING
 
+    // DERIVED STATUS
     order.status = getDerivedOrderStatus(order);
 
     await order.save();
@@ -357,7 +390,7 @@ router.patch('/:id/cancel-refund', authMiddleware, adminMiddleware, async (req, 
 
     // clear order-level refund schedule
     order.refundScheduledAt = null;
-    order.refundStatus = 'none';
+    order.refundStatus = 'cancelled';
 
     // restore payment state
     if (order.paymentStatus === 'refund_scheduled') {
@@ -426,6 +459,7 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
     }
 
     const refundCheck = canRefund(order);
+    console.log('REFUND CHECK:', refundCheck);
 
     if (!refundCheck.ok) {
       return res.status(400).json({
@@ -461,6 +495,8 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
     }
 
     const refund = calculateItemRefundAmount(item, refundQty);
+
+    console.log('🚨 STRIPE REFUND EXECUTING');
 
     const stripeRefund = await stripe.refunds.create({
       payment_intent: order.paymentIntentId,
@@ -525,12 +561,6 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
 
       by: req.user._id,
     });
-
-    // =====================================================
-    // DERIVED STATUS
-    // =====================================================
-
-    order.status = getDerivedOrderStatus(order);
 
     await order.save();
 

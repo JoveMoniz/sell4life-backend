@@ -1,4 +1,5 @@
 import './config/env.js';
+import User from './models/user.js';
 // ======================================================
 // DEPLOY TEST
 // ======================================================
@@ -16,6 +17,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 // ======================================================
 // ROUTES
@@ -46,6 +48,11 @@ app.set('trust proxy', 1);
 // SECURITY HEADERS
 // ======================================================
 app.use(helmet());
+
+// ======================================================
+// COOKIE PARSER
+// ======================================================
+app.use(cookieParser());
 
 // ======================================================
 // RATE LIMITERS
@@ -167,9 +174,15 @@ app.get('/api/health', (req, res) => {
 // ENVIRONMENT VALIDATION
 // ======================================================
 const mongoUri = process.env.MONGODB_URI;
+const ownerId = process.env.OWNER_USER_ID;
 
 if (!mongoUri) {
   console.error('❌ MONGODB_URI is not defined');
+  process.exit(1);
+}
+
+if (!ownerId) {
+  console.error('❌ OWNER_USER_ID is not defined');
   process.exit(1);
 }
 
@@ -228,8 +241,22 @@ mongoose
     autoIndex: true,
     serverSelectionTimeoutMS: 5000,
   })
-  .then(() => {
+  .then(async () => {
     console.log('✅ MongoDB connected');
+
+    const ownerUser = await User.findById(ownerId);
+
+    if (!ownerUser) {
+      console.error('❌ OWNER USER NOT FOUND');
+      process.exit(1);
+    }
+
+    if (ownerUser.role !== 'admin') {
+      console.error('❌ OWNER USER MUST HAVE ADMIN ROLE');
+      process.exit(1);
+    }
+
+    console.log('✅ Owner account validated');
 
     // ======================================================
     // START REFUND WORKER

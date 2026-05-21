@@ -117,10 +117,6 @@ router.patch('/:id/approve', async (req, res) => {
         message: 'Vendor not found or not in pending state',
       });
     }
-    // Sync user role
-    await User.findByIdAndUpdate(vendor.userId, {
-      role: 'vendor',
-    });
 
     res.json({ message: 'Vendor approved', vendor });
   } catch (error) {
@@ -186,10 +182,6 @@ router.patch('/:id/reactivate', async (req, res) => {
         message: 'Vendor not found or not in suspended state',
       });
     }
-
-    await User.findByIdAndUpdate(vendor.userId, {
-      role: 'vendor',
-    });
 
     res.json({ message: 'Vendor reactivated', vendor });
   } catch (error) {

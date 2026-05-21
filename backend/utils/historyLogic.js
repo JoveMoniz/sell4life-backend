@@ -1,29 +1,4 @@
 // ======================================================
-// ORDER HISTORY
-// SINGLE SOURCE OF TRUTH
-// ======================================================
-
-export function pushUniqueHistory(order, status, note = '', date = new Date()) {
-  if (!order.statusHistory) {
-    order.statusHistory = [];
-  }
-
-  const last = order.statusHistory[order.statusHistory.length - 1];
-
-  if (last && last.status === status) {
-    return false;
-  }
-
-  order.statusHistory.push({
-    status,
-    note,
-    date,
-  });
-
-  return true;
-}
-
-// ======================================================
 // ITEM HISTORY
 // SINGLE SOURCE OF TRUTH
 // ======================================================
@@ -135,6 +110,36 @@ export function pushAdminHistory(order, event = {}) {
     at: event.at || new Date(),
     metadata: event.metadata || {},
   });
+
+  return true;
+}
+
+// ======================================================
+// ORDER HISTORY
+// SINGLE SOURCE OF TRUTH
+// ======================================================
+
+export function pushUniqueHistory(order, status, note = '', date = new Date()) {
+  if (!order.statusHistory) {
+    order.statusHistory = [];
+  }
+
+  const last = order.statusHistory[order.statusHistory.length - 1];
+
+  if (last && last.status === status) {
+    return false;
+  }
+
+  order.statusHistory.push({
+    status,
+    note,
+    date,
+  });
+
+  // =========================================
+  // KEEP HISTORY CHRONOLOGICAL
+  // =========================================
+  order.statusHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return true;
 }

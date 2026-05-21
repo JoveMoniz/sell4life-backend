@@ -182,8 +182,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
 
     /* ======================================================
-       REFUND EVENT
-    ====================================================== */
+   REFUND EVENT
+====================================================== */
     if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
       const refund = event.data.object;
 
@@ -200,20 +200,91 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         return res.json({ received: true });
       }
 
-      // MONEY STATE
-      order.paymentStatus = 'refunded';
+      // =====================================================
+      // PREVENT DUPLICATE PROCESSING
+      // =====================================================
+
+      if (order.stripeRefundId === refund.id) {
+        console.log('⚠ Refund already processed');
+        return res.json({ received: true });
+      }
+
+      // =====================================================
+      // REFUND TOTALS
+      // =====================================================
+
+      const refundedAmount = Number(refund.amount || 0) / 100;
+
+      order.refundAmount = Number(order.refundAmount || 0) + refundedAmount;
+
+      const fullyRefunded = Number(order.refundAmount || 0) >= Number(order.total || 0);
+
+      // =====================================================
+      // PAYMENT STATE
+      // =====================================================
+
+      order.paymentStatus = fullyRefunded ? 'refunded' : 'partially_refunded';
+
+      order.refundStatus = fullyRefunded ? 'processed' : 'partially_refunded';
+
       order.refundScheduledAt = null;
 
-      order.refundStatus = 'processed';
       order.refundedAt = new Date();
 
+      // =====================================================
+      // CLEAR VENDOR REFUND SCHEDULES
+      // =====================================================
+
+      order.vendorOrders.forEach((vo) => {
+        vo.refundScheduledAt = null;
+
+        if (vo.refundStatus === 'scheduled') {
+          vo.refundStatus = fullyRefunded ? 'processed' : 'partially_refunded';
+        }
+
+        if (vo.status === 'Refund Scheduled') {
+          vo.status = fullyRefunded ? 'Refunded' : 'Partially Refunded';
+        }
+      });
+
+      // =====================================================
+      // CLEAR ITEM REFUND SCHEDULES
+      // =====================================================
+
+      order.items.forEach((item) => {
+        item.refundScheduledAt = null;
+
+        if (item.refundStatus === 'scheduled') {
+          item.refundStatus = fullyRefunded ? 'processed' : 'partially_refunded';
+        }
+      });
+
+      // =====================================================
+      // MARK ARRAYS AS MODIFIED
+      // =====================================================
+
+      order.markModified('vendorOrders');
+      order.markModified('items');
+
+      // =====================================================
       // HISTORY
+      // =====================================================
 
       const alreadyRefunded = order.statusHistory.some((h) => h.status === 'Refunded');
 
       if (!alreadyRefunded) {
-        pushUniqueHistory(order, 'Refunded', 'Refund confirmed by Stripe');
+        pushUniqueHistory(
+          order,
+          fullyRefunded ? 'Refunded' : 'Partially Refunded',
+          'Refund confirmed by Stripe'
+        );
       }
+
+      // =====================================================
+      // SAVE STRIPE REFUND ID
+      // =====================================================
+
+      order.stripeRefundId = refund.id;
 
       await order.save();
 

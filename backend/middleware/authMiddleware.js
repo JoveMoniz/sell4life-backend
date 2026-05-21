@@ -18,24 +18,14 @@ if (!JWT_SECRET) {
 
 export default async function authMiddleware(req, res, next) {
   try {
+    // Accept token from HttpOnly cookie (new) or Authorization header (legacy)
     const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      return res.status(401).json({ error: 'Authorization header missing' });
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Invalid authorization format' });
-    }
-
-    /* ======================================================
-       EXTRACT TOKEN
-    ====================================================== */
-
-    const token = authHeader.split(' ')[1];
+    const token =
+      req.cookies?.s4l_token ||
+      (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
 
     if (!token) {
-      return res.status(401).json({ error: 'Token missing' });
+      return res.status(401).json({ error: 'Not authenticated' });
     }
 
     /* ======================================================
