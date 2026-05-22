@@ -11,13 +11,21 @@
 
   <body>
     <div class="thankyou-container">
-      <div class="thankyou-card">
+
+      <!-- Shown while waiting for order data -->
+      <div class="ty-loading" id="ty-loading">
+        <div class="ty-spinner"></div>
+        <p>Processing your order&hellip;</p>
+      </div>
+
+      <!-- Hidden until all data is ready -->
+      <div class="thankyou-card" id="thankyou-card">
         <div class="gallery-item">
           <span class="check-inline" aria-hidden="true">✓</span>
           <h1>Thank You for Your Order!</h1>
         </div>
 
-        <p id="payment-status-message">Processing your payment...</p>
+        <p id="payment-status-message"></p>
 
         <div class="ty-details">
           <strong>Order Number:</strong>

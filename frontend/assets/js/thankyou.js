@@ -38,16 +38,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const itemsEl = document.getElementById('order-items');
   const totalEl = document.getElementById('order-total');
   const statusMsg = document.getElementById('payment-status-message');
+  const loadingEl = document.getElementById('ty-loading');
+  const cardEl = document.getElementById('thankyou-card');
+
+  function showCard() {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (cardEl) {
+      cardEl.style.display = 'block';
+      // next frame so display:block is painted before opacity transition starts
+      requestAnimationFrame(() => cardEl.classList.add('ty-ready'));
+    }
+  }
 
   // =====================================================
   // VALIDATION
   // =====================================================
   if (!paymentIntentId || paymentIntentId.length < 10) {
     console.warn('Invalid payment_intent');
-
-    if (itemsEl) {
-      itemsEl.innerHTML = '<p>Payment not found.</p>';
-    }
+    if (itemsEl) itemsEl.innerHTML = '<p>Payment not found.</p>';
+    showCard();
     return;
   }
 
@@ -62,24 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // =====================================================
-  // UI: LOADING STATE
-  // =====================================================
-
-  if (itemsEl) {
-    itemsEl.innerHTML = `
-  <div style="
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    min-height:200px;
-    font-size:18px;
-    font-weight:500;
-  ">
-    Processing your order… please wait
-  </div>
-`;
-  }
+  // Card stays hidden — spinner is visible via #ty-loading until data arrives
 
   // =====================================================
   // WAIT FOR WEBHOOK
@@ -247,28 +239,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       order = await waitForPaid();
     }
 
-    // still nothing
+    // still nothing after polling
     if (!order) {
       console.warn('⏳ Order not ready yet');
-
-      if (itemsEl) {
-        itemsEl.innerHTML = '<p>Payment received. Please check your orders shortly.</p>';
-      }
-
+      if (itemsEl) itemsEl.innerHTML = '<p>Payment received. Your order will appear in My Orders shortly.</p>';
       localStorage.setItem('checkout_completed', 'true');
+      showCard();
       return;
     }
 
-    // ✅ NOW SAFE
+    // ✅ render everything, then reveal card all at once
     renderOrder(order);
     cleanupCart(order);
+    showCard();
 
     console.log('✅ Thankyou complete');
   } catch (err) {
     console.error('Thankyou error:', err);
-
-    if (itemsEl) {
-      itemsEl.innerHTML = '<p>Something went wrong. Please refresh or check your orders.</p>';
-    }
+    if (itemsEl) itemsEl.innerHTML = '<p>Something went wrong. Please check your orders.</p>';
+    showCard();
   }
 });
