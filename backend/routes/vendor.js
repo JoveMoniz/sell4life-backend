@@ -26,7 +26,7 @@ import {
 } from '../utils/returnLogic.js';
 
 import { pushUniqueHistory } from '../utils/historyLogic.js';
-import { scheduleRefund } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
 
 import User from '../models/user.js';
 import Product from '../models/product.js';
@@ -729,14 +729,10 @@ router.patch(
         });
       }
 
+      const returnedQty = Number(quantity || item.returnApprovedQuantity || 0);
       applyMarkItemReturned(order, item, quantity, condition, req.user._id);
 
-      const vendorOrder = order.vendorOrders.find(
-        (vo) => String(vo.vendorId) === String(vendor._id)
-      );
-
-      // Do NOT scheduleRefund here — per-item returns are refunded via the
-      // admin per-item refund button, not the whole-order worker.
+      await triggerItemRefund(order, item, returnedQty, req.user._id);
 
       order.markModified('items');
       order.markModified('vendorOrders');
@@ -745,11 +741,8 @@ router.patch(
 
       res.json({
         success: true,
-
         returnStatus: item.returnStatus,
-
         refundStatus: item.refundStatus,
-
         refundScheduledAt: item.refundScheduledAt,
       });
     } catch (err) {
@@ -805,11 +798,13 @@ router.patch(
 
       pushUniqueHistory(order, 'Cancelled', `${item.name} cancellation approved by vendor`);
 
+      await triggerItemRefund(order, item, Number(item.quantity), req.user._id);
+
       order.markModified('items');
       order.markModified('vendorOrders');
       await order.save();
 
-      res.json({ success: true, status: item.status });
+      res.json({ success: true, status: item.status, refundStatus: item.refundStatus });
     } catch (err) {
       console.error('Vendor approve cancel error:', err);
       res.status(500).json({ error: err.message || 'Approve cancel failed' });

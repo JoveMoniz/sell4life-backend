@@ -1,4 +1,4 @@
-import { scheduleRefund } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
 import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
@@ -666,15 +666,15 @@ router.patch('/:id/items/:itemId/mark-returned', authMiddleware, adminMiddleware
     const check = validateMarkItemReturned(order, item, quantity);
     if (!check.ok) return res.status(400).json({ error: check.error });
 
+    const returnedQty = Number(quantity || item.returnApprovedQuantity || 0);
     applyMarkItemReturned(order, item, quantity, condition, req.user._id);
 
-    // Do NOT scheduleRefund here — per-item returns are refunded via the
-    // per-item refund button on admin order details, not the whole-order worker.
+    await triggerItemRefund(order, item, returnedQty, req.user._id);
 
     order.markModified('items');
     await order.save();
 
-    res.json({ success: true, returnStatus: item.returnStatus });
+    res.json({ success: true, returnStatus: item.returnStatus, refundStatus: item.refundStatus });
   } catch (err) {
     console.error('Admin mark returned error:', err);
     res.status(500).json({ error: 'Failed to mark item returned' });
