@@ -520,33 +520,34 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
 
     const refund = calculateItemRefundAmount(item, refundQty);
 
-    console.log('🚨 STRIPE REFUND EXECUTING');
+    let stripeRefundId = null;
 
-    const stripeRefund = await stripe.refunds.create({
-      payment_intent: order.paymentIntentId,
-
-      amount: Math.round(refund.total * 100),
-
-      metadata: {
-        orderId: String(order._id),
-        itemId: String(item._id),
-        productId: String(item.productId),
-        vendorId: String(item.vendorId),
-        quantity: String(refundQty),
-      },
-    });
+    if (order.stripeRefundId) {
+      // The automated worker already issued a full Stripe refund for this order.
+      // Money is already back with the customer — just record the item in the DB.
+      console.log('⚠ Order already refunded by worker, recording item refund without new Stripe call');
+      stripeRefundId = order.stripeRefundId;
+    } else {
+      console.log('🚨 STRIPE REFUND EXECUTING');
+      const stripeRefund = await stripe.refunds.create({
+        payment_intent: order.paymentIntentId,
+        amount: Math.round(refund.total * 100),
+        metadata: {
+          orderId: String(order._id),
+          itemId: String(item._id),
+          productId: String(item.productId),
+          vendorId: String(item.vendorId),
+          quantity: String(refundQty),
+        },
+      });
+      stripeRefundId = stripeRefund.id;
+    }
 
     item.refundedQuantity = Number(item.refundedQuantity || 0) + refundQty;
+    item.refundedAmount   = Number(item.refundedAmount || 0) + refund.total;
+    item.refundedAt       = new Date();
 
-    item.refundedAmount = Number(item.refundedAmount || 0) + refund.total;
-
-    item.refundedAt = new Date();
-
-    if (item.refundedQuantity >= item.quantity) {
-      item.refundStatus = 'processed';
-    } else {
-      item.refundStatus = 'partially_refunded';
-    }
+    item.refundStatus = item.refundedQuantity >= item.quantity ? 'processed' : 'partially_refunded';
 
     order.paymentStatus = order.items.every((i) => i.refundStatus === 'processed')
       ? 'refunded'
@@ -554,53 +555,34 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
 
     order.refundStatus = order.paymentStatus === 'refunded' ? 'processed' : 'partially_refunded';
 
-    // =====================================================
-    // ORDER HISTORY
-    // =====================================================
-
     pushUniqueHistory(
       order,
-
       item.refundStatus === 'processed' ? 'Refunded' : 'Partially Refunded',
-
       `Refunded ${item.name} x${refundQty}`
     );
 
-    // =====================================================
-    // ITEM HISTORY
-    // =====================================================
-
     pushItemHistory(item, {
-      type: item.refundStatus === 'processed' ? 'refund_processed' : 'partial_refund',
-
-      stripeRefundId: stripeRefund.id,
-
-      status: item.refundStatus,
-
-      quantity: refundQty,
-
-      amount: refund.total,
-
-      note: `Refund processed for ${item.name}`,
-
-      by: req.user._id,
+      type:          item.refundStatus === 'processed' ? 'refund_processed' : 'partial_refund',
+      stripeRefundId,
+      status:        item.refundStatus,
+      quantity:      refundQty,
+      amount:        refund.total,
+      note:          `Refund processed for ${item.name}`,
+      by:            req.user._id,
     });
 
     await order.save();
 
     res.json({
-      success: true,
-      refundId: stripeRefund.id,
+      success:        true,
+      refundId:       stripeRefundId,
       refundedAmount: refund.total,
-      paymentStatus: order.paymentStatus,
-      refundStatus: item.refundStatus,
+      paymentStatus:  order.paymentStatus,
+      refundStatus:   item.refundStatus,
     });
   } catch (err) {
     console.error('ITEM REFUND ERROR:', err);
-
-    res.status(500).json({
-      error: 'Item refund failed',
-    });
+    res.status(500).json({ error: err.message || 'Item refund failed' });
   }
 });
 
