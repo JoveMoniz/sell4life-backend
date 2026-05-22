@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transactions | Sell4Life</title>
+
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
+  </head>
+
+  <body>
+    <div class="vendor-layout">
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/account/vendor/dashboard.html" class="vendor-back-link">← Back to Dashboard</a>
+
+          <h1 class="vendor-title">Transactions</h1>
+
+          <!-- Period filter -->
+          <div class="period-filter">
+            <button type="button" class="period-btn active" data-period="all">All Time</button>
+            <button type="button" class="period-btn" data-period="week">This Week</button>
+            <button type="button" class="period-btn" data-period="month">This Month</button>
+            <button type="button" class="period-btn" data-period="quarter">This Quarter</button>
+            <button type="button" class="period-btn" data-period="year">This Year</button>
+          </div>
+
+          <!-- Type filter -->
+          <div class="txn-type-filter">
+            <button type="button" class="type-btn active" data-type="all">All</button>
+            <button type="button" class="type-btn" data-type="sales">Sales</button>
+            <button type="button" class="type-btn" data-type="refunds">Refunds</button>
+          </div>
+
+          <!-- Summary cards -->
+          <div class="txn-summary">
+            <div class="stat-card">
+              <h3 id="txn-sales">£0.00</h3>
+              <p>Total Sales</p>
+            </div>
+            <div class="stat-card">
+              <h3 id="txn-refunds">£0.00</h3>
+              <p>Total Refunds</p>
+            </div>
+            <div class="stat-card">
+              <h3 id="txn-net">£0.00</h3>
+              <p>Net Revenue</p>
+            </div>
+          </div>
+
+          <!-- Export -->
+          <div class="txn-toolbar">
+            <button type="button" id="btn-export-csv" class="btn-export">Export CSV</button>
+          </div>
+
+          <!-- Ledger table -->
+          <div class="txn-table-wrap">
+            <table class="txn-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order</th>
+                  <th>Description</th>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th class="txn-amount">Amount</th>
+                </tr>
+              </thead>
+              <tbody id="txn-body">
+                <tr><td colspan="6" class="txn-loading">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+
+    <script>
+      (async () => {
+        const token = localStorage.getItem('s4l_token');
+        if (!token) { window.location.href = '/account/signin.html'; return; }
+
+        try {
+          const res = await fetch(`${window.API_BASE}/vendor/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!data.vendor) { window.location.href = '/account/vendor/create.html'; return; }
+          if (data.vendor.status === 'pending' || data.vendor.status === 'suspended') {
+            window.location.href = '/account/vendor/dashboard.html';
+          }
+        } catch {
+          window.location.href = '/account/signin.html';
+        }
+      })();
+    </script>
+
+    <script src="/assets/js/layout.js?v=20260522"></script>
+    <script src="/assets/js/vendor-transactions.js?v=20260522a"></script>
+  </body>
+</html>

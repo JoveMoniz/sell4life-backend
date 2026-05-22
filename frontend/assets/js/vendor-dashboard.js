@@ -35,9 +35,15 @@ function getDisplayStatus(order) {
 /* ======================================================
    LOAD DASHBOARD STATS
 ====================================================== */
-async function loadVendorDashboard() {
+let currentPeriod = 'all';
+
+async function loadVendorDashboard(period = currentPeriod) {
   try {
-    const res = await authFetch(`${API_BASE}/vendor/dashboard`);
+    const url = period && period !== 'all'
+      ? `${API_BASE}/vendor/dashboard?period=${period}`
+      : `${API_BASE}/vendor/dashboard`;
+
+    const res = await authFetch(url);
 
     if (!res.ok) throw new Error('Dashboard API error');
 
@@ -57,6 +63,17 @@ async function loadVendorDashboard() {
     console.error('Vendor dashboard load error:', err);
   }
 }
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.period-btn');
+  if (!btn) return;
+
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  currentPeriod = btn.dataset.period;
+  loadVendorDashboard(currentPeriod);
+});
 
 /* ======================================================
    LOAD RECENT ORDERS
@@ -268,6 +285,6 @@ loadVendorDashboard();
 loadRecentOrders();
 
 startLiveUpdates(() => {
-  loadVendorDashboard();
+  loadVendorDashboard(currentPeriod);
   loadRecentOrders();
 });

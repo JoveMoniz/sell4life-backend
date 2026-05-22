@@ -1344,3 +1344,175 @@ Vendor Products
   background: var(--s4l-primary);
   color: #fff;
 }
+
+/* =====================================================
+   PERIOD FILTER
+===================================================== */
+.period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.period-btn {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.period-btn:hover {
+  border-color: var(--s4l-primary);
+  color: var(--s4l-primary);
+}
+
+.period-btn.active {
+  background: var(--s4l-primary);
+  border-color: var(--s4l-primary);
+  color: #fff;
+}
+
+/* =====================================================
+   TRANSACTIONS PAGE
+===================================================== */
+.txn-type-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.type-btn {
+  padding: 5px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.type-btn:hover {
+  border-color: var(--s4l-primary);
+  color: var(--s4l-primary);
+}
+
+.type-btn.active {
+  background: var(--s4l-primary);
+  border-color: var(--s4l-primary);
+  color: #fff;
+}
+
+.txn-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.txn-summary .stat-card {
+  flex: 1;
+  min-width: 140px;
+}
+
+.txn-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.btn-export {
+  padding: 7px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--s4l-primary);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--s4l-primary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-export:hover {
+  background: var(--s4l-primary);
+  color: #fff;
+}
+
+.txn-table-wrap {
+  overflow-x: auto;
+}
+
+.txn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.txn-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-bottom: 2px solid #e0e0e0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.txn-table thead th.txn-amount {
+  text-align: right;
+}
+
+.txn-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.txn-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.txn-row-sale {
+  background: #fffffe;
+}
+
+.txn-row-refund {
+  background: #fff9f9;
+}
+
+.txn-amount {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.txn-positive {
+  color: #2a7a2a;
+}
+
+.txn-negative {
+  color: #c0392b;
+}
+
+.txn-loading,
+.txn-empty {
+  text-align: center;
+  padding: 24px;
+  color: #888;
+}
+
+.txn-order a {
+  color: var(--s4l-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.txn-order a:hover {
+  text-decoration: underline;
+}
