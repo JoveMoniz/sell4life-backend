@@ -16,16 +16,28 @@ html, body {
   display: flex;
   min-height: 100vh;
   background: #f5f6f8;
+  animation: s4l-page-in 0.15s ease forwards;
+}
+
+@keyframes s4l-page-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ================================
    SIDEBAR
 ================================ */
 
+/* Reserve sidebar dimensions immediately so the layout never shifts
+   while vendor-sidebar.html is being fetched asynchronously */
 #vendor-sidebar {
   position: sticky;
   top: 0;
   align-self: flex-start;
+  width: 220px;
+  min-height: 100vh;
+  background: #1f6f6a;
+  flex-shrink: 0;
 }
 
 .vendor-sidebar {
@@ -35,6 +47,12 @@ html, body {
   padding: 30px 20px;
   display: flex;
   flex-direction: column;
+  animation: s4l-sidebar-in 0.12s ease forwards;
+}
+
+@keyframes s4l-sidebar-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .vendor-sidebar-logo {
