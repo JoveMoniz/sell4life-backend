@@ -289,6 +289,90 @@ document.addEventListener('click', e => {
 });
 
 /* =========================================
+   PAYOUT PANEL
+========================================= */
+async function loadPayoutRequests() {
+  const tbody = document.getElementById('payout-requests-body');
+  const badge = document.getElementById('payout-badge');
+  if (!tbody) return;
+
+  try {
+    const res = await authFetch(`${API}/admin/vendors/payouts?status=requested`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const payouts = data.payouts || [];
+
+    if (badge) {
+      badge.textContent = payouts.length;
+      badge.style.display = payouts.length ? 'inline-block' : 'none';
+    }
+
+    if (!payouts.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="admin-payout-empty">No pending payout requests</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = payouts.map(p => {
+      const vendor = p.vendorId || {};
+      const storeName = vendor.storeName || '—';
+      const email = vendor.userId?.email || '—';
+      const date = new Date(p.requestedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      return `<tr data-payout-id="${p._id}">
+  <td><strong>${storeName}</strong><br><small style="color:#6b7280">${email}</small></td>
+  <td><strong>£${Number(p.amount).toFixed(2)}</strong></td>
+  <td>${date}</td>
+  <td>
+    <div class="payout-actions">
+      <input type="text" class="payout-ref-input" placeholder="Bank ref (optional)">
+      <button class="btn-payout-paid" data-id="${p._id}" data-action="paid">Mark Paid</button>
+      <button class="btn-payout-reject" data-id="${p._id}" data-action="rejected">Reject</button>
+    </div>
+  </td>
+</tr>`;
+    }).join('');
+  } catch (err) {
+    console.error('Payout requests error:', err);
+  }
+}
+
+document.getElementById('payout-panel-toggle').addEventListener('click', () => {
+  const body = document.getElementById('payout-panel-body');
+  if (!body) return;
+  const isOpen = body.style.display === 'block';
+  body.style.display = isOpen ? 'none' : 'block';
+});
+
+document.getElementById('payout-requests-body').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+
+  const id     = btn.dataset.id;
+  const action = btn.dataset.action;
+  const row    = btn.closest('tr');
+  const ref    = row?.querySelector('.payout-ref-input')?.value?.trim() || '';
+
+  const label = action === 'paid' ? 'Mark this payout as paid?' : 'Reject this payout request?';
+  if (!confirm(label)) return;
+
+  btn.disabled = true;
+  try {
+    const body = { status: action };
+    if (ref) body.reference = ref;
+    const res = await authFetch(`${API}/admin/vendors/payouts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { alert('Action failed'); btn.disabled = false; return; }
+    loadPayoutRequests();
+  } catch (err) {
+    alert('Network error');
+    btn.disabled = false;
+  }
+});
+
+/* =========================================
    INIT
 ========================================= */
 loadVendors();
+loadPayoutRequests();

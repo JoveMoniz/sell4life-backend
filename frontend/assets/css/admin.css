@@ -1347,3 +1347,109 @@ body.admin-users .admin-users-table thead th {
     max-width: 220px;
   }
 }
+
+/* ======================================================
+   ADMIN PAYOUT PANEL
+====================================================== */
+
+.admin-payout-panel {
+  margin: 16px 24px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.admin-payout-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-payout-badge {
+  background: #ef4444;
+  color: #fff;
+  border-radius: 20px;
+  padding: 1px 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: none;
+}
+
+.admin-payout-body {
+  display: none;
+  padding: 0 18px 16px;
+}
+
+.admin-payout-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+  margin-top: 12px;
+}
+
+.admin-payout-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-payout-table td {
+  padding: 8px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.admin-payout-table .payout-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-payout-table .payout-ref-input {
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  width: 140px;
+}
+
+.btn-payout-paid {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-payout-paid:hover { background: #15803d; }
+
+.btn-payout-reject {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-payout-reject:hover { background: #fee2e2; }
+
+.admin-payout-empty {
+  padding: 16px 8px;
+  color: #9ca3af;
+  text-align: center;
+}

@@ -32,6 +32,7 @@ import User from '../models/user.js';
 import Product from '../models/product.js';
 import Order from '../models/order.js';
 import Vendor from '../models/vendor.js';
+import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 
@@ -452,6 +453,110 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     });
   } catch (err) {
     console.error('Vendor transactions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PAYOUTS
+====================================================== */
+
+const COMMISSION_RATE_PAYOUT = 0.08;
+const MIN_PAYOUT = 20;
+
+async function computeVendorBalance(vendorId) {
+  const ordersRaw = await Order.find({ 'vendorOrders.vendorId': vendorId });
+
+  let totalGross = 0;
+  let totalRefunds = 0;
+
+  ordersRaw.forEach(order => {
+    const vendorItems = (order.items || []).filter(
+      item => String(item.vendorId) === String(vendorId)
+    );
+    const ps = (order.paymentStatus || '').toLowerCase();
+    const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
+    if (!isPaid) return;
+
+    totalGross += vendorItems.reduce(
+      (s, item) => s + Number(item.price || 0) * Number(item.quantity || 0), 0
+    );
+
+    vendorItems.forEach(item => {
+      const price = Number(item.price || 0);
+      if (item.status === 'Cancelled') {
+        totalRefunds += price * Number(item.quantity || 0);
+      } else if (Number(item.refundedQuantity) > 0) {
+        totalRefunds += Number(item.refundedAmount) || price * Number(item.refundedQuantity);
+      } else if (Number(item.returnQuantity) > 0) {
+        totalRefunds += price * Number(item.returnQuantity);
+      }
+    });
+  });
+
+  const netSales = Math.max(0, totalGross - totalRefunds);
+  const commission = Number((netSales * COMMISSION_RATE_PAYOUT).toFixed(2));
+  const netAfterFees = Number((netSales - commission).toFixed(2));
+
+  const paidPayouts = await Payout.find({ vendorId, status: 'paid' });
+  const totalPaidOut = Number(paidPayouts.reduce((s, p) => s + p.amount, 0).toFixed(2));
+
+  const pendingBalance = Number(Math.max(0, netAfterFees - totalPaidOut).toFixed(2));
+
+  return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalPaidOut, pendingBalance };
+}
+
+router.get('/payouts', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
+
+    const [balance, payouts, pendingRequest] = await Promise.all([
+      computeVendorBalance(vendorId),
+      Payout.find({ vendorId }).sort({ createdAt: -1 }).limit(50),
+      Payout.findOne({ vendorId, status: 'requested' }),
+    ]);
+
+    res.json({
+      ...balance,
+      minimumPayout: MIN_PAYOUT,
+      hasPendingRequest: !!pendingRequest,
+      payouts: payouts.map(p => ({
+        _id: p._id,
+        amount: p.amount,
+        status: p.status,
+        requestedAt: p.requestedAt,
+        paidAt: p.paidAt,
+        reference: p.reference,
+        note: p.note,
+      })),
+    });
+  } catch (err) {
+    console.error('Vendor payouts error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/payouts/request', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
+
+    const existing = await Payout.findOne({ vendorId, status: 'requested' });
+    if (existing) {
+      return res.status(400).json({ error: 'A payout request is already pending' });
+    }
+
+    const { pendingBalance } = await computeVendorBalance(vendorId);
+
+    if (pendingBalance < MIN_PAYOUT) {
+      return res.status(400).json({
+        error: `Minimum payout is £${MIN_PAYOUT}. Your current balance is £${pendingBalance.toFixed(2)}.`,
+      });
+    }
+
+    const payout = await Payout.create({ vendorId, amount: pendingBalance });
+    res.json({ success: true, payout });
+  } catch (err) {
+    console.error('Payout request error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

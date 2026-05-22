@@ -1,4 +1,4 @@
-﻿import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
+import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import Vendor from '../models/vendor.js';
 import User from '../models/user.js';
 import Order from '../models/order.js';
+import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
@@ -187,6 +188,63 @@ router.patch('/:id/reactivate', async (req, res) => {
   } catch (error) {
     console.error('❌ Reactivate vendor error:', error);
     res.status(500).json({ message: 'Failed to reactivate vendor' });
+  }
+});
+
+/* ======================================================
+   PAYOUT REQUESTS
+====================================================== */
+
+router.get('/payouts', async (req, res) => {
+  try {
+    const { status = 'requested' } = req.query;
+    const VALID = ['requested', 'paid', 'rejected', 'all'];
+    if (!VALID.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+
+    const filter = status === 'all' ? {} : { status };
+
+    const payouts = await Payout.find(filter)
+      .populate({
+        path: 'vendorId',
+        select: 'storeName storeSlug',
+        populate: { path: 'userId', select: 'email' },
+      })
+      .sort({ requestedAt: -1 })
+      .limit(100);
+
+    res.json({ payouts });
+  } catch (err) {
+    console.error('Admin payouts list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/payouts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reference, note } = req.body;
+
+    if (!['paid', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be paid or rejected' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid payout ID' });
+    }
+
+    const update = { status, processedBy: req.user._id };
+    if (note) update.note = note;
+    if (status === 'paid') {
+      update.paidAt = new Date();
+      if (reference) update.reference = reference;
+    }
+
+    const payout = await Payout.findByIdAndUpdate(id, update, { new: true });
+    if (!payout) return res.status(404).json({ error: 'Payout not found' });
+
+    res.json({ success: true, payout });
+  } catch (err) {
+    console.error('Admin payout update error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

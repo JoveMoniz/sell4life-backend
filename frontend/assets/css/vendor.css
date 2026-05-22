@@ -1620,3 +1620,119 @@ Vendor Products
 .txn-order a:hover {
   text-decoration: underline;
 }
+
+/* ======================================================
+   PAYOUT SECTION
+====================================================== */
+
+.payout-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.payout-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 20px;
+}
+
+.payout-balance-card {
+  background: linear-gradient(135deg, #1f6f6a 0%, #155e59 100%);
+  color: #fff;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 420px;
+  margin-bottom: 32px;
+}
+
+.payout-balance-label {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+
+.payout-balance-amount {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.payout-balance-note {
+  font-size: 0.82rem;
+  opacity: 0.75;
+  min-height: 1.2em;
+  margin-bottom: 20px;
+}
+
+.btn-payout {
+  background: #fff;
+  color: #1f6f6a;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-payout:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-payout:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+.payout-history-wrap {
+  margin-top: 8px;
+}
+
+.payout-history-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 12px;
+}
+
+.payout-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.payout-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.payout-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.payout-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.payout-status-paid     { background: #dcfce7; color: #15803d; }
+.payout-status-rejected { background: #fee2e2; color: #b91c1c; }
+.payout-status-pending  { background: #fef3c7; color: #92400e; }

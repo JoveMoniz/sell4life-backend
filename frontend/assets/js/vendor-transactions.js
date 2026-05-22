@@ -189,6 +189,92 @@ document.addEventListener('click', (e) => {
 });
 
 /* ======================================================
+   PAYOUTS
+====================================================== */
+async function loadPayouts() {
+  const balanceEl = document.getElementById('payout-balance');
+  const noteEl    = document.getElementById('payout-balance-note');
+  const btn       = document.getElementById('btn-request-payout');
+  const tbody     = document.getElementById('payout-history-body');
+
+  try {
+    const res = await authFetch(`${API_BASE}/vendor/payouts`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (balanceEl) {
+      balanceEl.textContent = '£' + Number(data.pendingBalance || 0).toFixed(2);
+    }
+
+    if (btn && noteEl) {
+      if (data.hasPendingRequest) {
+        btn.disabled = true;
+        btn.textContent = 'Request Pending…';
+        noteEl.textContent = 'Your request has been received. We will process it shortly.';
+      } else if (data.pendingBalance < data.minimumPayout) {
+        btn.disabled = true;
+        noteEl.textContent = `Minimum payout is £${data.minimumPayout}. Keep selling!`;
+      } else {
+        btn.disabled = false;
+        noteEl.textContent = '';
+      }
+    }
+
+    if (tbody) {
+      if (!data.payouts || !data.payouts.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="txn-empty">No payouts yet</td></tr>';
+      } else {
+        tbody.innerHTML = data.payouts.map(p => {
+          const date = new Date(p.paidAt || p.requestedAt).toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric',
+          });
+          const statusClass = p.status === 'paid' ? 'payout-status-paid'
+            : p.status === 'rejected' ? 'payout-status-rejected'
+            : 'payout-status-pending';
+          const ref = p.reference || (p.note ? `<em>${p.note}</em>` : '—');
+          return `<tr>
+  <td>${date}</td>
+  <td>£${Number(p.amount).toFixed(2)}</td>
+  <td><span class="payout-status ${statusClass}">${p.status}</span></td>
+  <td>${ref}</td>
+</tr>`;
+        }).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Payout load error:', err);
+  }
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#btn-request-payout')) return;
+  const btn = document.getElementById('btn-request-payout');
+  if (!btn || btn.disabled) return;
+
+  if (!confirm('Request a payout for your full available balance?\n\nWe will process it via bank transfer within 3–5 business days.')) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const res = await authFetch(`${API_BASE}/vendor/payouts/request`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Payout request failed.');
+      btn.disabled = false;
+      btn.textContent = 'Request Payout';
+      return;
+    }
+    loadPayouts();
+  } catch (err) {
+    alert('Network error. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Request Payout';
+  }
+});
+
+/* ======================================================
    INIT
 ====================================================== */
 loadTransactions();
+loadPayouts();
