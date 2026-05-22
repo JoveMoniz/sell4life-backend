@@ -171,6 +171,45 @@ async function loadVendorSidebar() {
   } catch (err) {
     console.warn('Sidebar skipped', err);
   }
+
+  injectMobileBar();
+}
+
+function injectMobileBar() {
+  if (document.querySelector('.vendor-mobile-bar')) return;
+
+  const bar = document.createElement('div');
+  bar.className = 'vendor-mobile-bar';
+  bar.innerHTML = `
+    <button class="vendor-hamburger" aria-label="Open menu">&#9776;</button>
+    <span class="vendor-mobile-title">Vendor Panel</span>
+  `;
+  document.body.prepend(bar);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sidebar-overlay';
+  document.body.appendChild(overlay);
+
+  const sidebar = document.getElementById('vendor-sidebar');
+
+  function openSidebar() {
+    sidebar?.classList.add('sidebar-open');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    sidebar?.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  bar.querySelector('.vendor-hamburger').addEventListener('click', openSidebar);
+  overlay.addEventListener('click', closeSidebar);
+
+  sidebar?.addEventListener('click', (e) => {
+    if (e.target.closest('a')) closeSidebar();
+  });
 }
 
 async function populateVendorIdentity(container) {

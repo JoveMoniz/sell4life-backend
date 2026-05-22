@@ -12,6 +12,9 @@ function authFetch(url, opts = {}) {
 let currentPeriod = 'all';
 let currentType = 'all';
 let lastTransactions = [];
+let lastRows = [];
+let txnPage = 1;
+const TXN_PER_PAGE = 25;
 
 /* ======================================================
    LOAD TRANSACTIONS
@@ -160,13 +163,66 @@ async function loadTransactions() {
 </tr>`);
       }
     });
-    tbody.innerHTML = rows.join('');
+    lastRows = rows;
+    txnPage = 1;
+    renderTxnPage(1);
 
   } catch (err) {
     console.error('Transactions load error:', err);
     tbody.innerHTML = '<tr><td colspan="6">Could not load transactions</td></tr>';
   }
 }
+
+/* ======================================================
+   PAGINATION
+====================================================== */
+function renderTxnPage(page) {
+  const tbody = document.getElementById('txn-body');
+  if (!tbody) return;
+
+  const start = (page - 1) * TXN_PER_PAGE;
+  const end = start + TXN_PER_PAGE;
+  tbody.innerHTML = lastRows.slice(start, end).join('');
+  txnPage = page;
+  renderTxnPagination();
+}
+
+function renderTxnPagination() {
+  const container = document.getElementById('txn-pagination');
+  if (!container) return;
+
+  const totalPages = Math.ceil(lastRows.length / TXN_PER_PAGE);
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const parts = [];
+  parts.push(`<span class="txn-page-info">Page ${txnPage} of ${totalPages}</span>`);
+
+  const prev = txnPage > 1;
+  parts.push(`<button class="txn-pg-btn" data-pg="${txnPage - 1}" ${prev ? '' : 'disabled'}>‹ Prev</button>`);
+
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - txnPage) <= 1) {
+      parts.push(`<button class="txn-pg-btn ${p === txnPage ? 'active' : ''}" data-pg="${p}">${p}</button>`);
+    } else if (Math.abs(p - txnPage) === 2) {
+      parts.push(`<span class="txn-pg-ellipsis">…</span>`);
+    }
+  }
+
+  const next = txnPage < totalPages;
+  parts.push(`<button class="txn-pg-btn" data-pg="${txnPage + 1}" ${next ? '' : 'disabled'}>Next ›</button>`);
+
+  container.innerHTML = parts.join('');
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.txn-pg-btn');
+  if (!btn || btn.disabled) return;
+  const pg = parseInt(btn.dataset.pg, 10);
+  if (pg && pg !== txnPage) {
+    renderTxnPage(pg);
+    document.querySelector('.txn-table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
 
 /* ======================================================
    PERIOD FILTER
@@ -178,6 +234,7 @@ document.addEventListener('click', (e) => {
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentPeriod = btn.dataset.period;
+  txnPage = 1;
   loadTransactions();
 });
 
@@ -191,6 +248,7 @@ document.addEventListener('click', (e) => {
   document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentType = btn.dataset.type;
+  txnPage = 1;
   loadTransactions();
 });
 
