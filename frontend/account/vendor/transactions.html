@@ -49,10 +49,26 @@
               <h3 id="txn-commission">£0.00</h3>
               <p>Platform Fee (8%)</p>
             </div>
+            <div class="stat-card" id="txn-vat-card" hidden>
+              <h3 id="txn-vat">£0.00</h3>
+              <p>VAT to HMRC <span class="txn-vat-badge">info</span></p>
+            </div>
             <div class="stat-card">
               <h3 id="txn-net">£0.00</h3>
               <p>Net to You</p>
             </div>
+          </div>
+
+          <!-- VAT status toggle -->
+          <div id="vat-status-bar" class="vat-status-bar" hidden>
+            <span class="vat-status-icon">&#9432;</span>
+            <span id="vat-status-text"></span>
+            <button type="button" id="btn-vat-toggle" class="btn-vat-toggle"></button>
+            <span id="vat-number-wrap" hidden>
+              &nbsp;VAT No:&nbsp;
+              <input type="text" id="vat-number-input" class="vat-number-input" placeholder="GB123456789" maxlength="14">
+              <button type="button" id="btn-vat-save" class="btn-vat-save">Save</button>
+            </span>
           </div>
 
           <!-- Export -->
@@ -140,6 +156,6 @@
     </script>
 
     <script src="/assets/js/layout.js?v=20260522"></script>
-    <script src="/assets/js/vendor-transactions.js?v=20260522d"></script>
+    <script src="/assets/js/vendor-transactions.js?v=20260522e"></script>
   </body>
 </html>

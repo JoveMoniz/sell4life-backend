@@ -57,6 +57,21 @@ async function loadTransactions() {
     const feeEl = document.getElementById('txn-commission');
     if (feeEl) feeEl.textContent = '£' + Number(summary.totalCommission || 0).toFixed(2);
 
+    const vatCard = document.getElementById('txn-vat-card');
+    const vatEl   = document.getElementById('txn-vat');
+    if (vatCard && vatEl) {
+      if (summary.vatRegistered) {
+        vatEl.textContent = '£' + Number(summary.totalVat || 0).toFixed(2);
+        vatCard.hidden = false;
+      } else {
+        vatCard.hidden = true;
+      }
+    }
+
+    const vatBar = document.getElementById('vat-status-bar');
+    if (vatBar) vatBar.dataset.vatRegistered = String(summary.vatRegistered === true);
+    updateVatStatusBar(summary);
+
     const net = Number(summary.netAfterFees ?? summary.net ?? 0);
     const netEl = document.getElementById('txn-net');
     netEl.textContent = '£' + net.toFixed(2);
@@ -99,6 +114,16 @@ async function loadTransactions() {
   <td class="txn-order"></td>
   <td class="txn-desc txn-commission-label" colspan="3">Platform fee (8%)</td>
   <td class="txn-amount txn-commission-amount">-£${Number(t.commission).toFixed(2)}</td>
+</tr>`);
+      }
+
+      if (isSale && Number(t.vatAmount) > 0) {
+        rows.push(`
+<tr class="txn-row txn-row-vat">
+  <td class="txn-date"></td>
+  <td class="txn-order"></td>
+  <td class="txn-desc txn-vat-label" colspan="3">VAT to HMRC (20%) <span class="txn-vat-info">not deducted from payout</span></td>
+  <td class="txn-amount txn-vat-amount">£${Number(t.vatAmount).toFixed(2)}</td>
 </tr>`);
       }
     });
@@ -186,6 +211,76 @@ document.addEventListener('click', (e) => {
   a.download = `transactions${label}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+});
+
+/* ======================================================
+   VAT STATUS BAR
+====================================================== */
+function updateVatStatusBar(summary) {
+  const bar    = document.getElementById('vat-status-bar');
+  const text   = document.getElementById('vat-status-text');
+  const btn    = document.getElementById('btn-vat-toggle');
+  const numWrap = document.getElementById('vat-number-wrap');
+  const numInput = document.getElementById('vat-number-input');
+  if (!bar || !text || !btn) return;
+
+  bar.hidden = false;
+
+  if (summary.vatRegistered) {
+    text.textContent = `VAT registered${summary.vatNumber ? ` · ${summary.vatNumber}` : ''}.`;
+    btn.textContent = 'Remove VAT registration';
+    if (numWrap) numWrap.hidden = true;
+  } else {
+    text.textContent = 'Not VAT registered.';
+    btn.textContent = 'I am VAT registered';
+    if (numWrap) numWrap.hidden = false;
+    if (numInput && summary.vatNumber) numInput.value = summary.vatNumber;
+  }
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#btn-vat-toggle')) return;
+  const bar    = document.getElementById('vat-status-bar');
+  const numInput = document.getElementById('vat-number-input');
+  const isCurrentlyRegistered = bar?.dataset.vatRegistered === 'true';
+
+  const newStatus = !isCurrentlyRegistered;
+  const vatNumber = (!isCurrentlyRegistered && numInput) ? numInput.value.trim() : '';
+
+  try {
+    const res = await authFetch(`${API_BASE}/vendor/vat`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vatRegistered: newStatus, vatNumber }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to update VAT status'); return; }
+    if (bar) bar.dataset.vatRegistered = String(data.vatRegistered);
+    loadTransactions();
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
+});
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#btn-vat-save')) return;
+  const numInput = document.getElementById('vat-number-input');
+  const vatNumber = numInput ? numInput.value.trim() : '';
+
+  try {
+    const res = await authFetch(`${API_BASE}/vendor/vat`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vatRegistered: true, vatNumber }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Invalid VAT number'); return; }
+    const bar = document.getElementById('vat-status-bar');
+    if (bar) bar.dataset.vatRegistered = 'true';
+    loadTransactions();
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
 });
 
 /* ======================================================

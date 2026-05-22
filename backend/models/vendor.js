@@ -62,6 +62,17 @@ const vendorSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    vatRegistered: {
+      type: Boolean,
+      default: false,
+    },
+
+    vatNumber: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   { timestamps: true }
 );

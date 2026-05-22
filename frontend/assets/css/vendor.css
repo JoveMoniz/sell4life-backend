@@ -1594,6 +1594,97 @@ Vendor Products
   font-size: 0.82rem;
 }
 
+.txn-row-vat {
+  background: #f0fdf4;
+}
+
+.txn-vat-label {
+  color: #15803d;
+  font-size: 0.82rem;
+  padding-left: 24px !important;
+}
+
+.txn-vat-info {
+  font-size: 0.75rem;
+  color: #86efac;
+  margin-left: 6px;
+}
+
+.txn-vat-amount {
+  color: #15803d;
+  font-size: 0.82rem;
+}
+
+.txn-vat-badge {
+  display: inline-block;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vat-status-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  color: #166534;
+}
+
+.vat-status-icon {
+  font-style: normal;
+  font-size: 1rem;
+}
+
+.btn-vat-toggle {
+  background: #fff;
+  color: #166534;
+  border: 1px solid #86efac;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-vat-toggle:hover {
+  background: #dcfce7;
+}
+
+.vat-number-input {
+  border: 1px solid #86efac;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  width: 140px;
+  background: #fff;
+  color: #166534;
+}
+
+.btn-vat-save {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-vat-save:hover { background: #15803d; }
+
 .txn-truncation-banner {
   background: #fff8e1;
   border: 1px solid #f0c040;

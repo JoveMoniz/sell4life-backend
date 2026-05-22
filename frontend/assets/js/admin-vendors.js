@@ -140,6 +140,7 @@ function buildVendorPanel(v) {
           <div><strong>Gross:</strong> £${(v.grossRevenue || 0).toFixed(2)}</div>
           <div><strong>Refunds:</strong> £${(v.refunds || 0).toFixed(2)}</div>
           <div><strong>Net:</strong> £${(v.netRevenue || 0).toFixed(2)}</div>
+          <div><strong>VAT:</strong> ${v.vatRegistered ? `Registered${v.vatNumber ? ` · <code style="font-size:0.78rem">${v.vatNumber}</code>` : ''}` : 'Not registered'}</div>
         </div>
 
         <div>

@@ -292,6 +292,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
 
     const LIMIT = 500;
     const COMMISSION_RATE = 0.08;
+    const VAT_RATE = 20 / 120; // prices are VAT-inclusive; VAT portion = 20/120
 
     const totalMatchingOrders = await Order.countDocuments(orderFilter);
     const truncated = totalMatchingOrders > LIMIT;
@@ -301,10 +302,12 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(LIMIT);
 
+    const isVatRegistered = vendor.vatRegistered === true;
     const transactions = [];
     let totalSales = 0;
     let totalRefunds = 0;
     let totalCommission = 0;
+    let totalVat = 0;
 
     ordersRaw.forEach((order) => {
       const vendorOrder = order.vendorOrders.find(
@@ -386,6 +389,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         const netAmount = itemsTotal - orderRefundTotal;
         if (isPaid && netAmount > 0) {
           const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -396,9 +400,11 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             qty:         null,
             amount:      netAmount,
             commission,
+            vatAmount,
           });
           totalSales      += netAmount;
           totalCommission += commission;
+          totalVat        += vatAmount;
         }
       } else if (type === 'refunds') {
         // Refunds tab: individual refund items only (no commission rows)
@@ -411,6 +417,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         // All tab: gross sale entry + individual refund entries (standard ledger)
         if (isPaid && itemsTotal > 0) {
           const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((itemsTotal * VAT_RATE).toFixed(2)) : 0;
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -421,9 +428,11 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             qty:         null,
             amount:      itemsTotal,
             commission,
+            vatAmount,
           });
           totalSales      += itemsTotal;
           totalCommission += commission;
+          totalVat        += vatAmount;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -439,12 +448,15 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     res.json({
       transactions,
       summary: {
-        totalSales:     Number(totalSales.toFixed(2)),
-        totalRefunds:   Number(totalRefunds.toFixed(2)),
+        totalSales:      Number(totalSales.toFixed(2)),
+        totalRefunds:    Number(totalRefunds.toFixed(2)),
         totalCommission: Number(totalCommission.toFixed(2)),
+        totalVat:        Number(totalVat.toFixed(2)),
         net,
-        netAfterFees:   Number((net - totalCommission).toFixed(2)),
-        commissionRate: COMMISSION_RATE,
+        netAfterFees:    Number((net - totalCommission).toFixed(2)),
+        commissionRate:  COMMISSION_RATE,
+        vatRegistered:   isVatRegistered,
+        vatNumber:       vendor.vatNumber || '',
       },
       period:     period || 'all',
       truncated,
@@ -764,6 +776,42 @@ router.get('/me', authMiddleware, async (req, res) => {
     res.status(500).json({
       error: 'Server error',
     });
+  }
+});
+
+/* ======================================================
+   UPDATE VAT STATUS
+====================================================== */
+
+router.patch('/vat', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const { vatRegistered, vatNumber } = req.body;
+
+    if (typeof vatRegistered !== 'boolean') {
+      return res.status(400).json({ error: 'vatRegistered must be a boolean' });
+    }
+
+    // Validate VAT number format if registering
+    let cleanVatNumber = '';
+    if (vatRegistered) {
+      const raw = (vatNumber || '').trim().toUpperCase().replace(/\s/g, '');
+      const numericPart = raw.startsWith('GB') ? raw.slice(2) : raw;
+      if (numericPart && !/^\d{9}(\d{3})?$/.test(numericPart)) {
+        return res.status(400).json({ error: 'Invalid UK VAT number. Format: GB123456789' });
+      }
+      cleanVatNumber = numericPart ? `GB${numericPart}` : '';
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      req.vendor._id,
+      { vatRegistered, vatNumber: cleanVatNumber },
+      { new: true }
+    );
+
+    res.json({ success: true, vatRegistered: vendor.vatRegistered, vatNumber: vendor.vatNumber });
+  } catch (err) {
+    console.error('VAT update error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
