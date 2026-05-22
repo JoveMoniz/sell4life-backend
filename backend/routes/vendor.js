@@ -439,6 +439,41 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
           if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       }
+
+      // Chargeback entries (always shown except in Sales-only tab)
+      if (type !== 'sales') {
+        const orderTotal = Number(order.total || 0);
+        const vendorShare = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 0;
+
+        (order.disputes || []).forEach(disp => {
+          const ACTIVE_DISPUTE = ['needs_response', 'warning_needs_response', 'under_review', 'warning_under_review'];
+          const isLost    = disp.status === 'lost';
+          const isPending = ACTIVE_DISPUTE.includes(disp.status);
+          if (!isLost && !isPending) return; // won disputes have no financial impact
+
+          const disputeShare = Number((disp.amount * vendorShare).toFixed(2));
+          if (disputeShare <= 0) return;
+
+          const reasonLabel = (disp.reason || 'dispute').replace(/_/g, ' ');
+          transactions.push({
+            date:        disp.createdAt,
+            orderId:     order._id,
+            displayId,
+            type:        'chargeback',
+            description: isLost
+              ? `Chargeback lost – ${reasonLabel}`
+              : `Chargeback open – ${reasonLabel}`,
+            itemName:    null,
+            qty:         null,
+            amount:      isLost ? -disputeShare : 0,
+            pending:     isPending,
+            chargebackStatus: disp.status,
+            evidenceDueBy: disp.evidenceDueBy || null,
+          });
+
+          if (isLost) totalRefunds += disputeShare;
+        });
+      }
     });
 
     // Sort chronologically (newest first)
@@ -510,12 +545,32 @@ async function computeVendorBalance(vendorId) {
   const commission = Number((netSales * COMMISSION_RATE_PAYOUT).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
+  // Deduct lost chargebacks (vendor's proportional share of each)
+  let totalChargebacks = 0;
+  ordersRaw.forEach(order => {
+    const vendorItems = (order.items || []).filter(
+      item => String(item.vendorId) === String(vendorId)
+    );
+    const itemsTotal = vendorItems.reduce(
+      (s, item) => s + Number(item.price || 0) * Number(item.quantity || 0), 0
+    );
+    const orderTotal = Number(order.total || 0);
+    const vendorShare = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 0;
+
+    (order.disputes || []).forEach(disp => {
+      if (disp.status === 'lost') {
+        totalChargebacks += disp.amount * vendorShare;
+      }
+    });
+  });
+  totalChargebacks = Number(totalChargebacks.toFixed(2));
+
   const paidPayouts = await Payout.find({ vendorId, status: 'paid' });
   const totalPaidOut = Number(paidPayouts.reduce((s, p) => s + p.amount, 0).toFixed(2));
 
-  const pendingBalance = Number(Math.max(0, netAfterFees - totalPaidOut).toFixed(2));
+  const pendingBalance = Number(Math.max(0, netAfterFees - totalChargebacks - totalPaidOut).toFixed(2));
 
-  return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalPaidOut, pendingBalance };
+  return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance };
 }
 
 router.get('/payouts', authMiddleware, requireVendor, async (req, res) => {

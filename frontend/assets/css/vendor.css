@@ -1594,6 +1594,30 @@ Vendor Products
   font-size: 0.82rem;
 }
 
+.txn-row-chargeback {
+  background: #fff1f2;
+}
+
+.txn-row-chargeback-pending {
+  background: #fffbeb;
+  font-style: italic;
+}
+
+.txn-chargeback-pending {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.txn-chargeback-due {
+  font-size: 0.75rem;
+  color: #b45309;
+  font-style: normal;
+  margin-left: 6px;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
 .txn-row-vat {
   background: #f0fdf4;
 }

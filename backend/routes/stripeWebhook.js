@@ -290,6 +290,77 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       console.log('↩ Order refunded:', order._id);
     }
+    /* ======================================================
+       DISPUTE OPENED
+    ====================================================== */
+    if (event.type === 'charge.dispute.created') {
+      const dispute = event.data.object;
+      const paymentIntentId = dispute.payment_intent;
+
+      if (!paymentIntentId) {
+        console.warn('⚠ Dispute has no payment_intent:', dispute.id);
+      } else {
+        const order = await Order.findOne({ paymentIntentId });
+
+        if (!order) {
+          console.warn('⚠ No order found for dispute:', dispute.id);
+        } else {
+          const alreadyRecorded = order.disputes.some(d => d.stripeDisputeId === dispute.id);
+
+          if (!alreadyRecorded) {
+            order.disputes.push({
+              stripeDisputeId: dispute.id,
+              amount:          dispute.amount / 100,
+              currency:        (dispute.currency || 'gbp').toUpperCase(),
+              reason:          dispute.reason || 'unknown',
+              status:          dispute.status,
+              evidenceDueBy:   dispute.evidence_details?.due_by
+                ? new Date(dispute.evidence_details.due_by * 1000) : null,
+              createdAt:       new Date(dispute.created * 1000),
+            });
+            order.markModified('disputes');
+            pushUniqueHistory(order, 'Disputed', `Chargeback opened: ${dispute.reason}`);
+            await order.save();
+            console.log('⚠ Dispute recorded on order:', order._id);
+          }
+        }
+      }
+    }
+
+    /* ======================================================
+       DISPUTE UPDATED / CLOSED
+    ====================================================== */
+    if (event.type === 'charge.dispute.updated' || event.type === 'charge.dispute.closed') {
+      const dispute = event.data.object;
+      const paymentIntentId = dispute.payment_intent;
+
+      if (paymentIntentId) {
+        const order = await Order.findOne({ paymentIntentId });
+
+        if (order) {
+          const existing = order.disputes.find(d => d.stripeDisputeId === dispute.id);
+
+          if (existing) {
+            existing.status    = dispute.status;
+            existing.updatedAt = new Date();
+
+            if (dispute.status === 'lost' || dispute.status === 'won') {
+              existing.resolvedAt = new Date();
+            }
+            order.markModified('disputes');
+
+            if (dispute.status === 'won') {
+              pushUniqueHistory(order, 'Dispute Won', 'Chargeback resolved in your favour');
+            } else if (dispute.status === 'lost') {
+              pushUniqueHistory(order, 'Dispute Lost', 'Chargeback resolved — funds returned to customer');
+            }
+
+            await order.save();
+            console.log(`⚡ Dispute ${dispute.status} on order:`, order._id);
+          }
+        }
+      }
+    }
   } catch (err) {
     console.error('❌ Webhook error:', err);
     return res.status(500).json({ error: 'Webhook failed' });

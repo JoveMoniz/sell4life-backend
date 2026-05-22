@@ -120,11 +120,19 @@ async function loadOrders(page = 1, q = '', status = 'all') {
 
     const cleanId = displayId.replace('S4L-', '');
 
+    const activeDisputes = (order.disputes || []).filter(d =>
+      d.status !== 'won' && d.status !== 'charge_refunded' && d.status !== 'warning_closed'
+    );
+    const disputeBadge = activeDisputes.length
+      ? `<span class="dispute-badge" title="Chargeback: ${activeDisputes[0].status}">⚠ dispute</span>`
+      : '';
+
     tr.innerHTML = `
 <td>
   <button class="quick-search-id" data-id="${cleanId}">
     ${displayId}
   </button>
+  ${disputeBadge}
 </td>
 
 <td>

@@ -544,6 +544,25 @@ const orderSchema = new mongoose.Schema(
     customerNote: String,
     adminNote: String,
 
+    disputes: {
+      type: [
+        {
+          _id: false,
+          stripeDisputeId: { type: String, required: true },
+          amount:          { type: Number, required: true },  // in £
+          currency:        { type: String, default: 'GBP' },
+          reason:          String,   // stripe reason code
+          status:          String,   // stripe dispute status
+          evidenceDueBy:   Date,
+          stripeFee:       { type: Number, default: 15 },
+          createdAt:       { type: Date, default: Date.now },
+          updatedAt:       Date,
+          resolvedAt:      Date,
+        },
+      ],
+      default: [],
+    },
+
     archived: {
       type: Boolean,
       default: false,

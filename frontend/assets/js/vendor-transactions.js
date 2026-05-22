@@ -89,22 +89,41 @@ async function loadTransactions() {
       });
 
       const isSale = t.type === 'sale';
+      const isChargeback = t.type === 'chargeback';
       const isPending = t.pending === true;
-      const amountClass = isSale ? 'txn-positive' : isPending ? 'txn-pending' : 'txn-negative';
-      const amountSign = isSale ? '+' : '-';
-      const amount = Number(t.amount || 0).toFixed(2);
+
+      let amountClass, amountSign, rowClass;
+      if (isSale) {
+        amountClass = 'txn-positive'; amountSign = '+'; rowClass = 'txn-row-sale';
+      } else if (isChargeback && isPending) {
+        amountClass = 'txn-chargeback-pending'; amountSign = ''; rowClass = 'txn-row-chargeback-pending';
+      } else if (isChargeback) {
+        amountClass = 'txn-negative'; amountSign = '-'; rowClass = 'txn-row-chargeback';
+      } else if (isPending) {
+        amountClass = 'txn-pending'; amountSign = '-'; rowClass = 'txn-row-refund txn-row-pending';
+      } else {
+        amountClass = 'txn-negative'; amountSign = '-'; rowClass = 'txn-row-refund';
+      }
+
+      const amount = Number(Math.abs(t.amount) || 0).toFixed(2);
       const displayId = t.displayId || t.orderId;
 
+      let dueByNote = '';
+      if (isChargeback && isPending && t.evidenceDueBy) {
+        const due = new Date(t.evidenceDueBy).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        dueByNote = ` <span class="txn-chargeback-due">Evidence due ${due}</span>`;
+      }
+
       rows.push(`
-<tr class="txn-row ${isSale ? 'txn-row-sale' : 'txn-row-refund'}${isPending ? ' txn-row-pending' : ''}">
+<tr class="txn-row ${rowClass}">
   <td class="txn-date">${date}</td>
   <td class="txn-order">
     <a href="/account/vendor/order-details.html?id=${t.orderId}">${displayId}</a>
   </td>
-  <td class="txn-desc">${t.description || ''}</td>
+  <td class="txn-desc">${t.description || ''}${dueByNote}</td>
   <td class="txn-item">${t.itemName || '-'}</td>
   <td class="txn-qty">${t.qty != null ? t.qty : '-'}</td>
-  <td class="txn-amount ${amountClass}">${amountSign}£${amount}</td>
+  <td class="txn-amount ${amountClass}">${isPending && isChargeback ? '⚠ pending' : amountSign + '£' + amount}</td>
 </tr>`);
 
       if (isSale && Number(t.commission) > 0) {

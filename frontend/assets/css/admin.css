@@ -1349,6 +1349,23 @@ body.admin-users .admin-users-table thead th {
 }
 
 /* ======================================================
+   CHARGEBACK BADGE
+====================================================== */
+
+.dispute-badge {
+  display: inline-block;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ======================================================
    ADMIN PAYOUT PANEL
 ====================================================== */
 
