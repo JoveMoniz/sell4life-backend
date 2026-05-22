@@ -597,7 +597,23 @@ export function getDerivedPaymentStatus(order) {
     return 'partially_refunded';
   }
 
-  return order.paymentStatus || 'paid';
+  const raw = order.paymentStatus || 'paid';
+
+  // If payment status is still 'pending' but items have progressed past
+  // the initial state (shipped, delivered, returned, cancelled), the order
+  // was clearly fulfilled and the payment webhook was likely missed or the
+  // order was created manually. Treat as 'paid' so the UI doesn't confuse
+  // fulfilled orders with genuinely unpaid/abandoned ones.
+  if (raw === 'pending') {
+    const FULFILLED = new Set([
+      'Processing', 'Shipped', 'Delivered',
+      'Cancel Requested', 'Cancelled',
+      'Return Requested', 'Return Approved', 'Returned',
+    ]);
+    if (items.some((i) => FULFILLED.has(i.status))) return 'paid';
+  }
+
+  return raw;
 }
 
 // ======================================================
