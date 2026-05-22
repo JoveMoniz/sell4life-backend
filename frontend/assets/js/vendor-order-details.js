@@ -452,7 +452,7 @@ document.addEventListener('click', async (e) => {
     const qty    = Number(itemBtn.dataset.qty || 1);
 
     if (type === 'Vendor Cancel') {
-      const confirmed = confirm('Cancel this item? If the order is paid, a partial refund will be issued automatically.');
+      const confirmed = confirm('Cancel this item?\n\nA partial refund will be issued immediately to the customer and cannot be undone.\n\nOnly proceed if you are certain you cannot fulfil this item.');
       if (!confirmed) return;
     }
 
