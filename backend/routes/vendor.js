@@ -141,16 +141,15 @@ function getPeriodStart(period) {
 
 router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
   try {
-    const vendor = await getVendor(req);
-
-    if (!vendor) {
-      return res.status(403).json({
-        error: 'Vendor profile not found',
-      });
-    }
-
+    const vendor = req.vendor; // set by requireVendor — no second DB lookup needed
     const vendorId = vendor._id;
-    const periodStart = getPeriodStart(req.query.period);
+
+    const VALID_PERIODS = ['week', 'month', 'quarter', 'year'];
+    const period = req.query.period;
+    if (period && !VALID_PERIODS.includes(period)) {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    const periodStart = getPeriodStart(period);
 
     const products = await Product.countDocuments({
       vendor: vendorId,
@@ -274,11 +273,20 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
 router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
   try {
-    const vendor = await getVendor(req);
-    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
-
+    const vendor = req.vendor; // set by requireVendor — no second DB lookup needed
     const vendorId = vendor._id;
+
+    const VALID_PERIODS = ['week', 'month', 'quarter', 'year'];
+    const VALID_TYPES   = ['all', 'sales', 'refunds'];
     const { period, type = 'all' } = req.query;
+
+    if (period && !VALID_PERIODS.includes(period)) {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
     const periodStart = getPeriodStart(period);
 
     const orderFilter = { 'vendorOrders.vendorId': vendorId };
@@ -286,7 +294,8 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
 
     const ordersRaw = await Order.find(orderFilter)
       .populate('user', 'email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(500);
 
     const transactions = [];
     let totalSales = 0;
