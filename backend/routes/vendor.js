@@ -160,19 +160,29 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
       totalOrders++;
 
-      const status = getDerivedVendorStatus(vendorOrder, order.items || []);
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
 
       const subtotal = Number(vendorOrder.subtotal || 0);
 
-      // metrics
+      // Sum only items that were actually cancelled or returned for this vendor
+      const vendorItems = (order.items || []).filter(
+        item => String(item.vendorId) === String(vendorId)
+      );
 
-      if (status === 'Delivered') {
-        completedOrders++;
-      }
+      // Classify active vs completed by item states directly:
+      // - active: any item still in a progressing state (or no status set yet)
+      // - completed: all items finalized AND at least one was delivered
+      // - cancelled: all items cancelled — counts in neither bucket
+      const ACTIVE_ITEM_STATES = new Set(['Pending', 'Processing', 'Shipped', 'Cancel Requested']);
+      const hasActiveItems = vendorItems.some(
+        item => !item.status || ACTIVE_ITEM_STATES.has(item.status)
+      );
+      const hasDeliveredItems = vendorItems.some(item => item.status === 'Delivered');
 
-      if (['Pending', 'Processing', 'Shipped', 'Partially Delivered'].includes(status)) {
+      if (hasActiveItems) {
         activeOrders++;
+      } else if (hasDeliveredItems) {
+        completedOrders++;
       }
 
       const isPaid =
@@ -184,11 +194,6 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       if (isPaid) {
         grossRevenue += subtotal;
       }
-
-      // Sum only items that were actually cancelled or returned for this vendor
-      const vendorItems = (order.items || []).filter(
-        item => String(item.vendorId) === String(vendorId)
-      );
       let actualRefunded = 0;
       vendorItems.forEach(item => {
         const price = Number(item.price || 0);
