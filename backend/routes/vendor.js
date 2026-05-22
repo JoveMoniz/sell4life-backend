@@ -290,6 +290,8 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     if (periodStart) orderFilter.createdAt = { $gte: periodStart };
 
     const LIMIT = 500;
+    const COMMISSION_RATE = 0.08;
+
     const totalMatchingOrders = await Order.countDocuments(orderFilter);
     const truncated = totalMatchingOrders > LIMIT;
 
@@ -301,6 +303,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     const transactions = [];
     let totalSales = 0;
     let totalRefunds = 0;
+    let totalCommission = 0;
 
     ordersRaw.forEach((order) => {
       const vendorOrder = order.vendorOrders.find(
@@ -381,6 +384,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         // Sales tab: one entry per order showing net cash retained
         const netAmount = itemsTotal - orderRefundTotal;
         if (isPaid && netAmount > 0) {
+          const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -390,11 +394,13 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             itemName:    null,
             qty:         null,
             amount:      netAmount,
+            commission,
           });
-          totalSales += netAmount;
+          totalSales      += netAmount;
+          totalCommission += commission;
         }
       } else if (type === 'refunds') {
-        // Refunds tab: individual refund items only
+        // Refunds tab: individual refund items only (no commission rows)
         refundEntries.forEach(e => {
           transactions.push(e);
           // Only count in totalRefunds when money has actually moved
@@ -403,6 +409,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
       } else {
         // All tab: gross sale entry + individual refund entries (standard ledger)
         if (isPaid && itemsTotal > 0) {
+          const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -412,8 +419,10 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             itemName:    null,
             qty:         null,
             amount:      itemsTotal,
+            commission,
           });
-          totalSales += itemsTotal;
+          totalSales      += itemsTotal;
+          totalCommission += commission;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -425,16 +434,20 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     // Sort chronologically (newest first)
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    const net = Number((totalSales - totalRefunds).toFixed(2));
     res.json({
       transactions,
       summary: {
-        totalSales:   Number(totalSales.toFixed(2)),
-        totalRefunds: Number(totalRefunds.toFixed(2)),
-        net:          Number((totalSales - totalRefunds).toFixed(2)),
+        totalSales:     Number(totalSales.toFixed(2)),
+        totalRefunds:   Number(totalRefunds.toFixed(2)),
+        totalCommission: Number(totalCommission.toFixed(2)),
+        net,
+        netAfterFees:   Number((net - totalCommission).toFixed(2)),
+        commissionRate: COMMISSION_RATE,
       },
-      period:    period || 'all',
+      period:     period || 'all',
       truncated,
-      showing:   ordersRaw.length,
+      showing:    ordersRaw.length,
       totalOrders: totalMatchingOrders,
     });
   } catch (err) {

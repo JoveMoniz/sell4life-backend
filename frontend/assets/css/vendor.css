@@ -1579,6 +1579,21 @@ Vendor Products
   font-style: italic;
 }
 
+.txn-row-commission {
+  background: #fafafa;
+}
+
+.txn-commission-label {
+  color: #999;
+  font-size: 0.82rem;
+  padding-left: 24px !important;
+}
+
+.txn-commission-amount {
+  color: #bbb;
+  font-size: 0.82rem;
+}
+
 .txn-truncation-banner {
   background: #fff8e1;
   border: 1px solid #f0c040;

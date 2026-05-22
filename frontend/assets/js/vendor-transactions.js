@@ -54,7 +54,10 @@ async function loadTransactions() {
     document.getElementById('txn-sales').textContent = '£' + Number(summary.totalSales || 0).toFixed(2);
     document.getElementById('txn-refunds').textContent = '£' + Number(summary.totalRefunds || 0).toFixed(2);
 
-    const net = Number(summary.net || 0);
+    const feeEl = document.getElementById('txn-commission');
+    if (feeEl) feeEl.textContent = '£' + Number(summary.totalCommission || 0).toFixed(2);
+
+    const net = Number(summary.netAfterFees ?? summary.net ?? 0);
     const netEl = document.getElementById('txn-net');
     netEl.textContent = '£' + net.toFixed(2);
     netEl.className = net < 0 ? 'txn-negative' : '';
@@ -64,7 +67,8 @@ async function loadTransactions() {
       return;
     }
 
-    tbody.innerHTML = txns.map(t => {
+    const rows = [];
+    txns.forEach(t => {
       const date = new Date(t.date).toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric',
       });
@@ -74,10 +78,9 @@ async function loadTransactions() {
       const amountClass = isSale ? 'txn-positive' : isPending ? 'txn-pending' : 'txn-negative';
       const amountSign = isSale ? '+' : '-';
       const amount = Number(t.amount || 0).toFixed(2);
-
       const displayId = t.displayId || t.orderId;
 
-      return `
+      rows.push(`
 <tr class="txn-row ${isSale ? 'txn-row-sale' : 'txn-row-refund'}${isPending ? ' txn-row-pending' : ''}">
   <td class="txn-date">${date}</td>
   <td class="txn-order">
@@ -87,8 +90,19 @@ async function loadTransactions() {
   <td class="txn-item">${t.itemName || '-'}</td>
   <td class="txn-qty">${t.qty != null ? t.qty : '-'}</td>
   <td class="txn-amount ${amountClass}">${amountSign}£${amount}</td>
-</tr>`;
-    }).join('');
+</tr>`);
+
+      if (isSale && Number(t.commission) > 0) {
+        rows.push(`
+<tr class="txn-row txn-row-commission">
+  <td class="txn-date"></td>
+  <td class="txn-order"></td>
+  <td class="txn-desc txn-commission-label" colspan="3">Platform fee (8%)</td>
+  <td class="txn-amount txn-commission-amount">-£${Number(t.commission).toFixed(2)}</td>
+</tr>`);
+      }
+    });
+    tbody.innerHTML = rows.join('');
 
   } catch (err) {
     console.error('Transactions load error:', err);
@@ -135,10 +149,11 @@ document.addEventListener('click', (e) => {
 
   const header = ['Date', 'Order ID', 'Type', 'Description', 'Item', 'Qty', 'Amount (£)'];
 
-  const rows = lastTransactions.map(t => {
+  const rows = [];
+  lastTransactions.forEach(t => {
     const date = new Date(t.date).toLocaleDateString('en-GB');
     const sign = t.type === 'sale' ? '' : '-';
-    return [
+    rows.push([
       date,
       t.displayId || t.orderId,
       t.type,
@@ -146,7 +161,19 @@ document.addEventListener('click', (e) => {
       `"${(t.itemName || '').replace(/"/g, '""')}"`,
       t.qty != null ? t.qty : '',
       `${sign}${Number(t.amount || 0).toFixed(2)}`,
-    ].join(',');
+    ].join(','));
+
+    if (t.type === 'sale' && Number(t.commission) > 0) {
+      rows.push([
+        date,
+        t.displayId || t.orderId,
+        'commission',
+        '"Platform fee (8%)"',
+        '',
+        '',
+        `-${Number(t.commission).toFixed(2)}`,
+      ].join(','));
+    }
   });
 
   const csv = [header.join(','), ...rows].join('\n');
