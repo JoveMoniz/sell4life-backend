@@ -741,12 +741,14 @@ export function buildVendorAllowedActions(order, vendorId) {
   }
 
   // ====================================================
-  // CANCEL REQUESTED
+  // CANCEL REQUESTED — per-item so vendor can approve each one individually
   // ====================================================
 
   if (status === 'Cancel Requested') {
-    actions.push({
-      type: 'Cancelled',
+    vendorItems.forEach((item) => {
+      if (item.status === 'Cancel Requested') {
+        actions.push({ type: 'Cancel Approved', itemId: item._id });
+      }
     });
   }
 

@@ -725,21 +725,8 @@ router.patch(
         (vo) => String(vo.vendorId) === String(vendor._id)
       );
 
-      // =====================================================
-      // AUTO REFUND SCHEDULING
-      // =====================================================
-
-      const alreadyScheduled =
-        order.refundStatus === 'scheduled' ||
-        order.paymentStatus === 'refund_scheduled' ||
-        !!order.refundScheduledAt;
-
-      const alreadyRefunded =
-        order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
-
-      if (!alreadyScheduled && !alreadyRefunded) {
-        scheduleRefund(order);
-      }
+      // Do NOT scheduleRefund here — per-item returns are refunded via the
+      // admin per-item refund button, not the whole-order worker.
 
       order.markModified('items');
       order.markModified('vendorOrders');
@@ -761,6 +748,61 @@ router.patch(
       res.status(500).json({
         error: 'Failed to mark item returned',
       });
+    }
+  }
+);
+
+/* ======================================================
+   APPROVE ITEM CANCEL (per-item — vendor approves customer cancel request)
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/approve-cancel',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId))
+      return res.status(400).json({ error: 'Invalid order id' });
+    if (!mongoose.Types.ObjectId.isValid(itemId))
+      return res.status(400).json({ error: 'Invalid item id' });
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item   = findOrderItem(order, itemId);
+
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id))
+        return res.status(403).json({ error: 'Not your item' });
+      if (item.status !== 'Cancel Requested')
+        return res.status(400).json({ error: 'Item is not awaiting cancel approval' });
+
+      item.status      = 'Cancelled';
+      item.cancelledAt = new Date();
+
+      const vendorOrder = order.vendorOrders.find(
+        (vo) => String(vo.vendorId) === String(vendor._id)
+      );
+      if (vendorOrder) {
+        vendorOrder.status = getDerivedVendorStatus(vendorOrder, order.items);
+      }
+
+      order.status = getDerivedOrderStatus(order);
+
+      pushUniqueHistory(order, 'Cancelled', `${item.name} cancellation approved by vendor`);
+
+      order.markModified('items');
+      order.markModified('vendorOrders');
+      await order.save();
+
+      res.json({ success: true, status: item.status });
+    } catch (err) {
+      console.error('Vendor approve cancel error:', err);
+      res.status(500).json({ error: err.message || 'Approve cancel failed' });
     }
   }
 );
