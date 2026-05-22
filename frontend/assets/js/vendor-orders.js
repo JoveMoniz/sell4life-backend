@@ -154,53 +154,10 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
                 ? 'refund_scheduled'
                 : 'paid';
 
-        const paymentBlocked = !['paid', 'partially_refunded', 'refund_scheduled'].includes(vendorPaymentStatus);
-        const allowed = !paymentBlocked && !isRefundLocked ? o.allowedActions || [] : [];
-
-        const buttons = allowed
-          .map((s) => {
-            const map = {
-              Processing: 'btn-process',
-              Shipped: 'btn-ship',
-              Delivered: 'btn-deliver',
-
-              'Return Approved': 'btn-approve-return',
-              'Return Rejected': 'btn-reject-return',
-
-              Returned: 'btn-mark-returned',
-
-              Cancelled: 'btn-approve-cancel',
-            };
-
-            const labelMap = {
-              Processing: 'Start Processing',
-              Shipped: 'Mark Shipped',
-              Delivered: 'Mark Delivered',
-
-              'Return Approved': 'Approve Return',
-              'Return Rejected': 'Reject Return',
-
-              Returned: 'Mark Returned',
-
-              Cancelled: 'Approve Cancel',
-            };
-
-            const actionType = s.type || s;
-
-            const cls = map[actionType] || '';
-
-            return `
-              <button
-                class="${cls}"
-                data-id="${id}"
-                data-item="${s.itemId || ''}"
-                data-label="${actionType}"
-              >
-                ${labelMap[actionType] || actionType}
-              </button>
-            `;
-          })
-          .join('');
+        const hasPendingActions = (o.allowedActions || []).some(
+          a => ['Processing', 'Shipped', 'Delivered', 'Vendor Cancel',
+                'Return Approved', 'Return Rejected', 'Returned', 'Cancel Approved'].includes(a.type)
+        );
 
         return `
 <div class="order-row">
@@ -231,7 +188,9 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
   </span>
 
   <div class="order-actions">
-    ${buttons}
+    <a class="btn-view-order" href="/account/vendor/order-details.html?id=${id}">
+      ${hasPendingActions ? 'Action needed →' : 'View Details →'}
+    </a>
   </div>
 
   <span class="order-price">£${vendorTotal.toFixed(2)}</span>

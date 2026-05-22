@@ -133,35 +133,10 @@ async function loadRecentOrders() {
         const vendorRefundScheduledAt =
           vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
 
-        const allowed = Array.isArray(o.allowedActions) ? o.allowedActions : [];
-        const buttons = allowed
-          .map((s) => {
-            const map = {
-              Processing: 'btn-process',
-              Shipped: 'btn-ship',
-              Delivered: 'btn-deliver',
-              'Return Approved': 'btn-approve-return',
-              Returned: 'btn-mark-returned',
-              Cancelled: 'btn-approve-cancel',
-            };
-
-            const labelMap = {
-              Processing: 'Start Processing',
-              Shipped: 'Mark Shipped',
-              Delivered: 'Mark Delivered',
-              'Return Approved': 'Approve Return',
-              Returned: 'Mark Returned',
-              Cancelled: 'Approve Cancel',
-            };
-
-            const cls = map[s] || '';
-
-            return `
-  <button class="${cls}" data-id="${id}" data-item="${s.itemId || ''}" data-label="${s.type || s}">
-    ${labelMap[s.type || s] || s.type || s}
-  </button>`;
-          })
-          .join('');
+        const hasPendingActions = (o.allowedActions || []).some(
+          a => ['Processing', 'Shipped', 'Delivered', 'Vendor Cancel',
+                'Return Approved', 'Return Rejected', 'Returned', 'Cancel Approved'].includes(a.type)
+        );
 
         return `
 <div class="order-row">
@@ -174,7 +149,9 @@ async function loadRecentOrders() {
         : ''
     }
   </span>
-  <div class="order-actions">${buttons}</div>
+  <a class="btn-view-order" href="/account/vendor/order-details.html?id=${id}">
+    ${hasPendingActions ? 'Action needed →' : 'View →'}
+  </a>
   <span class="order-price">£${vendorTotal.toFixed(2)}</span>
 </div>`;
       })

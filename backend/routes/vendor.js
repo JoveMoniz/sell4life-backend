@@ -551,6 +551,114 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
 });
 
 /* ======================================================
+   PER-ITEM FULFILLMENT  (Processing → Shipped → Delivered)
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/fulfillment',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+    const { status } = req.body;
+
+    const VALID = ['Processing', 'Shipped', 'Delivered'];
+    if (!VALID.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item = findOrderItem(order, itemId);
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({ error: 'Not your item' });
+      }
+
+      const TRANSITIONS = { Pending: 'Processing', Processing: 'Shipped', Shipped: 'Delivered' };
+      const current = item.status || 'Pending';
+      if (TRANSITIONS[current] !== status) {
+        return res.status(400).json({ error: `Cannot move from ${current} to ${status}` });
+      }
+
+      item.status = status;
+      if (status === 'Delivered') item.deliveredAt = new Date();
+
+      pushUniqueHistory(order, status, `${vendor.storeName} marked "${item.name}" as ${status}`);
+
+      await order.save();
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Item fulfillment error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/* ======================================================
+   VENDOR-INITIATED ITEM CANCEL
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/vendor-cancel',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item = findOrderItem(order, itemId);
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({ error: 'Not your item' });
+      }
+
+      const current = item.status || 'Pending';
+      if (!['Pending', 'Processing'].includes(current)) {
+        return res.status(400).json({ error: `Cannot cancel item in ${current} state` });
+      }
+
+      item.status = 'Cancelled';
+      item.cancelledAt = new Date();
+
+      const isPaid = ['paid', 'partially_refunded'].includes(
+        (order.paymentStatus || '').toLowerCase()
+      );
+      if (isPaid && order.paymentIntentId) {
+        await triggerItemRefund(order, item, item.quantity, vendor._id);
+      }
+
+      pushUniqueHistory(
+        order,
+        'Cancelled',
+        `${vendor.storeName} cancelled item: "${item.name}" (out of stock / issue)`
+      );
+
+      await order.save();
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Vendor item cancel error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/* ======================================================
    APPROVE ITEM RETURN
 ====================================================== */
 

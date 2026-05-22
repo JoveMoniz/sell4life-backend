@@ -1321,3 +1321,26 @@ Vendor Products
 .vendor-suspended-message h2 {
   color: #b91c1c;
 }
+
+/* =====================================================
+   VIEW ORDER BUTTON (orders list + dashboard)
+===================================================== */
+.btn-view-order {
+  display: inline-block;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--s4l-primary);
+  background: transparent;
+  border: 1px solid var(--s4l-primary);
+  border-radius: 4px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-view-order:hover {
+  background: var(--s4l-primary);
+  color: #fff;
+}

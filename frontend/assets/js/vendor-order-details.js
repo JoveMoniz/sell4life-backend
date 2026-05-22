@@ -121,15 +121,15 @@ function buildItemHTML(item, itemActions, id) {
   const refQty   = Number(item.refundedQuantity || 0);
 
   const STATUS_BADGE = {
-    'Pending':          { label: 'Pending',           color: '#92400e', bg: '#fef3c7' },
-    'Processing':       { label: 'Processing',        color: '#1d4ed8', bg: '#dbeafe' },
-    'Shipped':          { label: 'Shipped',            color: '#6d28d9', bg: '#ede9fe' },
-    'Delivered':        { label: 'Delivered',          color: '#15803d', bg: '#dcfce7' },
-    'Cancel Requested': { label: 'Cancel Requested',  color: '#92400e', bg: '#fef3c7' },
-    'Cancelled':        { label: 'Cancelled',          color: '#b91c1c', bg: '#fee2e2' },
+    'Pending':          { label: 'Pending',          color: '#92400e', bg: '#fef3c7' },
+    'Processing':       { label: 'Processing',       color: '#1d4ed8', bg: '#dbeafe' },
+    'Shipped':          { label: 'Shipped',           color: '#6d28d9', bg: '#ede9fe' },
+    'Delivered':        { label: 'Delivered',         color: '#15803d', bg: '#dcfce7' },
+    'Cancel Requested': { label: 'Cancel Requested', color: '#92400e', bg: '#fef3c7' },
+    'Cancelled':        { label: 'Cancelled',         color: '#b91c1c', bg: '#fee2e2' },
   };
   const badges = [
-    badge(STATUS_BADGE, item.status),
+    badge(STATUS_BADGE, item.status || 'Pending'),
     badge(RETURN_BADGE, item.returnStatus),
     badge(REFUND_BADGE, item.refundStatus),
   ].filter(Boolean).join(' ');
@@ -141,24 +141,63 @@ function buildItemHTML(item, itemActions, id) {
   ].filter(Boolean).join(' · ');
 
   const actionsHTML = itemActions.map(a => {
+    // ── Fulfillment ──────────────────────────────────────
+    if (a.type === 'Processing') {
+      return `
+        <button class="vendor-item-btn"
+          data-type="Processing" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#1d4ed8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
+          Start Processing
+        </button>`;
+    }
+    if (a.type === 'Shipped') {
+      return `
+        <button class="vendor-item-btn"
+          data-type="Shipped" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#6d28d9;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
+          Mark Shipped
+        </button>`;
+    }
+    if (a.type === 'Delivered') {
+      return `
+        <button class="vendor-item-btn"
+          data-type="Delivered" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#15803d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
+          Mark Delivered
+        </button>`;
+    }
+    // ── Vendor-initiated cancel ───────────────────────────
+    if (a.type === 'Vendor Cancel') {
+      return `
+        <button class="vendor-item-btn vendor-cancel-btn"
+          data-type="Vendor Cancel" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#fff;color:#b91c1c;border:1px solid #b91c1c;border-radius:4px;cursor:pointer;font-size:0.82rem">
+          Cancel Item
+        </button>`;
+    }
+    // ── Customer cancel approval ──────────────────────────
+    if (a.type === 'Cancel Approved') {
+      return `
+        <button class="vendor-item-btn"
+          data-type="Cancel Approved" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
+          Approve Cancellation
+        </button>`;
+    }
+    // ── Return handling ───────────────────────────────────
     if (a.type === 'Return Approved') {
       return `
         <button class="vendor-item-btn"
-          data-type="Return Approved"
-          data-order-id="${id}"
-          data-item-id="${a.itemId}"
-          data-qty="${reqQty || qty}"
-          style="margin-top:6px;padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">
+          data-type="Return Approved" data-order-id="${id}" data-item-id="${a.itemId}" data-qty="${reqQty || qty}"
+          style="margin-top:6px;padding:5px 12px;background:#1d4ed8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
           Approve Return
         </button>`;
     }
     if (a.type === 'Return Rejected') {
       return `
         <button class="vendor-item-btn"
-          data-type="Return Rejected"
-          data-order-id="${id}"
-          data-item-id="${a.itemId}"
-          style="margin-top:6px;padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">
+          data-type="Return Rejected" data-order-id="${id}" data-item-id="${a.itemId}"
+          style="margin-top:6px;padding:5px 12px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
           Reject Return
         </button>`;
     }
@@ -174,24 +213,11 @@ function buildItemHTML(item, itemActions, id) {
             <option value="damaged">Damaged</option>
           </select>
           <button class="vendor-item-btn"
-            data-type="Returned"
-            data-order-id="${id}"
-            data-item-id="${a.itemId}"
-            data-qty="${remainingQty}"
-            style="padding:4px 10px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">
+            data-type="Returned" data-order-id="${id}" data-item-id="${a.itemId}" data-qty="${remainingQty}"
+            style="padding:5px 12px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">
             Mark Returned
           </button>
         </div>`;
-    }
-    if (a.type === 'Cancel Approved') {
-      return `
-        <button class="vendor-item-btn"
-          data-type="Cancel Approved"
-          data-order-id="${id}"
-          data-item-id="${a.itemId}"
-          style="margin-top:6px;padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">
-          Approve Cancellation
-        </button>`;
     }
     return '';
   }).join('');
@@ -289,13 +315,12 @@ async function loadOrder() {
       (sum, item) => sum + Number(item.price) * Number(item.quantity), 0
     );
 
-    // split allowedActions into order-level and per-item
+    // All actions are now per-item — build itemActionsMap only
     const allowed = Array.isArray(order.allowedActions) ? order.allowedActions : [];
 
-    const orderLevelActions = allowed.filter(a => !a.itemId);
-
     const itemActionsMap = {};
-    allowed.filter(a => a.itemId).forEach(a => {
+    allowed.forEach(a => {
+      if (!a.itemId) return;
       const key = String(a.itemId);
       if (!itemActionsMap[key]) itemActionsMap[key] = [];
       itemActionsMap[key].push(a);
@@ -315,10 +340,6 @@ async function loadOrder() {
               <div>Refund scheduled: ${new Date(order.refundScheduledAt).toLocaleString()}</div>
               <div id="refund-timer" data-time="${order.refundScheduledAt}"></div>
             </div>` : ''}
-        </div>
-
-        <div class="order-actions">
-          ${buildOrderActions(orderLevelActions, id, paymentStatus)}
         </div>
 
         <div class="order-items">
@@ -368,7 +389,13 @@ function initTimer() {
 async function updateItemStatus(oid, itemId, type, qty, condition) {
   let url, body;
 
-  if (type === 'Return Approved') {
+  if (['Processing', 'Shipped', 'Delivered'].includes(type)) {
+    url  = `${API_BASE}/vendor/orders/${oid}/items/${itemId}/fulfillment`;
+    body = { status: type };
+  } else if (type === 'Vendor Cancel') {
+    url  = `${API_BASE}/vendor/orders/${oid}/items/${itemId}/vendor-cancel`;
+    body = {};
+  } else if (type === 'Return Approved') {
     url  = `${API_BASE}/vendor/orders/${oid}/items/${itemId}/approve-return`;
     body = { quantity: qty };
   } else if (type === 'Return Rejected') {
@@ -423,6 +450,11 @@ document.addEventListener('click', async (e) => {
     const oid    = itemBtn.dataset.orderId;
     const itemId = itemBtn.dataset.itemId;
     const qty    = Number(itemBtn.dataset.qty || 1);
+
+    if (type === 'Vendor Cancel') {
+      const confirmed = confirm('Cancel this item? If the order is paid, a partial refund will be issued automatically.');
+      if (!confirmed) return;
+    }
 
     let condition = 'used';
     if (type === 'Returned') {

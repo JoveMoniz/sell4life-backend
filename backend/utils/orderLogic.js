@@ -699,74 +699,49 @@ export function buildVendorAllowedActions(order, vendorId) {
     (item) => String(item.vendorId) === String(vendorId)
   );
 
-  const vendorOrder = (order.vendorOrders || []).find(
-    (vo) => String(vo.vendorId) === String(vendorId)
-  );
+  vendorItems.forEach((item) => {
+    const itemId = item._id;
+    const s = item.status || 'Pending';
 
-  const status = getDerivedVendorStatus(vendorOrder, order.items || []);
+    // ====================================================
+    // PER-ITEM FULFILLMENT PROGRESSION
+    // ====================================================
 
-  // ====================================================
-  // NORMAL FULFILLMENT
-  // ====================================================
+    if (s === 'Pending') {
+      actions.push({ type: 'Processing', itemId });
+      actions.push({ type: 'Vendor Cancel', itemId });
+    }
 
-  if (status === 'Pending') {
-    actions.push({ type: 'Processing' });
-  }
+    if (s === 'Processing') {
+      actions.push({ type: 'Shipped', itemId });
+      actions.push({ type: 'Vendor Cancel', itemId });
+    }
 
-  if (status === 'Processing') {
-    actions.push({ type: 'Shipped' });
-  }
+    if (s === 'Shipped') {
+      actions.push({ type: 'Delivered', itemId });
+    }
 
-  if (status === 'Shipped') {
-    actions.push({ type: 'Delivered' });
-  }
+    // ====================================================
+    // CUSTOMER-INITIATED CANCEL APPROVAL
+    // ====================================================
 
-  // ====================================================
-  // RETURN REQUESTED
-  // ====================================================
+    if (item.status === 'Cancel Requested') {
+      actions.push({ type: 'Cancel Approved', itemId });
+    }
 
-  if (status === 'Return Requested') {
-    vendorItems.forEach((item) => {
-      if (item.returnStatus === 'requested') {
-        actions.push({
-          type: 'Return Approved',
-          itemId: item._id,
-        });
+    // ====================================================
+    // RETURN HANDLING
+    // ====================================================
 
-        actions.push({
-          type: 'Return Rejected',
-          itemId: item._id,
-        });
-      }
-    });
-  }
+    if (item.returnStatus === 'requested') {
+      actions.push({ type: 'Return Approved', itemId });
+      actions.push({ type: 'Return Rejected', itemId });
+    }
 
-  // ====================================================
-  // RETURN APPROVED
-  // ====================================================
-
-  if (status === 'Return Approved') {
-    vendorItems.forEach((item) => {
-      if (item.returnStatus === 'approved') {
-        actions.push({
-          type: 'Returned',
-          itemId: item._id,
-        });
-      }
-    });
-  }
-
-  // ====================================================
-  // CANCEL REQUESTED — per-item so vendor can approve each one individually
-  // ====================================================
-
-  if (status === 'Cancel Requested') {
-    vendorItems.forEach((item) => {
-      if (item.status === 'Cancel Requested') {
-        actions.push({ type: 'Cancel Approved', itemId: item._id });
-      }
-    });
-  }
+    if (item.returnStatus === 'approved') {
+      actions.push({ type: 'Returned', itemId });
+    }
+  });
 
   return actions;
 }
