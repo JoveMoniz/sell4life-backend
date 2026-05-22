@@ -475,7 +475,17 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
 
     const vendorItems = order.items.filter((item) => String(item.vendorId) === String(vendor._id));
 
-    const itemChecks = vendorItems.map((item) => canUpdateItemStatus(item, status, 'vendor'));
+    // Only validate items that would actually be updated — skip final-state items
+    // (Cancelled, Delivered, Returned) since the update loop already skips them.
+    const updatableItems = vendorItems.filter(
+      (item) => !['Cancelled', 'Delivered', 'Returned'].includes(item.status)
+    );
+
+    if (!updatableItems.length) {
+      return res.status(400).json({ error: 'No items available to update' });
+    }
+
+    const itemChecks = updatableItems.map((item) => canUpdateItemStatus(item, status, 'vendor'));
 
     const failedCheck = itemChecks.find((c) => !c.ok);
 
