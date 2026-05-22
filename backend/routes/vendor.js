@@ -223,18 +223,15 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
           qty    = Number(item.quantity || 0);
           amount = price * qty;
         } else {
-          // returnApprovedQuantity is zeroed out once the item is marked returned,
-          // so walk from most-progressed to least to pick the right figure.
           if (Number(item.refundedQuantity) > 0) {
             qty    = Number(item.refundedQuantity);
             amount = Number(item.refundedAmount) || price * qty;
           } else if (Number(item.returnQuantity) > 0) {
             qty    = Number(item.returnQuantity);
             amount = price * qty;
-          } else if (Number(item.returnApprovedQuantity) > 0) {
-            qty    = Number(item.returnApprovedQuantity);
-            amount = price * qty;
           }
+          // returnApprovedQuantity excluded — return approved but not yet
+          // received, so no money has moved yet.
         }
 
         actualRefunded += amount;
@@ -354,18 +351,24 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         }
 
         if (refundQty > 0) {
-          orderRefundTotal += refundAmount;
+          const moneyMoved = refundType !== 'return_pending';
+
+          // Only deduct from net calculations when money has actually moved.
+          // return_pending = approved but item not yet received back → excluded.
+          if (moneyMoved) orderRefundTotal += refundAmount;
+
           refundEntries.push({
             date:        refundDate,
             orderId:     order._id,
             displayId,
             type:        refundType,
-            description: refundType === 'cancelled' ? 'Item cancelled'
-                       : refundType === 'returned'  ? 'Item returned'
-                       : 'Return pending',
+            description: refundType === 'cancelled'     ? 'Item cancelled'
+                       : refundType === 'returned'      ? 'Item returned'
+                       : 'Return pending (awaiting item)',
             itemName:    item.name || 'Unknown item',
             qty:         refundQty,
             amount:      -refundAmount,
+            pending:     !moneyMoved,
           });
         }
       });
@@ -390,7 +393,8 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         // Refunds tab: individual refund items only
         refundEntries.forEach(e => {
           transactions.push(e);
-          totalRefunds += Math.abs(e.amount);
+          // Only count in totalRefunds when money has actually moved
+          if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       } else {
         // All tab: gross sale entry + individual refund entries (standard ledger)
@@ -409,7 +413,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         }
         refundEntries.forEach(e => {
           transactions.push(e);
-          totalRefunds += Math.abs(e.amount);
+          if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       }
     });

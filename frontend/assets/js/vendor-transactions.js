@@ -60,14 +60,15 @@ async function loadTransactions() {
       });
 
       const isSale = t.type === 'sale';
-      const amountClass = isSale ? 'txn-positive' : 'txn-negative';
+      const isPending = t.pending === true;
+      const amountClass = isSale ? 'txn-positive' : isPending ? 'txn-pending' : 'txn-negative';
       const amountSign = isSale ? '+' : '-';
       const amount = Number(t.amount || 0).toFixed(2);
 
       const displayId = t.displayId || t.orderId;
 
       return `
-<tr class="txn-row ${isSale ? 'txn-row-sale' : 'txn-row-refund'}">
+<tr class="txn-row ${isSale ? 'txn-row-sale' : 'txn-row-refund'}${isPending ? ' txn-row-pending' : ''}">
   <td class="txn-date">${date}</td>
   <td class="txn-order">
     <a href="/account/vendor/order-details.html?id=${t.orderId}">${displayId}</a>

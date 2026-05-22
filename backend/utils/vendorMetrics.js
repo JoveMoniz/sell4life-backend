@@ -1,8 +1,9 @@
 // ======================================================
 // VENDOR METRICS
-// Aligned with vendor dashboard calculation:
 // - grossRevenue: original item prices × qty for paid/refunded orders
-// - refunds: cancelled + returned item amounts
+// - refunds: only money that has ACTUALLY moved (cancelled + Stripe-refunded
+//   + physically returned). returnApprovedQuantity is excluded because the
+//   money has not moved yet — it is informational only.
 // - net = grossRevenue - refunds
 // ======================================================
 
@@ -54,9 +55,9 @@ export function calculateVendorMetrics(ordersRaw, vendorId) {
           refunds += Number(item.refundedAmount) || price * Number(item.refundedQuantity);
         } else if (Number(item.returnQuantity) > 0) {
           refunds += price * Number(item.returnQuantity);
-        } else if (Number(item.returnApprovedQuantity) > 0) {
-          refunds += price * Number(item.returnApprovedQuantity);
         }
+        // returnApprovedQuantity intentionally excluded — return approved but
+        // item not yet received back, so no money has moved yet.
       }
     });
   });
