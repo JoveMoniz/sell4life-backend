@@ -57,8 +57,9 @@ async function loadUsers(query = '', page = 1) {
       </td>
       <td>
         <select class="role-select" data-user-id="${user._id}">
-          <option value="user"  ${user.role === 'user'  ? 'selected' : ''}>user</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option>
+          <option value="user"   ${user.role === 'user'   ? 'selected' : ''}>user</option>
+          ${user.vendor ? `<option value="vendor" ${user.role === 'vendor' ? 'selected' : ''}>vendor</option>` : ''}
+          <option value="admin"  ${user.role === 'admin'  ? 'selected' : ''}>admin</option>
         </select>
       </td>
       <td>${accountType}</td>
@@ -172,8 +173,9 @@ function buildUserPanel(user) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:12px;border-top:1px solid #e5e7eb">
         <select class="role-select-inline" data-user-id="${user._id}"
           style="padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem">
-          <option value="user"  ${user.role === 'user'  ? 'selected' : ''}>user</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option>
+          <option value="user"   ${user.role === 'user'   ? 'selected' : ''}>user</option>
+          ${user.vendor ? `<option value="vendor" ${user.role === 'vendor' ? 'selected' : ''}>vendor</option>` : ''}
+          <option value="admin"  ${user.role === 'admin'  ? 'selected' : ''}>admin</option>
         </select>
         <button class="save-role-inline-btn" data-user-id="${user._id}"
           style="padding:5px 12px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem">

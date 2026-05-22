@@ -10,7 +10,7 @@ import adminMiddleware from '../middleware/adminMiddleware.js';
 
 const router = express.Router();
 
-const ALLOWED_ROLES = ['user', 'admin'];
+const ALLOWED_ROLES = ['user', 'vendor', 'admin'];
 
 /* ======================================================
    GET USERS (ADMIN)
