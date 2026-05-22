@@ -154,6 +154,11 @@ async function loadVendorSidebar() {
 
     const html = await res.text();
     container.innerHTML = html;
+
+    const path = window.location.pathname;
+    container.querySelectorAll('.vendor-nav a').forEach(a => {
+      if (a.getAttribute('href') === path) a.classList.add('active');
+    });
   } catch (err) {
     console.warn('Sidebar skipped', err);
   }

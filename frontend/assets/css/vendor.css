@@ -2,6 +2,12 @@
   --s4l-primary: #0b6b6a;
 }
 
+/* layout.css sets overflow-x:hidden on body which breaks position:sticky.
+   clip achieves the same visual result without creating a scroll container. */
+html, body {
+  overflow-x: clip;
+}
+
 /* ================================
    VENDOR LAYOUT
 ================================ */
@@ -15,6 +21,12 @@
 /* ================================
    SIDEBAR
 ================================ */
+
+#vendor-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+}
 
 .vendor-sidebar {
   width: 220px;
@@ -49,6 +61,12 @@
 
 .vendor-nav a:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.vendor-nav a.active {
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+  color: #a7f3d0;
 }
 
 /* ================================
@@ -1018,24 +1036,51 @@ Vendor Products
 }
 
 /* =====================================================
-   TABLET
+   TABLET — sidebar becomes sticky top bar
 ===================================================== */
 @media (max-width: 1024px) {
   .vendor-layout {
     flex-direction: column;
   }
 
+  #vendor-sidebar {
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
   .vendor-sidebar {
     width: 100%;
+    height: auto;
     flex-direction: row;
-    justify-content: space-around;
-    padding: 15px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .vendor-sidebar-logo {
+    font-size: 15px;
+    margin-bottom: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .vendor-nav {
     flex-direction: row;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .vendor-nav a {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 14px;
+    flex-shrink: 0;
   }
 
   .vendor-main {
@@ -1044,6 +1089,10 @@ Vendor Products
 
   .vendor-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card h3 {
+    font-size: 1.7rem;
   }
 
   .vendor-grid {
@@ -1059,35 +1108,27 @@ Vendor Products
    MOBILE
 ===================================================== */
 @media (max-width: 768px) {
-  .vendor-sidebar {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .vendor-nav {
-    flex-direction: row;
-    width: 100%;
-  }
-
-  .vendor-nav a {
-    text-align: center;
-  }
-
   .vendor-main {
     padding: 15px;
   }
 
   .vendor-container {
-    margin: 20px auto;
+    margin: 16px auto;
     padding: 10px;
   }
 
   .vendor-title {
     font-size: 1.5rem;
+    margin-bottom: 20px;
   }
 
   .vendor-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .stat-card h3 {
+    font-size: 1.6rem;
   }
 
   .vendor-grid {
@@ -1095,11 +1136,35 @@ Vendor Products
   }
 
   .vendor-products-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .vendor-products-header {
     justify-content: center;
+  }
+
+  /* Order rows stack */
+  .order-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    text-align: left;
+    padding: 14px 16px;
+  }
+
+  .order-price {
+    text-align: left;
+  }
+
+  /* Filter buttons 2-per-row */
+  .vendor-filters {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .vendor-filters .filter-btn {
+    flex: 1 1 calc(50% - 3px);
+    text-align: center;
+    padding: 8px 4px;
   }
 }
 
@@ -1107,20 +1172,64 @@ Vendor Products
    SMALL MOBILE
 ===================================================== */
 @media (max-width: 480px) {
+  /* Sidebar nav */
+  .vendor-sidebar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .vendor-sidebar-logo {
+    font-size: 13px;
+  }
+
+  .vendor-nav a {
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+
+  /* Main */
   .vendor-main {
     padding: 10px;
   }
 
   .vendor-title {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
+    margin-bottom: 14px;
+  }
+
+  /* Stats: 2 columns, compact */
+  .vendor-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
   }
 
   .stat-card {
-    padding: 20px;
+    padding: 16px 12px;
   }
 
+  .stat-card h3 {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+
+  .stat-card p {
+    font-size: 0.78rem;
+  }
+
+  /* Action cards */
   .vendor-card {
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .vendor-card h3 {
+    font-size: 1rem;
+    margin-bottom: 6px;
+  }
+
+  /* Products */
+  .vendor-products-grid {
+    grid-template-columns: 1fr;
   }
 
   .vendor-product-card img {
@@ -1131,21 +1240,84 @@ Vendor Products
   .btn-add-product-header {
     width: 100%;
     text-align: center;
+    padding: 12px;
+    font-size: 15px;
   }
-}
 
-@media (max-width: 768px) {
+  /* Orders list */
+  .vendor-orders-list {
+    border-radius: 8px;
+    margin: 14px 0;
+  }
+
   .order-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    text-align: left;
+    padding: 12px 14px;
+    gap: 5px;
+    font-size: 14px;
   }
 
-  .order-price {
-    text-align: left;
+  /* Order details */
+  .order-details-card {
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .order-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .order-actions button {
+    width: 100%;
+  }
+
+  /* Pagination */
+  .vendor-pagination {
+    gap: 5px;
+    margin-top: 14px;
+  }
+
+  .vendor-pagination button {
+    min-width: 32px;
+    height: 32px;
+    font-size: 13px;
+    padding: 0 6px;
+  }
+
+  /* Container */
+  .vendor-container {
+    margin: 10px auto;
+    padding: 8px;
   }
 }
 
 .vendor-product-card {
   cursor: pointer;
+}
+
+/* =====================================================
+   VENDOR STATUS MESSAGES (pending / suspended)
+===================================================== */
+.vendor-pending-message {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.vendor-pending-message h2 {
+  font-size: 1.5rem;
+  color: var(--s4l-primary);
+  margin-bottom: 16px;
+}
+
+.vendor-pending-message p {
+  color: #555;
+  font-size: 15px;
+  max-width: 420px;
+  margin: 0 auto 28px;
+  line-height: 1.6;
+}
+
+.vendor-suspended-message h2 {
+  color: #b91c1c;
 }

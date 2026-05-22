@@ -52,46 +52,7 @@
     </div>
 
     <script src="/assets/js/config-global.js"></script>
-
-    <script>
-      (async () => {
-        const token = localStorage.getItem('s4l_token');
-
-        if (!token) {
-          window.location.href = '/account/signin.html';
-          return;
-        }
-
-        try {
-          const res = await fetch(`${window.API_BASE}/vendor/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          const data = await res.json();
-          const vendor = data.vendor;
-
-          if (!vendor) {
-            window.location.href = '/account/vendor/create.html';
-            return;
-          }
-
-          if (vendor.status === 'pending') {
-            alert('Your store is under review');
-            window.location.href = '/account/vendor/dashboard.html';
-            return;
-          }
-
-          if (vendor.status === 'suspended') {
-            alert('Your store is suspended');
-            window.location.href = '/';
-            return;
-          }
-        } catch {
-          window.location.href = '/account/signin.html';
-        }
-      })();
-    </script>
-
+    <script src="/assets/js/vendor-guard.js"></script>
     <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/live-updates.js"></script>
     <script src="/assets/js/vendor-orders.js?v=20260522"></script>

@@ -147,7 +147,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
     let totalOrders = 0;
     let completedOrders = 0;
-    let refundedOrders = 0;
+    let refundedItems = 0;
     let activeOrders = 0;
 
     let grossRevenue = 0;
@@ -171,7 +171,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
         completedOrders++;
       }
 
-      if (['Pending', 'Processing', 'Shipped'].includes(status)) {
+      if (['Pending', 'Processing', 'Shipped', 'Partially Delivered'].includes(status)) {
         activeOrders++;
       }
 
@@ -185,7 +185,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
         grossRevenue += subtotal;
       }
 
-      // Sum only items actually cancelled or returned for this vendor
+      // Sum only items that were actually cancelled or returned for this vendor
       const vendorItems = (order.items || []).filter(
         item => String(item.vendorId) === String(vendorId)
       );
@@ -193,16 +193,17 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       vendorItems.forEach(item => {
         const price = Number(item.price || 0);
         if (item.status === 'Cancelled') {
-          actualRefunded += price * Number(item.quantity || 0);
+          const qty = Number(item.quantity || 0);
+          actualRefunded += price * qty;
+          refundedItems += qty;
         }
         if (Number(item.returnApprovedQuantity) > 0) {
-          actualRefunded += price * Number(item.returnApprovedQuantity);
+          const retQty = Number(item.returnApprovedQuantity);
+          actualRefunded += price * retQty;
+          refundedItems += retQty;
         }
       });
-      if (actualRefunded > 0) {
-        refundedOrders++;
-        revenueLoss += actualRefunded;
-      }
+      revenueLoss += actualRefunded;
     });
 
     const netRevenue = grossRevenue - revenueLoss;
@@ -212,7 +213,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
       totalOrders,
       completedOrders,
-      refundedOrders,
+      refundedItems,
       activeOrders,
 
       grossRevenue,
@@ -330,7 +331,7 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
     if (status && status !== 'all') {
       if (status === 'active') {
         filteredOrders = orders.filter((o) =>
-          ['Pending', 'Processing', 'Shipped'].includes(o.status)
+          ['Pending', 'Processing', 'Shipped', 'Partially Delivered'].includes(o.status)
         );
       } else if (status === 'issues') {
         filteredOrders = orders.filter((o) =>

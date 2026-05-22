@@ -52,7 +52,7 @@ async function loadVendorDashboard() {
     document.getElementById('stat-net').textContent = '£' + Number(data.netRevenue || 0).toFixed(2);
     document.getElementById('stat-active').textContent = data.activeOrders || 0;
     document.getElementById('stat-completed').textContent = data.completedOrders || 0;
-    document.getElementById('stat-refunded').textContent = data.refundedOrders || 0;
+    document.getElementById('stat-refunded').textContent = data.refundedItems || 0;
   } catch (err) {
     console.error('Vendor dashboard load error:', err);
   }
@@ -129,7 +129,7 @@ async function loadRecentOrders() {
           (vo) => String(vo.vendorId) === String(vendorId)
         );
 
-        const vendorStatus = vendorOrder?.status || o.status || 'Unknown';
+        const vendorStatus = o.status || vendorOrder?.status || 'Unknown';
         const vendorRefundScheduledAt =
           vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
 

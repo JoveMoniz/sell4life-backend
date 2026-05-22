@@ -47,7 +47,7 @@
 
             <div class="stat-card">
               <h3 id="stat-refunded">0</h3>
-              <p>Refunded Orders</p>
+              <p>Refunded Items</p>
             </div>
 
             <div class="stat-card">
@@ -119,19 +119,24 @@
           }
 
           if (vendor.status === 'pending') {
-            document.getElementById('recent-orders').innerHTML =
-              '<p>Your store is under review</p>';
-
-            document.getElementById('stat-products').textContent = '-';
-            document.getElementById('stat-orders').textContent = '-';
-            document.getElementById('stat-revenue').textContent = '£0.00';
-
+            document.querySelector('.vendor-container').innerHTML = `
+              <div class="vendor-pending-message">
+                <h2>Account Pending Approval</h2>
+                <p>Your vendor account is under review. Once approved by an admin, you'll have full access to all vendor features.</p>
+                <a href="/index.html" class="vendor-back-link">← Back to home</a>
+              </div>
+            `;
             return;
           }
 
           if (vendor.status === 'suspended') {
-            alert('Your store is suspended');
-            window.location.href = '/';
+            document.querySelector('.vendor-container').innerHTML = `
+              <div class="vendor-pending-message vendor-suspended-message">
+                <h2>Account Suspended</h2>
+                <p>Your vendor account has been suspended. Please contact support for assistance.</p>
+                <a href="/index.html" class="vendor-back-link">← Back to home</a>
+              </div>
+            `;
             return;
           }
         } catch {

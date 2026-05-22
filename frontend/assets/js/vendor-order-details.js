@@ -121,8 +121,12 @@ function buildItemHTML(item, itemActions, id) {
   const refQty   = Number(item.refundedQuantity || 0);
 
   const STATUS_BADGE = {
-    'Cancel Requested': { label: 'Cancel Requested', color: '#92400e', bg: '#fef3c7' },
-    'Cancelled':        { label: 'Cancelled',         color: '#b91c1c', bg: '#fee2e2' },
+    'Pending':          { label: 'Pending',           color: '#92400e', bg: '#fef3c7' },
+    'Processing':       { label: 'Processing',        color: '#1d4ed8', bg: '#dbeafe' },
+    'Shipped':          { label: 'Shipped',            color: '#6d28d9', bg: '#ede9fe' },
+    'Delivered':        { label: 'Delivered',          color: '#15803d', bg: '#dcfce7' },
+    'Cancel Requested': { label: 'Cancel Requested',  color: '#92400e', bg: '#fef3c7' },
+    'Cancelled':        { label: 'Cancelled',          color: '#b91c1c', bg: '#fee2e2' },
   };
   const badges = [
     badge(STATUS_BADGE, item.status),
