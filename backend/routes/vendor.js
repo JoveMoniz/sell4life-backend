@@ -219,6 +219,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       totalOrders,
       completedOrders,
       refundedItems,
+      refundedOrders: refundedItems,
       activeOrders,
 
       grossRevenue,
@@ -510,7 +511,7 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
     const now = new Date();
 
     vendorItems.forEach((item) => {
-      if (['Pending', 'Processing', 'Shipped'].includes(item.status)) {
+      if (!item.status || ['Pending', 'Processing', 'Shipped'].includes(item.status)) {
         item.status = status;
       }
 
