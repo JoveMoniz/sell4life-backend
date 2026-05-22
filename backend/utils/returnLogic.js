@@ -35,7 +35,7 @@ export function validateReturnRequest(order, item, quantity) {
     return { ok: false, error: 'Item not found' };
   }
 
-  if (!['paid', 'partially_refunded', 'refund_scheduled'].includes(order.paymentStatus)) {
+  if (!['paid', 'partially_refunded', 'refund_scheduled', 'refunded'].includes(order.paymentStatus)) {
     return { ok: false, error: 'Only paid orders can be returned' };
   }
 

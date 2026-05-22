@@ -297,11 +297,11 @@ router.patch('/:id/items/:itemId/cancel-request', authMiddleware, async (req, re
     if (!order || String(order.user) !== String(req.user.id))
       return res.status(403).json({ error: 'Not allowed' });
 
-    if (order.paymentStatus === 'refunded')
-      return res.status(400).json({ error: 'Refunded orders cannot be modified' });
-
     const item = findOrderItem(order, itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (item.refundStatus === 'processed')
+      return res.status(400).json({ error: 'Item already refunded, cannot cancel' });
 
     if (!['Pending', 'Processing'].includes(item.status))
       return res.status(400).json({ error: `Cannot cancel item with status: ${item.status}` });
