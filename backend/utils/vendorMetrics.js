@@ -34,17 +34,25 @@ export function calculateVendorMetrics(ordersRaw, vendorId) {
       grossRevenue += subtotal;
     }
 
-    // Sum only items actually cancelled or returned for this vendor
+    // Sum cancelled and returned items for this vendor.
+    // returnApprovedQuantity is zeroed when the item is marked returned,
+    // so walk from most-progressed to least to avoid missing returned items.
     const vendorItems = (order.items || []).filter(
       item => String(item.vendorId) === String(vendorId)
     );
     vendorItems.forEach(item => {
       const price = Number(item.price || 0);
+
       if (item.status === 'Cancelled') {
         refunds += price * Number(item.quantity || 0);
-      }
-      if (Number(item.returnApprovedQuantity) > 0) {
-        refunds += price * Number(item.returnApprovedQuantity);
+      } else {
+        if (Number(item.refundedQuantity) > 0) {
+          refunds += Number(item.refundedAmount) || price * Number(item.refundedQuantity);
+        } else if (Number(item.returnQuantity) > 0) {
+          refunds += price * Number(item.returnQuantity);
+        } else if (Number(item.returnApprovedQuantity) > 0) {
+          refunds += price * Number(item.returnApprovedQuantity);
+        }
       }
     });
   });

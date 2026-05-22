@@ -197,16 +197,29 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       let actualRefunded = 0;
       vendorItems.forEach(item => {
         const price = Number(item.price || 0);
+        let qty = 0;
+        let amount = 0;
+
         if (item.status === 'Cancelled') {
-          const qty = Number(item.quantity || 0);
-          actualRefunded += price * qty;
-          refundedItems += qty;
+          qty    = Number(item.quantity || 0);
+          amount = price * qty;
+        } else {
+          // returnApprovedQuantity is zeroed out once the item is marked returned,
+          // so walk from most-progressed to least to pick the right figure.
+          if (Number(item.refundedQuantity) > 0) {
+            qty    = Number(item.refundedQuantity);
+            amount = Number(item.refundedAmount) || price * qty;
+          } else if (Number(item.returnQuantity) > 0) {
+            qty    = Number(item.returnQuantity);
+            amount = price * qty;
+          } else if (Number(item.returnApprovedQuantity) > 0) {
+            qty    = Number(item.returnApprovedQuantity);
+            amount = price * qty;
+          }
         }
-        if (Number(item.returnApprovedQuantity) > 0) {
-          const retQty = Number(item.returnApprovedQuantity);
-          actualRefunded += price * retQty;
-          refundedItems += retQty;
-        }
+
+        actualRefunded += amount;
+        refundedItems  += qty;
       });
       revenueLoss += actualRefunded;
     });
