@@ -176,6 +176,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       pushUniqueHistory(order, 'Pending', 'Payment successful');
 
+      // Fetch actual Stripe fee from balance transaction
+      try {
+        const chargeId = paymentIntent.latest_charge;
+        if (chargeId) {
+          const charge = await stripe.charges.retrieve(chargeId);
+          if (charge.balance_transaction) {
+            const balanceTxn = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+            order.stripeFeeAmount = Number((balanceTxn.fee / 100).toFixed(2));
+          }
+        }
+      } catch (feeErr) {
+        // Non-fatal — fall back to estimate at display time
+        console.warn('Could not retrieve Stripe fee:', feeErr.message);
+      }
+
       await order.save();
 
       console.log('🎉 Order created:', order._id);

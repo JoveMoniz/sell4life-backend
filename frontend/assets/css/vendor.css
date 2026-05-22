@@ -1618,6 +1618,27 @@ Vendor Products
   border-radius: 10px;
 }
 
+.txn-row-stripe {
+  background: #f5f3ff;
+}
+
+.txn-stripe-label {
+  color: #7c3aed;
+  font-size: 0.82rem;
+  padding-left: 24px !important;
+}
+
+.txn-stripe-note {
+  font-size: 0.75rem;
+  color: #c4b5fd;
+  margin-left: 6px;
+}
+
+.txn-stripe-amount {
+  color: #7c3aed;
+  font-size: 0.82rem;
+}
+
 .txn-row-vat {
   background: #f0fdf4;
 }

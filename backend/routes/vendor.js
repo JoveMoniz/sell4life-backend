@@ -293,6 +293,8 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     const LIMIT = 500;
     const COMMISSION_RATE = 0.08;
     const VAT_RATE = 20 / 120; // prices are VAT-inclusive; VAT portion = 20/120
+    const STRIPE_PCT = 0.014;  // 1.4% for UK cards
+    const STRIPE_FIXED = 0.20; // + 20p per transaction
 
     const totalMatchingOrders = await Order.countDocuments(orderFilter);
     const truncated = totalMatchingOrders > LIMIT;
@@ -308,6 +310,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     let totalRefunds = 0;
     let totalCommission = 0;
     let totalVat = 0;
+    let totalStripeFees = 0;
 
     ordersRaw.forEach((order) => {
       const vendorOrder = order.vendorOrders.find(
@@ -384,6 +387,15 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         }
       });
 
+      // Vendor's proportional share of the Stripe fee for this order
+      const orderTotal = Number(order.total || 0);
+      const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
+      const rawStripeFee = Number(order.stripeFeeAmount || 0);
+      const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
+      const orderStripeFee = rawStripeFee > 0 ? rawStripeFee : estimatedFee;
+      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
+      const stripeIsEstimated = rawStripeFee === 0;
+
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
         const netAmount = itemsTotal - orderRefundTotal;
@@ -401,10 +413,13 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             amount:      netAmount,
             commission,
             vatAmount,
+            stripeFee:   vendorStripeFee,
+            stripeIsEstimated,
           });
           totalSales      += netAmount;
           totalCommission += commission;
           totalVat        += vatAmount;
+          totalStripeFees += vendorStripeFee;
         }
       } else if (type === 'refunds') {
         // Refunds tab: individual refund items only (no commission rows)
@@ -429,10 +444,13 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
             amount:      itemsTotal,
             commission,
             vatAmount,
+            stripeFee:   vendorStripeFee,
+            stripeIsEstimated,
           });
           totalSales      += itemsTotal;
           totalCommission += commission;
           totalVat        += vatAmount;
+          totalStripeFees += vendorStripeFee;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -483,15 +501,16 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     res.json({
       transactions,
       summary: {
-        totalSales:      Number(totalSales.toFixed(2)),
-        totalRefunds:    Number(totalRefunds.toFixed(2)),
-        totalCommission: Number(totalCommission.toFixed(2)),
-        totalVat:        Number(totalVat.toFixed(2)),
+        totalSales:       Number(totalSales.toFixed(2)),
+        totalRefunds:     Number(totalRefunds.toFixed(2)),
+        totalCommission:  Number(totalCommission.toFixed(2)),
+        totalVat:         Number(totalVat.toFixed(2)),
+        totalStripeFees:  Number(totalStripeFees.toFixed(2)),
         net,
-        netAfterFees:    Number((net - totalCommission).toFixed(2)),
-        commissionRate:  COMMISSION_RATE,
-        vatRegistered:   isVatRegistered,
-        vatNumber:       vendor.vatNumber || '',
+        netAfterFees:     Number((net - totalCommission).toFixed(2)),
+        commissionRate:   COMMISSION_RATE,
+        vatRegistered:    isVatRegistered,
+        vatNumber:        vendor.vatNumber || '',
       },
       period:     period || 'all',
       truncated,

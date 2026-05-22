@@ -469,6 +469,8 @@ const orderSchema = new mongoose.Schema(
       default: '',
     },
 
+    stripeFeeAmount: { type: Number, default: 0 },  // actual fee in £, stored at payment time
+
     refundCancelledAt: Date,
 
     refundCancelledBy: {

@@ -57,6 +57,9 @@ async function loadTransactions() {
     const feeEl = document.getElementById('txn-commission');
     if (feeEl) feeEl.textContent = '£' + Number(summary.totalCommission || 0).toFixed(2);
 
+    const stripeEl = document.getElementById('txn-stripe');
+    if (stripeEl) stripeEl.textContent = '£' + Number(summary.totalStripeFees || 0).toFixed(2);
+
     const vatCard = document.getElementById('txn-vat-card');
     const vatEl   = document.getElementById('txn-vat');
     if (vatCard && vatEl) {
@@ -133,6 +136,17 @@ async function loadTransactions() {
   <td class="txn-order"></td>
   <td class="txn-desc txn-commission-label" colspan="3">Platform fee (8%)</td>
   <td class="txn-amount txn-commission-amount">-£${Number(t.commission).toFixed(2)}</td>
+</tr>`);
+      }
+
+      if (isSale && Number(t.stripeFee) > 0) {
+        const est = t.stripeIsEstimated ? ' (est.)' : '';
+        rows.push(`
+<tr class="txn-row txn-row-stripe">
+  <td class="txn-date"></td>
+  <td class="txn-order"></td>
+  <td class="txn-desc txn-stripe-label" colspan="3">Stripe fee${est} <span class="txn-stripe-note">covered by platform</span></td>
+  <td class="txn-amount txn-stripe-amount">£${Number(t.stripeFee).toFixed(2)}</td>
 </tr>`);
       }
 
@@ -216,6 +230,18 @@ document.addEventListener('click', (e) => {
         '',
         '',
         `-${Number(t.commission).toFixed(2)}`,
+      ].join(','));
+    }
+
+    if (t.type === 'sale' && Number(t.stripeFee) > 0) {
+      rows.push([
+        date,
+        t.displayId || t.orderId,
+        'stripe_fee',
+        `"Stripe fee${t.stripeIsEstimated ? ' (est.)' : ''} - covered by platform"`,
+        '',
+        '',
+        `${Number(t.stripeFee).toFixed(2)}`,
       ].join(','));
     }
   });
