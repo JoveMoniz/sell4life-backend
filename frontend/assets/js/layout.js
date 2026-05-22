@@ -160,12 +160,58 @@ async function loadVendorSidebar() {
     const html = await res.text();
     container.innerHTML = html;
 
+    // Mark active nav link
     const path = window.location.pathname;
     container.querySelectorAll('.vendor-nav a').forEach(a => {
       if (a.getAttribute('href') === path) a.classList.add('active');
     });
+
+    // Populate vendor identity
+    populateVendorIdentity(container);
   } catch (err) {
     console.warn('Sidebar skipped', err);
+  }
+}
+
+async function populateVendorIdentity(container) {
+  try {
+    // User info comes from localStorage (set at login, always available)
+    let displayName = '';
+    try {
+      const userRaw = localStorage.getItem('s4l_user');
+      if (userRaw) {
+        const u = JSON.parse(userRaw);
+        displayName = u.name || u.username || u.email || '';
+      }
+    } catch {}
+
+    // Vendor store info from API
+    const token = localStorage.getItem('s4l_token');
+    const vendorRes = await fetch(`${window.API_BASE}/vendor/me`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+    });
+
+    if (!vendorRes.ok) return;
+
+    const { vendor } = await vendorRes.json();
+    if (!vendor) return;
+
+    const storeEl   = container.querySelector('#sidebar-store-name');
+    const slugEl    = container.querySelector('#sidebar-store-slug');
+    const userEl    = container.querySelector('#sidebar-user-name');
+    const avatarEl  = container.querySelector('#sidebar-avatar');
+
+    if (storeEl && vendor.storeName) storeEl.textContent = vendor.storeName;
+    if (slugEl  && vendor.storeSlug) slugEl.textContent  = `@${vendor.storeSlug}`;
+    if (userEl  && displayName)      userEl.textContent  = displayName;
+
+    // Avatar: first letter of store name
+    if (avatarEl && vendor.storeName) {
+      avatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
+    }
+  } catch (err) {
+    console.warn('Vendor identity skipped', err);
   }
 }
 
