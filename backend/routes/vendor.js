@@ -179,11 +179,14 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
 
-      const subtotal = Number(vendorOrder.subtotal || 0);
-
       // Sum only items that were actually cancelled or returned for this vendor
       const vendorItems = (order.items || []).filter(
         item => String(item.vendorId) === String(vendorId)
+      );
+
+      // Gross revenue = original full item prices × quantities (before any deductions)
+      const itemsTotal = vendorItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
       );
 
       // Classify active vs completed by item states directly:
@@ -209,7 +212,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
         paymentStatus === 'partially_refunded';
 
       if (isPaid) {
-        grossRevenue += subtotal;
+        grossRevenue += itemsTotal;
       }
       let actualRefunded = 0;
       vendorItems.forEach(item => {
@@ -301,11 +304,15 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
 
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
       const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
-      const subtotal = Number(vendorOrder.subtotal || 0);
       const displayId = order.shortId ? `S4L-${order.shortId}` : `S4L-${String(order._id).slice(0, 10).toUpperCase()}`;
 
+      // Gross sale amount = original full item prices × quantities
+      const itemsTotal = vendorItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
+      );
+
       // ── Sale entry ─────────────────────────────────────
-      if (isPaid && subtotal > 0 && type !== 'refunds') {
+      if (isPaid && itemsTotal > 0 && type !== 'refunds') {
         transactions.push({
           date:        order.createdAt,
           orderId:     order._id,
@@ -313,9 +320,10 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
           type:        'sale',
           description: `Order received`,
           itemName:    null,
-          amount:      subtotal,
+          qty:         null,
+          amount:      itemsTotal,
         });
-        totalSales += subtotal;
+        totalSales += itemsTotal;
       }
 
       // ── Refund entries (one per item) ───────────────────

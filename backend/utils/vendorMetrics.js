@@ -1,9 +1,9 @@
 // ======================================================
 // VENDOR METRICS
 // Aligned with vendor dashboard calculation:
-// - grossRevenue: only paid/refunded orders
-// - refunds: based on paymentStatus (not item.refundStatus)
-// - uses vendorOrder.subtotal as single source of truth
+// - grossRevenue: original item prices × qty for paid/refunded orders
+// - refunds: cancelled + returned item amounts
+// - net = grossRevenue - refunds
 // ======================================================
 
 export function calculateVendorMetrics(ordersRaw, vendorId) {
@@ -28,18 +28,22 @@ export function calculateVendorMetrics(ordersRaw, vendorId) {
       paymentStatus === 'refund_scheduled' ||
       paymentStatus === 'partially_refunded';
 
-    const subtotal = Number(vendorOrder.subtotal || 0);
+    const vendorItems = (order.items || []).filter(
+      item => String(item.vendorId) === String(vendorId)
+    );
+
+    // Gross revenue = original full item prices × quantities (before any deductions)
+    const itemsTotal = vendorItems.reduce(
+      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
+    );
 
     if (isPaid) {
-      grossRevenue += subtotal;
+      grossRevenue += itemsTotal;
     }
 
     // Sum cancelled and returned items for this vendor.
     // returnApprovedQuantity is zeroed when the item is marked returned,
     // so walk from most-progressed to least to avoid missing returned items.
-    const vendorItems = (order.items || []).filter(
-      item => String(item.vendorId) === String(vendorId)
-    );
     vendorItems.forEach(item => {
       const price = Number(item.price || 0);
 
