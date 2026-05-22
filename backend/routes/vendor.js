@@ -311,65 +311,96 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
       );
 
-      // ── Sale entry ─────────────────────────────────────
-      if (isPaid && itemsTotal > 0 && type !== 'refunds') {
-        transactions.push({
-          date:        order.createdAt,
-          orderId:     order._id,
-          displayId,
-          type:        'sale',
-          description: `Order received`,
-          itemName:    null,
-          qty:         null,
-          amount:      itemsTotal,
+      // ── Compute per-order refund total (used for net sale calculation) ──
+      let orderRefundTotal = 0;
+      const refundEntries = [];
+
+      vendorItems.forEach((item) => {
+        const price = Number(item.price || 0);
+        let refundQty = 0;
+        let refundAmount = 0;
+        let refundType = '';
+        let refundDate = order.createdAt;
+
+        if (item.status === 'Cancelled') {
+          refundQty    = Number(item.quantity || 0);
+          refundAmount = price * refundQty;
+          refundType   = 'cancelled';
+          refundDate   = item.cancelledAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.refundedQuantity) > 0) {
+          refundQty    = Number(item.refundedQuantity);
+          refundAmount = Number(item.refundedAmount) || price * refundQty;
+          refundType   = 'returned';
+          refundDate   = item.refundedAt || item.returnedAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.returnQuantity) > 0) {
+          refundQty    = Number(item.returnQuantity);
+          refundAmount = price * refundQty;
+          refundType   = 'returned';
+          refundDate   = item.returnedAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.returnApprovedQuantity) > 0) {
+          refundQty    = Number(item.returnApprovedQuantity);
+          refundAmount = price * refundQty;
+          refundType   = 'return_pending';
+          refundDate   = item.returnApprovedAt || order.updatedAt || order.createdAt;
+        }
+
+        if (refundQty > 0) {
+          orderRefundTotal += refundAmount;
+          refundEntries.push({
+            date:        refundDate,
+            orderId:     order._id,
+            displayId,
+            type:        refundType,
+            description: refundType === 'cancelled' ? 'Item cancelled'
+                       : refundType === 'returned'  ? 'Item returned'
+                       : 'Return pending',
+            itemName:    item.name || 'Unknown item',
+            qty:         refundQty,
+            amount:      -refundAmount,
+          });
+        }
+      });
+
+      if (type === 'sales') {
+        // Sales tab: one entry per order showing net cash retained
+        const netAmount = itemsTotal - orderRefundTotal;
+        if (isPaid && netAmount > 0) {
+          transactions.push({
+            date:        order.createdAt,
+            orderId:     order._id,
+            displayId,
+            type:        'sale',
+            description: 'Order received',
+            itemName:    null,
+            qty:         null,
+            amount:      netAmount,
+          });
+          totalSales += netAmount;
+        }
+      } else if (type === 'refunds') {
+        // Refunds tab: individual refund items only
+        refundEntries.forEach(e => {
+          transactions.push(e);
+          totalRefunds += Math.abs(e.amount);
         });
-        totalSales += itemsTotal;
-      }
-
-      // ── Refund entries (one per item) ───────────────────
-      if (type !== 'sales') {
-        vendorItems.forEach((item) => {
-          const price = Number(item.price || 0);
-          let refundQty = 0;
-          let refundAmount = 0;
-          let refundType = '';
-          let refundDate = order.createdAt;
-
-          if (item.status === 'Cancelled') {
-            refundQty    = Number(item.quantity || 0);
-            refundAmount = price * refundQty;
-            refundType   = 'cancelled';
-            refundDate   = item.cancelledAt || order.updatedAt || order.createdAt;
-          } else if (Number(item.refundedQuantity) > 0) {
-            refundQty    = Number(item.refundedQuantity);
-            refundAmount = Number(item.refundedAmount) || price * refundQty;
-            refundType   = 'returned';
-            refundDate   = item.refundedAt || item.returnedAt || order.updatedAt || order.createdAt;
-          } else if (Number(item.returnQuantity) > 0) {
-            refundQty    = Number(item.returnQuantity);
-            refundAmount = price * refundQty;
-            refundType   = 'returned';
-            refundDate   = item.returnedAt || order.updatedAt || order.createdAt;
-          } else if (Number(item.returnApprovedQuantity) > 0) {
-            refundQty    = Number(item.returnApprovedQuantity);
-            refundAmount = price * refundQty;
-            refundType   = 'return_pending';
-            refundDate   = item.returnApprovedAt || order.updatedAt || order.createdAt;
-          }
-
-          if (refundQty > 0) {
-            transactions.push({
-              date:        refundDate,
-              orderId:     order._id,
-              displayId,
-              type:        refundType,
-              description: refundType === 'cancelled' ? 'Item cancelled' : refundType === 'returned' ? 'Item returned' : 'Return pending',
-              itemName:    item.name || 'Unknown item',
-              qty:         refundQty,
-              amount:      -refundAmount,
-            });
-            totalRefunds += refundAmount;
-          }
+      } else {
+        // All tab: gross sale entry + individual refund entries (standard ledger)
+        if (isPaid && itemsTotal > 0) {
+          transactions.push({
+            date:        order.createdAt,
+            orderId:     order._id,
+            displayId,
+            type:        'sale',
+            description: 'Order received',
+            itemName:    null,
+            qty:         null,
+            amount:      itemsTotal,
+          });
+          totalSales += itemsTotal;
+        }
+        refundEntries.forEach(e => {
+          transactions.push(e);
+          totalRefunds += Math.abs(e.amount);
         });
       }
     });
