@@ -85,32 +85,37 @@ function logout() {
 // LOAD HEADER + FOOTER
 // =====================================================
 
+const isVendorPage = path.includes('/account/vendor/');
+
 async function loadLayout() {
   if (!shouldInjectLayout) return;
 
-  try {
-    if (!document.querySelector('.s4l-header-desktop')) {
-      const res = await fetch('/includes/header.html', { cache: 'no-store' });
-      const html = await res.text();
-      document.body.insertAdjacentHTML('afterbegin', html);
+  // Vendor panel pages use a sidebar instead of the global site header/footer
+  if (!isVendorPage) {
+    try {
+      if (!document.querySelector('.s4l-header-desktop')) {
+        const res = await fetch('/includes/header.html', { cache: 'no-store' });
+        const html = await res.text();
+        document.body.insertAdjacentHTML('afterbegin', html);
+      }
+
+      // ⚠️ delay to ensure DOM ready
+      setTimeout(() => {
+        document.dispatchEvent(new Event('headerLoaded'));
+      }, 0);
+    } catch (err) {
+      console.warn('Header skipped', err);
     }
 
-    // ⚠️ delay to ensure DOM ready
-    setTimeout(() => {
-      document.dispatchEvent(new Event('headerLoaded'));
-    }, 0);
-  } catch (err) {
-    console.warn('Header skipped', err);
-  }
-
-  try {
-    if (!document.querySelector('.site-footer')) {
-      const res = await fetch('/includes/footer.html', { cache: 'no-store' });
-      const html = await res.text();
-      document.body.insertAdjacentHTML('beforeend', html);
+    try {
+      if (!document.querySelector('.site-footer')) {
+        const res = await fetch('/includes/footer.html', { cache: 'no-store' });
+        const html = await res.text();
+        document.body.insertAdjacentHTML('beforeend', html);
+      }
+    } catch (err) {
+      console.warn('Footer skipped', err);
     }
-  } catch (err) {
-    console.warn('Footer skipped', err);
   }
 
   await loadVendorSidebar();
