@@ -121,6 +121,21 @@ async function getVendor(req) {
 }
 
 /* ======================================================
+   PERIOD FILTER HELPER
+====================================================== */
+
+function getPeriodStart(period) {
+  const now = new Date();
+  switch (period) {
+    case 'week':    { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
+    case 'month':   return new Date(now.getFullYear(), now.getMonth(), 1);
+    case 'quarter': return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    case 'year':    return new Date(now.getFullYear(), 0, 1);
+    default:        return null;
+  }
+}
+
+/* ======================================================
    DASHBOARD
 ====================================================== */
 
@@ -135,15 +150,17 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
     }
 
     const vendorId = vendor._id;
+    const periodStart = getPeriodStart(req.query.period);
 
     const products = await Product.countDocuments({
       vendor: vendorId,
       archived: false,
     });
 
-    const ordersRaw = await Order.find({
-      'vendorOrders.vendorId': vendorId,
-    });
+    const orderFilter = { 'vendorOrders.vendorId': vendorId };
+    if (periodStart) orderFilter.createdAt = { $gte: periodStart };
+
+    const ordersRaw = await Order.find(orderFilter);
 
     let totalOrders = 0;
     let completedOrders = 0;
@@ -245,6 +262,125 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
     res.status(500).json({
       error: 'Server error',
     });
+  }
+});
+
+/* ======================================================
+   TRANSACTIONS LEDGER
+====================================================== */
+
+router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendor = await getVendor(req);
+    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    const vendorId = vendor._id;
+    const { period, type = 'all' } = req.query;
+    const periodStart = getPeriodStart(period);
+
+    const orderFilter = { 'vendorOrders.vendorId': vendorId };
+    if (periodStart) orderFilter.createdAt = { $gte: periodStart };
+
+    const ordersRaw = await Order.find(orderFilter)
+      .populate('user', 'email')
+      .sort({ createdAt: -1 });
+
+    const transactions = [];
+    let totalSales = 0;
+    let totalRefunds = 0;
+
+    ordersRaw.forEach((order) => {
+      const vendorOrder = order.vendorOrders.find(
+        (vo) => String(vo.vendorId) === String(vendorId)
+      );
+      if (!vendorOrder) return;
+
+      const vendorItems = (order.items || []).filter(
+        (item) => String(item.vendorId) === String(vendorId)
+      );
+
+      const paymentStatus = (order.paymentStatus || '').toLowerCase();
+      const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
+      const subtotal = Number(vendorOrder.subtotal || 0);
+      const displayId = order.shortId ? `S4L-${order.shortId}` : `S4L-${String(order._id).slice(0, 10).toUpperCase()}`;
+
+      // ── Sale entry ─────────────────────────────────────
+      if (isPaid && subtotal > 0 && type !== 'refunds') {
+        transactions.push({
+          date:        order.createdAt,
+          orderId:     order._id,
+          displayId,
+          type:        'sale',
+          description: `Order received`,
+          itemName:    null,
+          amount:      subtotal,
+        });
+        totalSales += subtotal;
+      }
+
+      // ── Refund entries (one per item) ───────────────────
+      if (type !== 'sales') {
+        vendorItems.forEach((item) => {
+          const price = Number(item.price || 0);
+          let refundQty = 0;
+          let refundAmount = 0;
+          let refundType = '';
+          let refundDate = order.createdAt;
+
+          if (item.status === 'Cancelled') {
+            refundQty    = Number(item.quantity || 0);
+            refundAmount = price * refundQty;
+            refundType   = 'cancelled';
+            refundDate   = item.cancelledAt || order.updatedAt || order.createdAt;
+          } else if (Number(item.refundedQuantity) > 0) {
+            refundQty    = Number(item.refundedQuantity);
+            refundAmount = Number(item.refundedAmount) || price * refundQty;
+            refundType   = 'returned';
+            refundDate   = item.refundedAt || item.returnedAt || order.updatedAt || order.createdAt;
+          } else if (Number(item.returnQuantity) > 0) {
+            refundQty    = Number(item.returnQuantity);
+            refundAmount = price * refundQty;
+            refundType   = 'returned';
+            refundDate   = item.returnedAt || order.updatedAt || order.createdAt;
+          } else if (Number(item.returnApprovedQuantity) > 0) {
+            refundQty    = Number(item.returnApprovedQuantity);
+            refundAmount = price * refundQty;
+            refundType   = 'return_pending';
+            refundDate   = item.returnApprovedAt || order.updatedAt || order.createdAt;
+          }
+
+          if (refundQty > 0) {
+            transactions.push({
+              date:        refundDate,
+              orderId:     order._id,
+              displayId,
+              type:        refundType,
+              description: refundType === 'cancelled' ? 'Item cancelled' : refundType === 'returned' ? 'Item returned' : 'Return pending',
+              itemName:    item.name || 'Unknown item',
+              qty:         refundQty,
+              amount:      -refundAmount,
+            });
+            totalRefunds += refundAmount;
+          }
+        });
+      }
+    });
+
+    // Sort chronologically (newest first)
+    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({
+      transactions,
+      summary: {
+        totalSales:   Number(totalSales.toFixed(2)),
+        totalRefunds: Number(totalRefunds.toFixed(2)),
+        net:          Number((totalSales - totalRefunds).toFixed(2)),
+      },
+      period: period || 'all',
+    });
+  } catch (err) {
+    console.error('Vendor transactions error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
