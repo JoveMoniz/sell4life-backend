@@ -82,11 +82,12 @@ function canItemRefund(item) {
 ================================ */
 function getPaymentLabel(state) {
   switch ((state || '').toLowerCase()) {
-    case 'paid':             return 'Paid';
-    case 'refund_scheduled': return 'Refund Scheduled';
-    case 'refunded':         return 'Refunded';
-    case 'failed':           return 'Failed';
-    default:                 return 'Unpaid';
+    case 'paid':               return 'Paid';
+    case 'refund_scheduled':   return 'Refund Scheduled';
+    case 'refunded':           return 'Refunded';
+    case 'partially_refunded': return 'Partially Refunded';
+    case 'failed':             return 'Failed';
+    default:                   return 'Unpaid';
   }
 }
 

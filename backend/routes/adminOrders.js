@@ -2,6 +2,7 @@ import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
 import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
+  getDerivedVendorStatus,
   getAllowedAdminActions,
   getAdminActionLabel,
   isFinalOrder,
@@ -199,6 +200,7 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req, res) => {
       const v = vendorMap[String(vo.vendorId)];
       return {
         ...vo,
+        status:        getDerivedVendorStatus(vo, orderObj.items || []),
         accountStatus: v?.status || null,
         accountType:   v?.type   || null,
         verified:      v?.verified || false,

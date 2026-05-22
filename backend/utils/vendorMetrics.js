@@ -28,20 +28,25 @@ export function calculateVendorMetrics(ordersRaw, vendorId) {
       paymentStatus === 'refund_scheduled' ||
       paymentStatus === 'partially_refunded';
 
-    const isRefunded =
-      paymentStatus === 'refunded' ||
-      paymentStatus === 'refund_scheduled' ||
-      paymentStatus === 'partially_refunded';
-
     const subtotal = Number(vendorOrder.subtotal || 0);
 
     if (isPaid) {
       grossRevenue += subtotal;
     }
 
-    if (isRefunded) {
-      refunds += subtotal;
-    }
+    // Sum only items actually cancelled or returned for this vendor
+    const vendorItems = (order.items || []).filter(
+      item => String(item.vendorId) === String(vendorId)
+    );
+    vendorItems.forEach(item => {
+      const price = Number(item.price || 0);
+      if (item.status === 'Cancelled') {
+        refunds += price * Number(item.quantity || 0);
+      }
+      if (Number(item.returnApprovedQuantity) > 0) {
+        refunds += price * Number(item.returnApprovedQuantity);
+      }
+    });
   });
 
   return {

@@ -104,6 +104,7 @@ async function loadOrders(page = 1, q = '', status = 'all') {
       paid: 'Paid',
       refund_scheduled: 'Refund Scheduled',
       refunded: 'Refunded',
+      partially_refunded: 'Partially Refunded',
       failed: 'Failed',
     };
 

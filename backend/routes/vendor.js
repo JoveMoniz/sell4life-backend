@@ -181,21 +181,27 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
         paymentStatus === 'refund_scheduled' ||
         paymentStatus === 'partially_refunded';
 
-      const isRefunded =
-        paymentStatus === 'refunded' ||
-        paymentStatus === 'refund_scheduled' ||
-        paymentStatus === 'partially_refunded';
-
-      if (isRefunded) {
-        refundedOrders++;
-      }
-
       if (isPaid) {
         grossRevenue += subtotal;
       }
 
-      if (isRefunded) {
-        revenueLoss += subtotal;
+      // Sum only items actually cancelled or returned for this vendor
+      const vendorItems = (order.items || []).filter(
+        item => String(item.vendorId) === String(vendorId)
+      );
+      let actualRefunded = 0;
+      vendorItems.forEach(item => {
+        const price = Number(item.price || 0);
+        if (item.status === 'Cancelled') {
+          actualRefunded += price * Number(item.quantity || 0);
+        }
+        if (Number(item.returnApprovedQuantity) > 0) {
+          actualRefunded += price * Number(item.returnApprovedQuantity);
+        }
+      });
+      if (actualRefunded > 0) {
+        refundedOrders++;
+        revenueLoss += actualRefunded;
       }
     });
 
