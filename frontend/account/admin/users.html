@@ -11,35 +11,38 @@
 
     <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
 
-    <link rel="stylesheet" href="/assets/css/admin.css?v=20260206-dev" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260522" />
   </head>
 
   <body class="admin admin-users">
-    <!-- TOP BAR -->
-    <div class="admin-top">
-      <!-- Logo -->
-      <header class="admin-header">
-        <a href="/index.html" class="admin-logo">
-          <span class="logo-dollar">$</span>
-          <span class="logo-text">ell</span>
-          <span class="logo-four">4</span>
-          <span class="logo-text">Life</span>
-        </a>
-      </header>
+    <!-- STICKY STACK: top bar + search -->
+    <div class="admin-sticky">
+      <!-- TOP BAR -->
+      <div class="admin-top">
+        <!-- Logo -->
+        <header class="admin-header">
+          <a href="/index.html" class="admin-logo">
+            <span class="logo-dollar">$</span>
+            <span class="logo-text">ell</span>
+            <span class="logo-four">4</span>
+            <span class="logo-text">Life</span>
+          </a>
+        </header>
 
-      <!-- Title + Back -->
-      <div class="admin-title">
-        <a href="/account/admin/index.html" class="admin-back">← back to dashboard</a>
-        <h1>Users</h1>
+        <!-- Title + Back -->
+        <div class="admin-title">
+          <a href="/account/admin/index.html" class="admin-back">← back to dashboard</a>
+          <h1>Users</h1>
+        </div>
+
+        <!-- Logout -->
+        <button id="logoutBtn">Log out</button>
       </div>
 
-      <!-- Logout -->
-      <button id="logoutBtn">Log out</button>
-    </div>
-
-    <!-- USER SEARCH -->
-    <div class="admin-search-bar">
-      <input type="text" id="userSearch" placeholder="Search by email..." autocomplete="off" />
+      <!-- USER SEARCH -->
+      <div class="admin-search-bar">
+        <input type="text" id="userSearch" placeholder="Search by email..." autocomplete="off" />
+      </div>
     </div>
 
     <!-- USERS TABLE (WRAPPED – THIS IS THE FIX) -->
@@ -66,8 +69,8 @@
 
     <!-- Scripts -->
     <script src="/assets/js/config-global.js"></script>
-    <script src="/assets/js/require-auth.js"></script>
-    <script type="module" src="/assets/js/admin-users.js?v=20260211"></script>
+    <script src="/assets/js/require-admin.js"></script>
+    <script type="module" src="/assets/js/admin-users.js?v=20260521"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>
 </html>

@@ -4,6 +4,16 @@
 
 console.log('vendor orders loaded');
 
+/* ======================================================
+   AUTH FETCH — cookie + Authorization header (fallback)
+====================================================== */
+function authFetch(url, opts = {}) {
+  const token = localStorage.getItem('s4l_token');
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(url, { ...opts, credentials: 'include', headers });
+}
+
 let currentStatus = 'all';
 let currentQuery = '';
 
@@ -16,9 +26,8 @@ function getDisplayStatus(o) {
   const payment = (o.paymentStatus || '').toLowerCase();
   const status = o.status;
 
-  if (payment === 'refunded') {
-    return `${status} • Refunded`;
-  }
+  if (payment === 'refunded') return `${status} • Refunded`;
+  if (payment === 'partially_refunded') return `${status} • Partial Refund`;
 
   if (payment === 'refund_scheduled' && o.refundScheduledAt) {
     return `
@@ -31,40 +40,23 @@ function getDisplayStatus(o) {
 }
 
 /* ======================================================
-   STATUS TRANSITIONS
-====================================================== */
-function getAllowedTransitions(status) {
-  if (!status) return [];
-
-  const map = {
-    Pending: ['Processing'],
-    Processing: ['Shipped'],
-    Shipped: ['Delivered'],
-
-    'Return Requested': ['Return Approved', 'Return Rejected'],
-    'Return Approved': ['Returned'],
-
-    'Cancel Requested': ['Cancelled'],
-
-    Cancelled: [],
-    Returned: [],
-  };
-
-  return map[status] || [];
-}
-
-/* ======================================================
    LOAD ORDERS
 ====================================================== */
 async function loadVendorOrders(status = 'all', q = '', page = 1) {
   const container = document.getElementById('vendor-orders');
-  const token = localStorage.getItem('s4l_token');
 
-  if (!container || !token) return;
+  if (!container) return;
 
-  const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const vendorRes = await authFetch(`${API_BASE}/vendor/me`);
+
+  if (!vendorRes.ok) {
+    if (vendorRes.status === 401) {
+      window.location.href = '/account/signin.html';
+      return;
+    }
+    container.innerHTML = '<p>Failed to load vendor profile</p>';
+    return;
+  }
 
   const vendorData = await vendorRes.json();
   const vendor = vendorData.vendor;
@@ -89,17 +81,15 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
   try {
     let url = `${API_BASE}/vendor/orders`;
 
-    const params = [];
+    const queryParams = [];
 
-    if (status !== 'all') params.push(`status=${status}`);
-    if (q) params.push(`q=${encodeURIComponent(q)}`);
-    params.push(`page=${page}`);
+    if (status !== 'all') queryParams.push(`status=${status}`);
+    if (q) queryParams.push(`q=${encodeURIComponent(q)}`);
+    queryParams.push(`page=${page}`);
 
-    if (params.length) url += `?${params.join('&')}`;
+    if (queryParams.length) url += `?${queryParams.join('&')}`;
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await authFetch(url);
 
     if (!res.ok) {
       container.innerHTML = '<p>Failed to load orders</p>';
@@ -148,8 +138,24 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 
         const isRefundLocked = refundScheduledAt && new Date(refundScheduledAt) > new Date();
 
-        const allowed =
-          o.paymentStatus === 'paid' && !isRefundLocked ? getAllowedTransitions(safeStatus) : [];
+        // Vendor-specific payment status — isolates this vendor from other vendors' refunds
+        const orderPayment = (o.paymentStatus || 'pending').toLowerCase();
+        const vendorRefStatuses = vendorItems.map(i => i.refundStatus || 'none');
+        const vendorHasReturnedItems = vendorItems.some(i =>
+          ['returned', 'partially_returned'].includes(i.returnStatus)
+        );
+        const vendorPaymentStatus = !['paid', 'partially_refunded', 'refunded', 'refund_scheduled'].includes(orderPayment)
+          ? orderPayment
+          : vendorRefStatuses.every(s => s === 'processed')
+            ? 'refunded'
+            : vendorRefStatuses.some(s => ['processed', 'partially_refunded'].includes(s))
+              ? 'partially_refunded'
+              : (orderPayment === 'refund_scheduled' && vendorHasReturnedItems)
+                ? 'refund_scheduled'
+                : 'paid';
+
+        const paymentBlocked = !['paid', 'partially_refunded', 'refund_scheduled'].includes(vendorPaymentStatus);
+        const allowed = !paymentBlocked && !isRefundLocked ? o.allowedActions || [] : [];
 
         const buttons = allowed
           .map((s) => {
@@ -179,26 +185,18 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
               Cancelled: 'Approve Cancel',
             };
 
-            const cls = map[s] || '';
+            const actionType = s.type || s;
 
-            let itemId = '';
-
-            if (['Return Approved', 'Return Rejected', 'Returned'].includes(s)) {
-              const returnItem = vendorItems.find(
-                (item) => item.returnStatus === 'requested' || item.returnStatus === 'approved'
-              );
-
-              itemId = returnItem?._id || '';
-            }
+            const cls = map[actionType] || '';
 
             return `
               <button
                 class="${cls}"
                 data-id="${id}"
-                data-item="${itemId}"
-                data-label="${s}"
+                data-item="${s.itemId || ''}"
+                data-label="${actionType}"
               >
-                ${labelMap[s] || s}
+                ${labelMap[actionType] || actionType}
               </button>
             `;
           })
@@ -228,6 +226,7 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
       ...o,
       status: safeStatus,
       refundScheduledAt,
+      paymentStatus: vendorPaymentStatus,
     })}
   </span>
 
@@ -256,7 +255,7 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 function initRefundTimers() {
   const timers = document.querySelectorAll('.refund-timer');
   if (!timers.length) return;
-
+   
   if (timerInterval) clearInterval(timerInterval);
 
   function update() {
@@ -360,8 +359,6 @@ if (searchInput) {
    UPDATE STATUS
 ====================================================== */
 async function updateStatus(orderId, itemId, status) {
-  const token = localStorage.getItem('s4l_token');
-
   let url = '';
   let body = {};
 
@@ -398,12 +395,9 @@ async function updateStatus(orderId, itemId, status) {
     };
   }
 
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 

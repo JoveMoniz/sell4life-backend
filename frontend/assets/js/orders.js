@@ -61,7 +61,7 @@ function renderOrderCard(o) {
 
   const itemCount = o.items?.length || 0;
 
-  const { paymentLabel, paymentClass } = getPaymentStatus(o.paymentStatus);
+  const { paymentLabel, paymentClass } = getPaymentStatus(o);
 
   const payNowButton =
     o.paymentStatus === 'pending'
@@ -103,7 +103,17 @@ function renderOrderCard(o) {
 // PAYMENT STATUS HELPER
 // =====================================================
 
-function getPaymentStatus(status) {
+function getPaymentStatus(order) {
+  const status = typeof order === 'string' ? order : (order.paymentStatus || 'pending');
+  const items  = typeof order === 'object' ? (order.items || []) : [];
+
+  // Item-level refund statuses override the order-level payment status
+  const allRefunded = items.length > 0 && items.every((i) => i.refundStatus === 'processed');
+  if (allRefunded) return { paymentLabel: 'Refunded', paymentClass: 'refunded' };
+
+  const anyRefunded = items.some((i) => ['processed', 'partially_refunded'].includes(i.refundStatus));
+  if (anyRefunded) return { paymentLabel: 'Partially Refunded', paymentClass: 'partially_refunded' };
+
   switch (status) {
     case 'paid':
       return { paymentLabel: 'Paid', paymentClass: 'paid' };
@@ -114,12 +124,24 @@ function getPaymentStatus(status) {
     case 'refunded':
       return { paymentLabel: 'Refunded', paymentClass: 'refunded' };
 
+    case 'partially_refunded':
+      return { paymentLabel: 'Partially Refunded', paymentClass: 'partially_refunded' };
+
     case 'failed':
       return { paymentLabel: 'Failed', paymentClass: 'failed' };
 
     case 'pending':
-    default:
+    default: {
+      // If any item progressed past Pending the order was paid — stale DB status
+      const FULFILLED = new Set([
+        'Processing', 'Shipped', 'Delivered',
+        'Cancel Requested', 'Cancelled', 'Returned',
+      ]);
+      if (items.some((i) => FULFILLED.has(i.status))) {
+        return { paymentLabel: 'Paid', paymentClass: 'paid' };
+      }
       return { paymentLabel: 'Unpaid', paymentClass: 'pending' };
+    }
   }
 }
 

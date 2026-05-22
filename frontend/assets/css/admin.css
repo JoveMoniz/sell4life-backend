@@ -160,24 +160,41 @@ button {
 /* ===============================
    SEARCH + FILTER BAR
 =============================== */
-.admin-search-bar {
+.admin-search-bar,
+.admin-filters {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
 
   padding: 12px 20px;
-  margin: 0; /* IMPORTANT inside sticky stack */
+  margin: 0;
   background: #f5f6f8;
   border-bottom: 1px solid #e5e7eb;
 
-  position: static; /* not sticky */
+  position: static;
 }
 
 .admin-search-bar input,
-.admin-search-bar select {
+.admin-search-bar select,
+.admin-filters input,
+.admin-filters select {
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.admin-filters input {
+  flex: 1;
+  min-width: 180px;
+  max-width: 340px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Quick search links (Order ID + Email) */
@@ -751,6 +768,16 @@ button {
   font-size: 14px;
 }
 
+button:disabled,
+select:disabled {
+  background: #9ca3af !important;
+  color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+  border-color: #9ca3af !important;
+  pointer-events: none;
+}
+
 /* ===============================
    ADMIN SIGN IN
 =============================== */
@@ -1188,4 +1215,61 @@ h1 {
 
 .btn-suspend:hover {
   background: #c82333;
+}
+
+#sellersSection { display: none; }
+
+/* ===========================
+   USER STATUS PILLS
+=========================== */
+.status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.status-pill.active   { background: #dcfce7; color: #15803d; }
+.status-pill.inactive { background: #f3f4f6; color: #6b7280; }
+.status-pill.banned   { background: #fee2e2; color: #b91c1c; }
+
+/* ===============================
+   VENDORS + USERS: FULL-HEIGHT LAYOUT
+   Table fills remaining viewport; sticky thead works within its scroll box.
+=============================== */
+body.admin-vendors,
+body.admin-users {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.admin-vendors .admin-sticky,
+body.admin-users .admin-sticky {
+  flex-shrink: 0;
+}
+
+body.admin-vendors .admin-table-scroll,
+body.admin-users .admin-table-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+body.admin-vendors #pagination,
+body.admin-users #pagination {
+  flex-shrink: 0;
+  padding: 10px 0;
+  background: #f5f6f8;
+}
+
+/* Sticky column headers within the table's own scroll box */
+body.admin-vendors .admin-vendors-table thead th,
+body.admin-users .admin-users-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f1f5f9;
+  box-shadow: 0 1px 0 #e5e7eb;
 }

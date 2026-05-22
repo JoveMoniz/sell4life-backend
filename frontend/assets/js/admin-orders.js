@@ -1,15 +1,13 @@
-const FINAL_STATES = ['cancelled', 'returned'];
-const FINAL_PAYMENT_STATES = ['refunded'];
-
 const API = window.API_BASE;
-/* =================================
-   AUTH GUARD
-================================= */
-const token = localStorage.getItem('s4l_token');
-const role = localStorage.getItem('s4l_role');
 
-if (!token || role !== 'admin') {
-  window.location.href = '/account/admin/signin.html';
+/* =================================
+   AUTH FETCH — cookie + Authorization header (fallback)
+================================= */
+function authFetch(url, opts = {}) {
+  const token = localStorage.getItem('s4l_token');
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(url, { ...opts, credentials: 'include', headers });
 }
 
 /* =================================
@@ -25,63 +23,18 @@ let searchInput;
    HELPERS
 ================================= */
 
-function getAdminActions(status) {
-  const map = {
-    // ======================
-    // NORMAL FLOW
-    // ======================
-    Pending: ['Processing', 'Cancelled'],
-
-    Processing: ['Shipped'],
-
-    Shipped: ['Delivered'],
-
-    Delivered: [], // no action unless request comes
-
-    // ======================
-    // CUSTOMER REQUESTS
-    // ======================
-    'Cancel Requested': ['Cancelled', 'Processing'],
-
-    'Return Requested': ['Return Approved', 'Return Rejected'],
-
-    // ======================
-    // RETURN FLOW
-    // ======================
-    'Return Approved': ['Returned'],
-
-    'Return Rejected': [],
-
-    // ======================
-    // FINAL / PAYMENT FLOW
-    // ======================
-    Returned: ['Refunded'],
-
-    'Refund Requested': ['Refunded'],
-
-    Cancelled: [],
-  };
-
-  return map[status] || [];
-}
-
 function getAdminLabel(status) {
   const labels = {
-    Processing: 'Start Processing',
-    Shipped: 'Mark Shipped',
-    Delivered: 'Mark Delivered',
     Cancelled: 'Force Cancel',
 
-    'Return Requested': 'Mark Return Requested', // ✅ FIX
-    'Return Approved': 'Approve Return',
-    'Return Rejected': 'Reject Return',
-    Returned: 'Mark Returned',
+    'Return Approved': 'Override Approve Return',
 
-    Refunded: 'Issue Refund',
+    'Return Rejected': 'Override Reject Return',
   };
 
   return labels[status] || status;
 }
+
 /* =================================
    SEARCH HANDLER (ONLY ONE SOURCE)
 ================================= */
@@ -129,9 +82,7 @@ async function loadOrders(page = 1, q = '', status = 'all') {
   if (q) url += `&q=${encodeURIComponent(q)}`;
   if (status !== 'all') url += `&status=${status}`;
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await authFetch(url);
 
   if (res.status === 401 || res.status === 403) {
     window.location.href = '/account/admin/signin.html';
@@ -145,6 +96,7 @@ async function loadOrders(page = 1, q = '', status = 'all') {
 
   data.orders.forEach((order) => {
     const tr = document.createElement('tr');
+    tr.dataset.order = JSON.stringify(order);
 
     const paymentStatus = order.paymentStatus || 'pending';
 
@@ -290,9 +242,6 @@ document.getElementById('ordersTable').addEventListener('click', (e) => {
   }
 
   // ===============================
-  // REMOVE ANY OPEN ROW
-  // ===============================
-  // ===============================
   // CLOSE ANY OPEN ROW (SMOOTH, NOT INSTANT)
   // ===============================
   const openRow = document.querySelector('.order-details-row');
@@ -316,7 +265,12 @@ document.getElementById('ordersTable').addEventListener('click', (e) => {
   }
 
   const backendStatus = row.children[3].innerText.trim();
-  const allowedStatuses = getAdminActions(backendStatus);
+  const order = JSON.parse(row.dataset.order);
+
+  const allowedStatuses = Array.isArray(order.allowedActions) ? order.allowedActions : [];
+  const paymentState = row.querySelector('.payment-status')?.textContent.trim().toLowerCase();
+
+  const isFinalState = Boolean(order.isFinal);
   // ===============================
   // CREATE ROW
   // ===============================
@@ -325,6 +279,24 @@ document.getElementById('ordersTable').addEventListener('click', (e) => {
 
   const cell = document.createElement('td');
   cell.colSpan = 7;
+
+  const vendorOrders = Array.isArray(order.vendorOrders) ? order.vendorOrders : [];
+
+  const vendorChips = vendorOrders.map(vo => {
+    const name     = vo.vendorStoreName || vo.vendorName || '';
+    const shortVId = '...' + String(vo.vendorId || '').slice(-6).toUpperCase();
+    const nameHtml = name
+      ? `<strong>${name}</strong> <strong style="font-family:monospace;font-size:0.72rem;color:#6b7280">${shortVId}</strong>`
+      : `<strong style="font-family:monospace;font-size:0.78rem">${shortVId}</strong>`;
+    const status = vo.status || 'Pending';
+    const total  = Number(vo.total || 0).toFixed(2);
+    return `
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:0.78rem;margin:2px 4px 2px 0">
+        ${nameHtml}
+        <span class="status status-${status.toLowerCase().replace(/\s+/g, '-')}" style="font-size:0.72rem">${status}</span>
+        <span style="color:#6b7280">£${total}</span>
+      </div>`;
+  }).join('');
 
   cell.innerHTML = `
 <div class="inline-order-wrapper">
@@ -337,16 +309,22 @@ document.getElementById('ordersTable').addEventListener('click', (e) => {
       </span>
     </div>
 
-    <div class="inline-status-buttons">
-      ${allowedStatuses
-        .map(
-          (status) => `
+    ${vendorChips ? `<div style="margin:6px 0 4px"><strong style="font-size:0.8rem;color:#6b7280">Sellers</strong><div style="margin-top:4px">${vendorChips}</div></div>` : ''}
+
+<div class="inline-status-buttons">
+  ${
+    isFinalState
+      ? `<div class="final-state-message">Order is finalized</div>`
+      : allowedStatuses
+          .map(
+            (status) => `
         <button class="status-btn" data-id="${orderId}" data-status="${status}">
-         ${getAdminLabel(status)}
+          ${getAdminLabel(status)}
         </button>
       `
-        )
-        .join('')}
+          )
+          .join('')
+  }
     </div>
 
     <a class="inline-details-link"
@@ -382,12 +360,9 @@ document.getElementById('ordersTable').addEventListener('click', (e) => {
 
 async function updateOrderStatus(orderId, status) {
   try {
-    const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+    const res = await authFetch(`${API_BASE}/admin/orders/${orderId}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
 

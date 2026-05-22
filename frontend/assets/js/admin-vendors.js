@@ -1,48 +1,34 @@
-console.log('admin vendors loaded');
-
-/* =========================================
-   STATE
-========================================= */
 let currentPage = 1;
 let currentQuery = '';
 let currentStatus = 'all';
 
 const API = window.API_BASE;
-const token = localStorage.getItem('s4l_token');
+
+function authFetch(url, opts = {}) {
+  const token = localStorage.getItem('s4l_token');
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(url, { ...opts, credentials: 'include', headers });
+}
 
 /* =========================================
    LOAD VENDORS
 ========================================= */
 async function loadVendors(page = 1, q = '', status = 'all') {
-  const tableBody = document.getElementById('vendorsTable');
-  const oldContainer = document.getElementById('vendors-list');
-  const loading = document.getElementById('vendors-loading');
+  const tbody = document.getElementById('vendorsTable');
 
-  if (!token) {
-    if (tableBody) tableBody.innerHTML = '<tr><td colspan="8">Not logged in</td></tr>';
-    if (oldContainer) oldContainer.innerHTML = 'Not logged in';
-    return;
-  }
-
-  currentPage = page;
+  currentPage  = page;
   currentQuery = q;
   currentStatus = status;
 
   let url = `${API}/admin/vendors?page=${page}`;
-
-  if (q) url += `&q=${encodeURIComponent(q)}`;
+  if (q)            url += `&q=${encodeURIComponent(q)}`;
   if (status !== 'all') url += `&status=${status}`;
 
-  if (tableBody) {
-    tableBody.innerHTML = '<tr><td colspan="8">Loading vendors...</td></tr>';
-  }
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9">Loading vendors...</td></tr>';
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const res = await authFetch(url);
 
     if (res.status === 401 || res.status === 403) {
       window.location.href = '/account/admin/signin.html';
@@ -51,25 +37,11 @@ async function loadVendors(page = 1, q = '', status = 'all') {
 
     const data = await res.json();
 
-    if (loading) loading.style.display = 'none';
-
-    /* ===============================
-       TABLE RENDER (PRIMARY)
-    =============================== */
-    if (tableBody) {
-      renderVendorsTable(data.vendors || []);
-      renderPagination(data.pagination);
-    }
-
-    /* ===============================
-       LEGACY CARD RENDER (TEMP)
-    =============================== */
-    if (oldContainer) {
-      renderVendors(data.vendors || []);
-    }
+    renderVendorsTable(data.vendors || []);
+    renderPagination(data.pagination);
   } catch (err) {
     console.error(err);
-    if (loading) loading.textContent = 'Failed to load vendors';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9">Failed to load vendors</td></tr>';
   }
 }
 
@@ -83,119 +55,181 @@ function renderVendorsTable(vendors) {
   tbody.innerHTML = '';
 
   if (!vendors.length) {
-    tbody.innerHTML = '<tr><td colspan="8">No vendors found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9">No vendors found</td></tr>';
     return;
   }
 
-  vendors.forEach((v) => {
+  vendors.forEach(v => {
     const tr = document.createElement('tr');
+    tr.dataset.vendor = JSON.stringify(v);
 
     const created = v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-GB') : '—';
 
+    const shortVId = '...' + String(v._id || '').slice(-6).toUpperCase();
     tr.innerHTML = `
-      <td>${v.storeName || 'No Name'}</td>
-      <td>${v.userId?.email || 'No email'}</td>
-
       <td>
-        <span class="status status-${v.status}">
-          ${v.status}
-        </span>
+        ${v.storeName || 'No Name'}
+        <strong style="font-family:monospace;font-size:0.72rem;color:#6b7280;margin-left:4px">${shortVId}</strong>
       </td>
-
+      <td>${v.userId?.email || 'No email'}</td>
+      <td><span class="status status-${v.status}">${v.status}</span></td>
       <td>${v.orders || 0}</td>
-<td>£${(v.grossRevenue || 0).toFixed(2)}</td>
-<td>£${(v.refunds || 0).toFixed(2)}</td>
-<td>£${(v.netRevenue || 0).toFixed(2)}</td>
-
+      <td>£${(v.grossRevenue || 0).toFixed(2)}</td>
+      <td>£${(v.refunds || 0).toFixed(2)}</td>
+      <td>£${(v.netRevenue || 0).toFixed(2)}</td>
       <td>${created}</td>
-
-      <td>${renderVendorActions(v)}</td>
-    `;
+      <td>
+        ${renderVendorActions(v)}
+        <button class="view-vendor-btn" data-id="${v._id}"
+          style="margin-left:6px;padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;font-size:0.8rem">
+          View
+        </button>
+      </td>`;
 
     tbody.appendChild(tr);
   });
 }
 
-/* =========================================
-   LEGACY CARD RENDER (KEEP TEMP)
-========================================= */
-function renderVendors(vendors) {
-  const container = document.getElementById('vendors-list');
-  if (!container) return;
-
-  if (!vendors.length) {
-    container.innerHTML = '<p>No vendors found</p>';
-    return;
-  }
-
-  container.innerHTML = vendors
-    .map(
-      (v) => `
-      <div class="vendor-card">
-        <div class="vendor-top">
-          <div class="vendor-info">
-            <h3>${v.storeName || 'No Name'}</h3>
-            <p class="vendor-email">${v.userId?.email || 'No email'}</p>
-          </div>
-          <div class="vendor-status status-${v.status}">
-            ${v.status}
-          </div>
-        </div>
-
-        <div class="vendor-actions">
-          ${v.status === 'pending' ? `<button onclick="approveVendor('${v._id}')">Approve</button>` : ''}
-          ${v.status === 'approved' ? `<button onclick="suspendVendor('${v._id}', '${v.status}')">Suspend</button>` : ''}
-          ${v.status === 'suspended' ? `<button onclick="reactivateVendor('${v._id}', '${v.status}')">Reactivate</button>` : ''}
-        </div>
-      </div>
-    `
-    )
-    .join('');
-}
-
-/* =========================================
-   ACTION BUTTON BUILDER
-========================================= */
 function renderVendorActions(v) {
-  if (v.status === 'pending') {
-    return `<button class="action-btn" data-id="${v._id}" data-action="approve">Approve</button>`;
-  }
-  if (v.status === 'approved') {
-    return `<button class="action-btn" data-id="${v._id}" data-action="suspend">Suspend</button>`;
-  }
-  if (v.status === 'suspended') {
-    return `<button class="action-btn" data-id="${v._id}" data-action="reactivate">Reactivate</button>`;
-  }
+  if (v.status === 'pending')   return `<button class="action-btn" data-id="${v._id}" data-action="approve">Approve</button>`;
+  if (v.status === 'approved')  return `<button class="action-btn" data-id="${v._id}" data-action="suspend">Suspend</button>`;
+  if (v.status === 'suspended') return `<button class="action-btn" data-id="${v._id}" data-action="reactivate">Reactivate</button>`;
   return '';
 }
 
 /* =========================================
-   ACTION HANDLER (MAIN)
+   INLINE VENDOR PANEL
 ========================================= */
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.action-btn');
-  if (!btn) return;
+function buildVendorPanel(v) {
+  const shortVId  = '...' + String(v._id || '').slice(-6).toUpperCase();
+  const email     = v.userId?.email || '—';
+  const created   = v.createdAt   ? new Date(v.createdAt).toLocaleString()   : '—';
+  const approved  = v.approvedAt  ? new Date(v.approvedAt).toLocaleString()  : '—';
+  const suspended = v.suspendedAt ? new Date(v.suspendedAt).toLocaleString() : null;
 
-  const id = btn.dataset.id;
-  const action = btn.dataset.action;
+  const verifiedBadge = v.verified  ? '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">✓ Verified</span>' : '';
+  const featuredBadge = v.featured  ? '<span style="background:#fef9c3;color:#92400e;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">Featured</span>' : '';
 
-  try {
-    const res = await fetch(`${API}/admin/vendors/${id}/${action}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  const stripeInfo = v.stripeAccountId
+    ? `<div><strong>Stripe account:</strong> <code style="font-size:0.78rem">${v.stripeAccountId}</code></div>
+       <div><strong>Payouts:</strong> ${v.payoutEnabled ? '<span style="color:#15803d">Enabled ✓</span>' : '<span style="color:#b91c1c">Not enabled</span>'}</div>`
+    : '<div style="color:#9ca3af">No Stripe account connected</div>';
 
-    if (!res.ok) {
-      alert('Action failed');
-      return;
+  return `
+    <div style="padding:16px 0">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:14px">
+        <strong style="font-size:1rem">${v.storeName || '—'}</strong>
+        <strong style="font-family:monospace;font-size:0.78rem;color:#6b7280">${shortVId}</strong>
+        <span class="status status-${v.status}" style="font-size:0.78rem">${v.status}</span>
+        ${v.type ? `<span style="background:#f3f4f6;color:#374151;padding:1px 7px;border-radius:10px;font-size:0.72rem;text-transform:capitalize">${v.type}</span>` : ''}
+        ${verifiedBadge} ${featuredBadge}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:16px">
+
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">Store</div>
+          <div><strong>Slug:</strong> ${v.storeSlug || '—'}</div>
+          <div><strong>Type:</strong> ${v.type || '—'}</div>
+          ${v.storeDescription ? `<div style="margin-top:4px;color:#374151;font-size:0.85rem">${v.storeDescription}</div>` : ''}
+        </div>
+
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">Financials</div>
+          <div><strong>Orders:</strong> ${v.orders || 0}</div>
+          <div><strong>Gross:</strong> £${(v.grossRevenue || 0).toFixed(2)}</div>
+          <div><strong>Refunds:</strong> £${(v.refunds || 0).toFixed(2)}</div>
+          <div><strong>Net:</strong> £${(v.netRevenue || 0).toFixed(2)}</div>
+        </div>
+
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">Payout / Bank</div>
+          ${stripeInfo}
+        </div>
+
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">Account</div>
+          <div><strong>Email:</strong> <a href="mailto:${email}" style="color:#1d4ed8">${email}</a></div>
+          <div><strong>Created:</strong> ${created}</div>
+          ${approved !== '—' ? `<div><strong>Approved:</strong> ${approved}</div>` : ''}
+          ${suspended ? `<div><strong>Suspended:</strong> ${suspended}</div>` : ''}
+        </div>
+
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #e5e7eb">
+        ${renderVendorActions(v)}
+      </div>
+    </div>`;
+}
+
+/* =========================================
+   CLICK HANDLER
+========================================= */
+document.getElementById('vendorsTable').addEventListener('click', async e => {
+  // Existing action buttons
+  const actionBtn = e.target.closest('.action-btn');
+  if (actionBtn) {
+    const id     = actionBtn.dataset.id;
+    const action = actionBtn.dataset.action;
+    try {
+      const res = await authFetch(`${API}/admin/vendors/${id}/${action}`, { method: 'PATCH' });
+      if (!res.ok) { alert('Action failed'); return; }
+      loadVendors(currentPage, currentQuery, currentStatus);
+    } catch (err) {
+      console.error(err);
     }
-
-    loadVendors(currentPage, currentQuery, currentStatus);
-  } catch (err) {
-    console.error(err);
+    return;
   }
+
+  // View button — inline panel
+  const viewBtn = e.target.closest('.view-vendor-btn');
+  if (!viewBtn) return;
+
+  const row    = viewBtn.closest('tr');
+  const vendor = JSON.parse(row.dataset.vendor || '{}');
+
+  let detailsRow = row.nextElementSibling;
+
+  // Close if already open
+  if (detailsRow && detailsRow.classList.contains('order-details-row')) {
+    const wrapper = detailsRow.querySelector('.inline-order-wrapper');
+    if (wrapper) {
+      wrapper.style.height = wrapper.scrollHeight + 'px';
+      requestAnimationFrame(() => { wrapper.style.height = '0px'; });
+      setTimeout(() => detailsRow.remove(), 450);
+    }
+    return;
+  }
+
+  // Close any other open panel
+  const openRow = document.querySelector('#vendorsTable .order-details-row');
+  if (openRow) {
+    const openWrapper = openRow.querySelector('.inline-order-wrapper');
+    if (openWrapper) {
+      openWrapper.style.height = openWrapper.scrollHeight + 'px';
+      requestAnimationFrame(() => { openWrapper.style.height = '0px'; });
+      setTimeout(() => openRow.remove(), 450);
+    }
+  }
+
+  // Create panel
+  detailsRow = document.createElement('tr');
+  detailsRow.className = 'order-details-row';
+
+  const cell = document.createElement('td');
+  cell.colSpan = 9;
+  cell.innerHTML = `<div class="inline-order-wrapper">${buildVendorPanel(vendor)}</div>`;
+  detailsRow.appendChild(cell);
+  row.after(detailsRow);
+
+  // Animate open
+  const wrapper = detailsRow.querySelector('.inline-order-wrapper');
+  wrapper.style.height = 'auto';
+  const fullHeight = wrapper.scrollHeight + 'px';
+  wrapper.style.height = '0px';
+  wrapper.offsetHeight;
+  requestAnimationFrame(() => { wrapper.style.height = fullHeight; });
 });
 
 /* =========================================
@@ -206,36 +240,23 @@ function renderPagination(pagination) {
   if (!container || !pagination) return;
 
   const { page, pages } = pagination;
-
   container.innerHTML = '';
-
   if (pages <= 1) return;
 
-  // Prev
   const prev = document.createElement('button');
   prev.textContent = '← Prev';
   prev.disabled = page <= 1;
-
-  prev.onclick = () => {
-    loadVendors(page - 1, currentQuery, currentStatus);
-  };
-
+  prev.onclick = () => loadVendors(page - 1, currentQuery, currentStatus);
   container.appendChild(prev);
 
-  // Info
   const info = document.createElement('span');
   info.textContent = ` Page ${page} of ${pages} `;
   container.appendChild(info);
 
-  // Next
   const next = document.createElement('button');
   next.textContent = 'Next →';
   next.disabled = page >= pages;
-
-  next.onclick = () => {
-    loadVendors(page + 1, currentQuery, currentStatus);
-  };
-
+  next.onclick = () => loadVendors(page + 1, currentQuery, currentStatus);
   container.appendChild(next);
 }
 
@@ -243,13 +264,10 @@ function renderPagination(pagination) {
    SEARCH
 ========================================= */
 const searchInput = document.getElementById('vendorSearch');
-
 if (searchInput) {
   let timer;
-
   searchInput.addEventListener('input', () => {
     clearTimeout(timer);
-
     timer = setTimeout(() => {
       currentQuery = searchInput.value.trim();
       loadVendors(1, currentQuery, currentStatus);
@@ -260,22 +278,17 @@ if (searchInput) {
 /* =========================================
    FILTERS
 ========================================= */
-document.addEventListener('click', (e) => {
+document.addEventListener('click', e => {
   const btn = e.target.closest('.filter-btn');
   if (!btn) return;
-
   currentStatus = btn.dataset.status;
-  currentPage = 1;
-
-  document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+  currentPage   = 1;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
   loadVendors(currentPage, currentQuery, currentStatus);
 });
 
 /* =========================================
    INIT
 ========================================= */
-document.addEventListener('DOMContentLoaded', () => {
-  loadVendors();
-});
+loadVendors();

@@ -1,11 +1,16 @@
 const API = window.API_BASE;
 
-const token = localStorage.getItem('s4l_token');
-const role = localStorage.getItem('s4l_role');
-
-if (token && role === 'admin' && token.includes('.')) {
-  window.location.href = '/account/admin/index.html';
-}
+// Already signed in → skip sign-in page
+fetch(`${API}/auth/me`, { credentials: 'include' })
+  .then((res) => {
+    if (res.ok) return res.json();
+  })
+  .then((data) => {
+    if (data?.user?.role === 'admin') {
+      window.location.replace('/account/admin/index.html');
+    }
+  })
+  .catch(() => {});
 
 const form = document.getElementById('loginForm');
 const error = document.getElementById('error');
@@ -29,6 +34,7 @@ form.addEventListener('submit', async (e) => {
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
 
@@ -39,6 +45,8 @@ form.addEventListener('submit', async (e) => {
     }
 
     if (data.user.role !== 'admin') {
+      // Clear cookie the backend just set for a non-admin user
+      await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
       throw new Error('You do not have admin access.');
     }
 
@@ -46,6 +54,7 @@ form.addEventListener('submit', async (e) => {
     localStorage.setItem('s4l_role', data.user.role);
     localStorage.setItem('s4l_user', JSON.stringify(data.user));
 
+    btn.disabled = false;
     btn.textContent = 'Login successful';
     btn.classList.add('success');
 

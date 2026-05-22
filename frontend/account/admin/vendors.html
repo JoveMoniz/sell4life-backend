@@ -6,46 +6,49 @@
 
     <title>Admin – Vendors</title>
 
-    <link rel="stylesheet" href="/assets/css/admin.css?v=20260211" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260522" />
   </head>
 
   <body class="admin admin-vendors">
-    <!-- TOP BAR -->
-    <div class="admin-top">
-      <!-- Logo -->
-      <header class="admin-header">
-        <a href="/index.html" class="admin-logo">
-          <span class="logo-dollar">$</span>
-          <span class="logo-text">ell</span>
-          <span class="logo-four">4</span>
-          <span class="logo-text">Life</span>
-        </a>
-      </header>
+    <!-- STICKY STACK: top bar + search/filters -->
+    <div class="admin-sticky">
+      <!-- TOP BAR -->
+      <div class="admin-top">
+        <!-- Logo -->
+        <header class="admin-header">
+          <a href="/index.html" class="admin-logo">
+            <span class="logo-dollar">$</span>
+            <span class="logo-text">ell</span>
+            <span class="logo-four">4</span>
+            <span class="logo-text">Life</span>
+          </a>
+        </header>
 
-      <!-- Title -->
-      <div class="admin-title">
-        <a href="/account/admin/index.html" class="admin-back">← back to dashboard</a>
-        <h1>Admin – Vendors</h1>
+        <!-- Title -->
+        <div class="admin-title">
+          <a href="/account/admin/index.html" class="admin-back">← back to dashboard</a>
+          <h1>Admin – Vendors</h1>
+        </div>
+
+        <!-- Logout -->
+        <button id="logoutBtn">Log out</button>
       </div>
 
-      <!-- Logout -->
-      <button id="logoutBtn">Log out</button>
-    </div>
+      <!-- SEARCH + FILTER BAR -->
+      <div class="admin-filters">
+        <input
+          type="text"
+          id="vendorSearch"
+          placeholder="Search vendor name or email"
+          autocomplete="off"
+        />
 
-    <!-- SEARCH + FILTER BAR -->
-    <div class="admin-filters">
-      <input
-        type="text"
-        id="vendorSearch"
-        placeholder="Search vendor name or email"
-        autocomplete="off"
-      />
-
-      <div class="filter-tabs">
-        <button class="filter-btn active" data-status="all">All</button>
-        <button class="filter-btn" data-status="pending">Pending</button>
-        <button class="filter-btn" data-status="approved">Approved</button>
-        <button class="filter-btn" data-status="suspended">Suspended</button>
+        <div class="filter-tabs">
+          <button class="filter-btn active" data-status="all">All</button>
+          <button class="filter-btn" data-status="pending">Pending</button>
+          <button class="filter-btn" data-status="approved">Approved</button>
+          <button class="filter-btn" data-status="suspended">Suspended</button>
+        </div>
       </div>
     </div>
 
@@ -79,8 +82,8 @@
 
     <!-- Scripts -->
     <script src="/assets/js/config-global.js"></script>
-    <script src="/assets/js/require-auth.js"></script>
-    <script type="module" src="/assets/js/admin-vendors.js?v=20260211"></script>
+    <script src="/assets/js/require-admin.js"></script>
+    <script type="module" src="/assets/js/admin-vendors.js?v=20260521"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>
 </html>
