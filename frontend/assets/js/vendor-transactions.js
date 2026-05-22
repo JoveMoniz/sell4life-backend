@@ -41,6 +41,16 @@ async function loadTransactions() {
 
     lastTransactions = txns;
 
+    const banner = document.getElementById('txn-truncation-banner');
+    if (banner) {
+      if (data.truncated) {
+        banner.textContent = `Showing ${data.showing} of ${data.totalOrders} orders. Use period filters to narrow the range, or export CSV for complete data.`;
+        banner.hidden = false;
+      } else {
+        banner.hidden = true;
+      }
+    }
+
     document.getElementById('txn-sales').textContent = '£' + Number(summary.totalSales || 0).toFixed(2);
     document.getElementById('txn-refunds').textContent = '£' + Number(summary.totalRefunds || 0).toFixed(2);
 

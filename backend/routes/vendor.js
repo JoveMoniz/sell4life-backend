@@ -289,10 +289,14 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     const orderFilter = { 'vendorOrders.vendorId': vendorId };
     if (periodStart) orderFilter.createdAt = { $gte: periodStart };
 
+    const LIMIT = 500;
+    const totalMatchingOrders = await Order.countDocuments(orderFilter);
+    const truncated = totalMatchingOrders > LIMIT;
+
     const ordersRaw = await Order.find(orderFilter)
       .populate('user', 'email')
       .sort({ createdAt: -1 })
-      .limit(500);
+      .limit(LIMIT);
 
     const transactions = [];
     let totalSales = 0;
@@ -428,7 +432,10 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
         totalRefunds: Number(totalRefunds.toFixed(2)),
         net:          Number((totalSales - totalRefunds).toFixed(2)),
       },
-      period: period || 'all',
+      period:    period || 'all',
+      truncated,
+      showing:   ordersRaw.length,
+      totalOrders: totalMatchingOrders,
     });
   } catch (err) {
     console.error('Vendor transactions error:', err);

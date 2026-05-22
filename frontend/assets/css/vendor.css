@@ -1579,6 +1579,16 @@ Vendor Products
   font-style: italic;
 }
 
+.txn-truncation-banner {
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: #7a5c00;
+}
+
 .txn-loading,
 .txn-empty {
   text-align: center;
