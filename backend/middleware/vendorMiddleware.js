@@ -10,12 +10,6 @@ export async function requireApprovedVendor(req, res, next) {
       });
     }
 
-    if (!['vendor', 'admin'].includes(req.user.role)) {
-      return res.status(403).json({
-        error: 'Vendor access required',
-      });
-    }
-
     if (vendor.status === 'suspended') {
       return res.status(403).json({ error: 'Vendor suspended' });
     }

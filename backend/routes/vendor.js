@@ -94,20 +94,20 @@ router.post('/create', authMiddleware, async (req, res) => {
    REQUIRE VENDOR
 ====================================================== */
 
-function requireVendor(req, res, next) {
+async function requireVendor(req, res, next) {
   if (!req.user) {
-    return res.status(401).json({
-      error: 'Authentication required',
-    });
+    return res.status(401).json({ error: 'Authentication required' });
   }
-
-  if (req.user.role !== 'vendor' && req.user.role !== 'admin') {
-    return res.status(403).json({
-      error: 'Vendor access required',
-    });
+  try {
+    const vendor = await Vendor.findOne({ userId: req.user._id });
+    if (!vendor || vendor.status !== 'approved') {
+      return res.status(403).json({ error: 'Vendor access required' });
+    }
+    req.vendor = vendor;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
   }
-
-  next();
 }
 
 /* ======================================================
