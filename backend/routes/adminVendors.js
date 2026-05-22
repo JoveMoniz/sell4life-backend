@@ -118,6 +118,8 @@ router.patch('/:id/approve', async (req, res) => {
       });
     }
 
+    await User.findByIdAndUpdate(vendor.userId, { role: 'vendor' });
+
     res.json({ message: 'Vendor approved', vendor });
   } catch (error) {
     console.error('❌ Approve vendor error:', error);
