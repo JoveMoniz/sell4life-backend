@@ -2310,21 +2310,9 @@ Vendor Products
     top: 52px;
   }
 
-  /* Orders toolbar: not sticky on mobile (portrait handles it separately) */
+  /* Orders toolbar: not sticky on landscape mobile */
   .orders-toolbar {
     position: static;
-    flex-wrap: wrap;
-    padding: 8px 0 10px;
-  }
-
-  .orders-search-input {
-    flex: 1 1 100%;
-  }
-
-  .orders-filter-btns {
-    flex: 1 1 100%;
-    overflow-x: auto;
-    padding-bottom: 2px;
   }
 
   .orders-filter-btns .filter-btn {
@@ -2381,5 +2369,18 @@ Vendor Products
     align-items: stretch;
     gap: 8px;
     padding: 8px 0 10px;
+  }
+
+  .orders-search-input {
+    width: 100%;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+  }
+
+  .orders-filter-btns {
+    width: 100%;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 }
