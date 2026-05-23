@@ -174,6 +174,12 @@ async function loadVendorSidebar() {
 
     // Orders badge
     loadOrderBadge(container);
+
+    // Wire logout link
+    const logoutLink = container.querySelector('.vendor-logout');
+    if (logoutLink) {
+      logoutLink.addEventListener('click', e => { e.preventDefault(); logout(); });
+    }
   } catch (err) {
     console.warn('Sidebar skipped', err);
   }
@@ -249,6 +255,12 @@ function injectMobileBar() {
     return `<a href="${l.href}"${cls}>${l.label}</a>`;
   }).join('');
   bar.after(nav);
+
+  // Wire mobile logout
+  const mobileLogout = nav.querySelector('.vendor-logout');
+  if (mobileLogout) {
+    mobileLogout.addEventListener('click', e => { e.preventDefault(); logout(); });
+  }
 
   // Toggle dropdown on hamburger
   bar.querySelector('.vendor-hamburger').addEventListener('click', (e) => {
