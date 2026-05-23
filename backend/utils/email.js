@@ -1,47 +1,39 @@
 // ======================================================
-// EMAIL UTILITY  –  SMTP via nodemailer
+// EMAIL UTILITY  –  Resend HTTP API
 // Env vars required:
-//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
-//   EMAIL_FROM  (e.g. "Sell4Life <no-reply@sell4life.com>")
+//   RESEND_API_KEY  (from resend.com)
+//   EMAIL_FROM      (e.g. "Sell4Life <noreply@sell4life.com>")
 // ======================================================
 
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-let _transport = null;
+let _client = null;
 
-function getTransport() {
-  if (_transport) return _transport;
-
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    console.warn('[email] SMTP not configured — emails disabled');
+function getClient() {
+  if (_client) return _client;
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    console.warn('[email] RESEND_API_KEY not configured — emails disabled');
     return null;
   }
-
-  _transport = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT) || 587,
-    secure: Number(SMTP_PORT) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-
-  return _transport;
+  _client = new Resend(key);
+  return _client;
 }
 
-export async function sendMail({ to, subject, html, text }) {
-  const transport = getTransport();
-  if (!transport) return;
+export async function sendMail({ to, subject, html }) {
+  const client = getClient();
+  if (!client) return;
 
   try {
-    await transport.sendMail({
-      from: process.env.EMAIL_FROM || 'Sell4Life <no-reply@sell4life.com>',
-      to,
-      subject,
-      html,
-      text,
-    });
+    const from = process.env.EMAIL_FROM || 'Sell4Life <noreply@sell4life.com>';
+    const { error } = await client.emails.send({ from, to, subject, html });
+    if (error) {
+      console.error('[email] Send failed:', error.message);
+    } else {
+      console.log('[email] Sent to:', to);
+    }
   } catch (err) {
-    console.error('[email] Send failed:', err.message);
+    console.error('[email] Exception:', err.message);
   }
 }
 
@@ -106,9 +98,9 @@ export function mailPayoutProcessed({ to, storeName, amount, reference }) {
 
 export function mailVendorStatusChange({ to, storeName, status }) {
   const messages = {
-    approved:   { heading: `Welcome, ${storeName}!`, body: 'Your vendor account has been approved. You can now list products and start selling.' },
-    suspended:  { heading: 'Account suspended',     body: 'Your vendor account has been suspended. Please contact support if you believe this is an error.' },
-    reactivated:{ heading: 'Account reactivated',   body: 'Your vendor account has been reactivated. You can now list products again.' },
+    approved:    { heading: `Welcome, ${storeName}!`, body: 'Your vendor account has been approved. You can now list products and start selling.' },
+    suspended:   { heading: 'Account suspended',      body: 'Your vendor account has been suspended. Please contact support if you believe this is an error.' },
+    reactivated: { heading: 'Account reactivated',    body: 'Your vendor account has been reactivated. You can now list products again.' },
   };
   const { heading, body } = messages[status] || { heading: `Account status: ${status}`, body: '' };
 
