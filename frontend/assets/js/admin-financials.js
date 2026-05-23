@@ -182,6 +182,20 @@ document.addEventListener('click', e => {
 });
 
 /* ======================================================
-   INIT
+   INIT + AUTO-REFRESH
 ====================================================== */
 loadFinancials();
+
+const REFRESH_INTERVAL = 20;
+let refreshTimer = REFRESH_INTERVAL;
+
+const refreshEl = document.getElementById('fin-refresh-indicator');
+
+setInterval(() => {
+  refreshTimer--;
+  if (refreshTimer <= 0) {
+    refreshTimer = REFRESH_INTERVAL;
+    loadFinancials(currentPeriod);
+  }
+  if (refreshEl) refreshEl.textContent = `Refreshes in ${refreshTimer}s`;
+}, 1000);
