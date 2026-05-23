@@ -121,6 +121,9 @@ footer p {
   transition: background 0.2s;
 }
 .back-to-top:hover .back-to-top-arrow { background: rgba(255,255,255,0.35); }
+@media (max-width: 600px) {
+  .back-to-top-text { display: none; }
+}
 
 .footer-top:hover {
   background: #086160;
