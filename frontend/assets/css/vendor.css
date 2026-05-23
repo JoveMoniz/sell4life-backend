@@ -641,6 +641,49 @@ Vendor Products
   color: #0f766e;
 }
 
+/* ==============================
+   ORDERS TOOLBAR (search + filters)
+============================== */
+.orders-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #f5f6f8;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding: 10px 0 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e2e6ea;
+}
+
+.orders-search-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.orders-search-input:focus {
+  border-color: #0b6b6a;
+  box-shadow: 0 0 0 3px rgba(11, 107, 106, 0.12);
+}
+
+.orders-filter-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* keep vendor-filters for any other pages that use it */
 .vendor-filters {
   display: flex;
   gap: 10px;
@@ -648,17 +691,25 @@ Vendor Products
 }
 
 .filter-btn {
-  padding: 6px 12px;
-  border: 1px solid #ccc;
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
   background: #fff;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.filter-btn:hover {
+  border-color: #0b6b6a;
+  color: #0b6b6a;
 }
 
 .filter-btn.active {
-  background: #2c7be5; /* blue */
+  background: #0b6b6a;
   color: #fff;
-  border-color: #2c7be5;
+  border-color: #0b6b6a;
 }
 
 /* ==============================
@@ -2254,8 +2305,30 @@ Vendor Products
     flex-shrink: 0;
   }
 
+  /* Transactions filter bar: clear the fixed mobile nav bar */
   .txn-filter-sticky {
-    top: 0;
+    top: 52px;
+  }
+
+  /* Orders toolbar: not sticky on mobile (portrait handles it separately) */
+  .orders-toolbar {
+    position: static;
+    flex-wrap: wrap;
+    padding: 8px 0 10px;
+  }
+
+  .orders-search-input {
+    flex: 1 1 100%;
+  }
+
+  .orders-filter-btns {
+    flex: 1 1 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .orders-filter-btns .filter-btn {
+    flex-shrink: 0;
   }
 
   /* Sticky payout bar: full width */
@@ -2292,5 +2365,21 @@ Vendor Products
 
   .vendor-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ======================================================
+   PORTRAIT-ONLY — sticky orders toolbar below mobile bar
+====================================================== */
+@media (max-width: 900px) and (orientation: portrait) {
+  .orders-toolbar {
+    position: sticky;
+    top: 52px;
+    z-index: 50;
+    background: #f5f6f8;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 0 10px;
   }
 }

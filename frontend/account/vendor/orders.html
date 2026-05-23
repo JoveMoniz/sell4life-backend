@@ -9,10 +9,10 @@
     <title>Vendor Orders | Sell4Life</title>
 
     <link rel="stylesheet" href="/assets/css/layout.css" />
-    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523g" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523h" />
   </head>
 
-  <body>
+  <body class="page-orders">
     <div class="vendor-layout">
       <!-- Sidebar injected by layout.js -->
       <div id="vendor-sidebar"></div>
@@ -25,17 +25,15 @@
 
           <h1 class="vendor-title">Orders</h1>
 
-          <div class="vendor-search">
+          <div class="orders-toolbar">
             <input
               type="text"
               id="vendorOrderSearch"
-              placeholder="Search Order ID or Email (e.g. S4L-123)"
+              class="orders-search-input"
+              placeholder="Search by Order ID or email…"
               value="S4L-"
             />
-          </div>
-
-          <div class="vendor-filters" role="group" aria-label="Order filters">
-            <div class="vendor-filters">
+            <div class="orders-filter-btns" role="group" aria-label="Order filters">
               <button type="button" class="filter-btn active" data-status="all">All</button>
               <button type="button" class="filter-btn" data-status="active">Active</button>
               <button type="button" class="filter-btn" data-status="issues">Issues</button>
