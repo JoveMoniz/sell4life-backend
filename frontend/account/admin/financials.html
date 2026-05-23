@@ -148,6 +148,9 @@
       /* ── Loading / empty ── */
       .fin-loading { color: #9ca3af; text-align: center; padding: 30px; font-size: 14px; }
 
+      .fin-vendor-count { font-weight: 400; color: #9ca3af; font-size: 12px; }
+      .fin-refresh-indicator { font-size: 11px; color: #9ca3af; margin-left: auto; }
+
       /* ── Page wrapper ── */
       .fin-body {
         max-width: 1100px;
@@ -182,11 +185,12 @@
 
       <!-- PERIOD FILTER -->
       <div class="fin-period">
-        <button class="fin-period-btn active" data-period="all">All Time</button>
-        <button class="fin-period-btn" data-period="week">This Week</button>
-        <button class="fin-period-btn" data-period="month">This Month</button>
-        <button class="fin-period-btn" data-period="quarter">This Quarter</button>
-        <button class="fin-period-btn" data-period="year">This Year</button>
+        <button type="button" class="fin-period-btn active" data-period="all">All Time</button>
+        <button type="button" class="fin-period-btn" data-period="today">Today</button>
+        <button type="button" class="fin-period-btn" data-period="week">This Week</button>
+        <button type="button" class="fin-period-btn" data-period="month">This Month</button>
+        <button type="button" class="fin-period-btn" data-period="quarter">This Quarter</button>
+        <button type="button" class="fin-period-btn" data-period="year">Year to Date</button>
       </div>
 
       <!-- SUMMARY CARDS -->
@@ -197,12 +201,12 @@
       <!-- VENDOR BREAKDOWN -->
       <div class="fin-section-title">
         Vendor Breakdown
-        <span id="vendor-count" style="font-weight:400;color:#9ca3af;font-size:12px"></span>
+        <span id="vendor-count" class="fin-vendor-count"></span>
       </div>
 
       <div class="fin-toolbar">
-        <button class="btn-export" id="btn-export-csv">Export CSV</button>
-        <span id="fin-refresh-indicator" style="font-size:11px;color:#9ca3af;margin-left:auto">Refreshes in 20s</span>
+        <button type="button" class="btn-export" id="btn-export-csv">Export CSV</button>
+        <span id="fin-refresh-indicator" class="fin-refresh-indicator">Refreshes in 20s</span>
       </div>
 
       <div class="fin-table-wrap">
