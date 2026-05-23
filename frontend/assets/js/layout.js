@@ -152,6 +152,14 @@ async function loadVendorSidebar() {
   const container = document.getElementById('vendor-sidebar');
   if (!container) return;
 
+  // Auth guard — redirect to sign-in if not logged in or not a vendor
+  const token = localStorage.getItem('s4l_token');
+  const isVendor = localStorage.getItem('s4l_isVendor') === 'true';
+  if (!token || !isVendor) {
+    window.location.replace('/account/signin.html');
+    return;
+  }
+
   // Inject mobile bar immediately (before async fetch) so it appears instantly
   injectMobileBar();
 
