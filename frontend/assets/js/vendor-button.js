@@ -120,6 +120,26 @@ async function initVendorButtons() {
           btn.textContent = 'Store Suspended';
         }
       });
+
+      if (status === 'approved') {
+        try {
+          const cr = await fetch(`${API_BASE}/vendor/orders/pending-count`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (cr.ok) {
+            const { count } = await cr.json();
+            if (count > 0) {
+              const label = count > 99 ? '99+' : String(count);
+              buttons.forEach((btn) => {
+                const badge = document.createElement('span');
+                badge.className = 'vendor-btn-badge';
+                badge.textContent = label;
+                btn.appendChild(badge);
+              });
+            }
+          }
+        } catch { /* non-critical */ }
+      }
     } else {
       localStorage.setItem('s4l_isVendor', 'false');
 
