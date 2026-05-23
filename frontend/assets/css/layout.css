@@ -99,9 +99,31 @@ footer p {
 }
 
 .back-to-top {
-  color: #ccc;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
   text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+  transition: opacity 0.2s;
 }
+.back-to-top:hover { opacity: 1; }
+.back-to-top-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+.back-to-top:hover .back-to-top-arrow { background: rgba(255,255,255,0.35); }
 
 .footer-top:hover {
   background: #086160;
