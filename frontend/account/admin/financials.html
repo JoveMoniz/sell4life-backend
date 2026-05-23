@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Platform Financials | Admin</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260523a" />
+    <style>
+      #logoutBtn { padding: 5px 10px; font-size: 12px; font-weight: 500; }
+
+      /* ── Period filter ── */
+      .fin-period {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 10px 0 4px;
+      }
+      .fin-period-btn {
+        padding: 5px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background .12s, color .12s, border-color .12s;
+      }
+      .fin-period-btn.active,
+      .fin-period-btn:hover {
+        background: #0b6b6a;
+        color: #fff;
+        border-color: #0b6b6a;
+      }
+
+      /* ── Summary cards ── */
+      .fin-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 14px;
+        padding: 18px 0 10px;
+      }
+      .fin-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+      }
+      .fin-card-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      .fin-card-value {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.1;
+      }
+      .fin-card-value.positive { color: #15803d; }
+      .fin-card-value.negative { color: #b91c1c; }
+      .fin-card-value.warn     { color: #b45309; }
+      .fin-card-sub {
+        font-size: 11px;
+        color: #9ca3af;
+        margin-top: 3px;
+      }
+
+      /* ── Section headings ── */
+      .fin-section-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #374151;
+        margin: 22px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ── Vendor breakdown table ── */
+      .fin-table-wrap {
+        overflow-x: auto;
+      }
+      .fin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        min-width: 700px;
+      }
+      .fin-table th {
+        text-align: left;
+        padding: 8px 10px;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #6b7280;
+        white-space: nowrap;
+      }
+      .fin-table td {
+        padding: 9px 10px;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+      }
+      .fin-table tr:last-child td { border-bottom: none; }
+      .fin-table tr:hover td { background: #f9fafb; }
+      .fin-num { text-align: right; font-variant-numeric: tabular-nums; }
+      .fin-positive { color: #15803d; font-weight: 600; }
+      .fin-commission { color: #1d4ed8; font-weight: 600; }
+      .fin-status {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .fin-status.approved  { background:#dcfce7; color:#166534; }
+      .fin-status.pending   { background:#fef9c3; color:#854d0e; }
+      .fin-status.suspended { background:#fee2e2; color:#991b1b; }
+
+      /* ── Export bar ── */
+      .fin-toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .btn-export {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn-export:hover { border-color: #0b6b6a; color: #0b6b6a; }
+
+      /* ── Loading / empty ── */
+      .fin-loading { color: #9ca3af; text-align: center; padding: 30px; font-size: 14px; }
+
+      /* ── Page wrapper ── */
+      .fin-body {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 20px 60px;
+      }
+    </style>
+  </head>
+
+  <body class="admin">
+
+    <!-- TOP BAR -->
+    <div class="admin-sticky">
+      <div class="admin-top">
+        <header class="admin-header">
+          <a href="/index.html" class="admin-logo">
+            <span class="logo-dollar">$</span>
+            <span class="logo-text">ell</span>
+            <span class="logo-four">4</span>
+            <span class="logo-text">Life</span>
+          </a>
+        </header>
+        <div class="admin-title">
+          <a href="/account/admin/index.html" class="admin-back">← dashboard</a>
+          <h1>Platform Financials</h1>
+        </div>
+        <button id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <div class="fin-body">
+
+      <!-- PERIOD FILTER -->
+      <div class="fin-period">
+        <button class="fin-period-btn active" data-period="all">All Time</button>
+        <button class="fin-period-btn" data-period="week">This Week</button>
+        <button class="fin-period-btn" data-period="month">This Month</button>
+        <button class="fin-period-btn" data-period="quarter">This Quarter</button>
+        <button class="fin-period-btn" data-period="year">This Year</button>
+      </div>
+
+      <!-- SUMMARY CARDS -->
+      <div class="fin-cards" id="fin-cards">
+        <div class="fin-loading">Loading…</div>
+      </div>
+
+      <!-- VENDOR BREAKDOWN -->
+      <div class="fin-section-title">
+        Vendor Breakdown
+        <span id="vendor-count" style="font-weight:400;color:#9ca3af;font-size:12px"></span>
+      </div>
+
+      <div class="fin-toolbar">
+        <button class="btn-export" id="btn-export-csv">Export CSV</button>
+      </div>
+
+      <div class="fin-table-wrap">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th class="fin-num">Orders</th>
+              <th class="fin-num">Gross Sales</th>
+              <th class="fin-num">Refunds</th>
+              <th class="fin-num">Net to Vendor</th>
+              <th class="fin-num">Commission (8%)</th>
+            </tr>
+          </thead>
+          <tbody id="fin-vendor-table">
+            <tr><td colspan="8" class="fin-loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/require-admin.js"></script>
+    <script type="module" src="/assets/js/admin-financials.js?v=20260523a"></script>
+    <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
+  </body>
+</html>

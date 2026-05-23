@@ -25,7 +25,7 @@ async function loadVendors(page = 1, q = '', status = 'all') {
   if (q)            url += `&q=${encodeURIComponent(q)}`;
   if (status !== 'all') url += `&status=${status}`;
 
-  if (tbody) tbody.innerHTML = '<tr><td colspan="9">Loading vendors...</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10">Loading vendors...</td></tr>';
 
   try {
     const res = await authFetch(url);
@@ -41,7 +41,7 @@ async function loadVendors(page = 1, q = '', status = 'all') {
     renderPagination(data.pagination);
   } catch (err) {
     console.error(err);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9">Failed to load vendors</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10">Failed to load vendors</td></tr>';
   }
 }
 
@@ -55,7 +55,7 @@ function renderVendorsTable(vendors) {
   tbody.innerHTML = '';
 
   if (!vendors.length) {
-    tbody.innerHTML = '<tr><td colspan="9">No vendors found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10">No vendors found</td></tr>';
     return;
   }
 
@@ -64,7 +64,7 @@ function renderVendorsTable(vendors) {
     tr.dataset.vendor = JSON.stringify(v);
 
     const created = v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-GB') : '—';
-
+    const commission = ((v.grossRevenue || 0) * 0.08).toFixed(2);
     const shortVId = '...' + String(v._id || '').slice(-6).toUpperCase();
     tr.innerHTML = `
       <td>
@@ -76,6 +76,7 @@ function renderVendorsTable(vendors) {
       <td>${v.orders || 0}</td>
       <td>£${(v.grossRevenue || 0).toFixed(2)}</td>
       <td>£${(v.refunds || 0).toFixed(2)}</td>
+      <td style="color:#1d4ed8;font-weight:600">£${commission}</td>
       <td>£${(v.netRevenue || 0).toFixed(2)}</td>
       <td>${created}</td>
       <td>
@@ -139,7 +140,8 @@ function buildVendorPanel(v) {
           <div><strong>Orders:</strong> ${v.orders || 0}</div>
           <div><strong>Gross:</strong> £${(v.grossRevenue || 0).toFixed(2)}</div>
           <div><strong>Refunds:</strong> £${(v.refunds || 0).toFixed(2)}</div>
-          <div><strong>Net:</strong> £${(v.netRevenue || 0).toFixed(2)}</div>
+          <div><strong>Commission (8%):</strong> <span style="color:#1d4ed8;font-weight:600">£${((v.grossRevenue || 0) * 0.08).toFixed(2)}</span></div>
+          <div><strong>Net to Vendor:</strong> £${(v.netRevenue || 0).toFixed(2)}</div>
           <div><strong>VAT:</strong> ${v.vatRegistered ? `Registered${v.vatNumber ? ` · <code style="font-size:0.78rem">${v.vatNumber}</code>` : ''}` : 'Not registered'}</div>
         </div>
 
@@ -158,8 +160,12 @@ function buildVendorPanel(v) {
 
       </div>
 
-      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #e5e7eb">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #e5e7eb;align-items:center">
         ${renderVendorActions(v)}
+        <a href="/account/admin/financials.html" target="_blank"
+          style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
+          Platform Financials ↗
+        </a>
       </div>
     </div>`;
 }
@@ -219,7 +225,7 @@ document.getElementById('vendorsTable').addEventListener('click', async e => {
   detailsRow.className = 'order-details-row';
 
   const cell = document.createElement('td');
-  cell.colSpan = 9;
+  cell.colSpan = 10;
   cell.innerHTML = `<div class="inline-order-wrapper">${buildVendorPanel(vendor)}</div>`;
   detailsRow.appendChild(cell);
   row.after(detailsRow);

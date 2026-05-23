@@ -192,6 +192,137 @@ router.patch('/:id/reactivate', async (req, res) => {
 });
 
 /* ======================================================
+   PLATFORM FINANCIALS
+====================================================== */
+
+router.get('/financials', async (req, res) => {
+  try {
+    const { period } = req.query;
+
+    // Date filter for orders
+    const now = new Date();
+    let dateFilter = {};
+    if (period === 'week') {
+      const s = new Date(now); s.setDate(s.getDate() - 7);
+      dateFilter = { createdAt: { $gte: s } };
+    } else if (period === 'month') {
+      dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) } };
+    } else if (period === 'quarter') {
+      const q = Math.floor(now.getMonth() / 3);
+      dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), q * 3, 1) } };
+    } else if (period === 'year') {
+      dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), 0, 1) } };
+    }
+
+    const PAID = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled'];
+
+    const orders = await Order.find({
+      paymentStatus: { $in: PAID },
+      ...dateFilter,
+    }).select('items vendorOrders paymentStatus stripeFeeAmount createdAt');
+
+    // One-pass aggregation across all orders
+    let totalGross = 0;
+    let totalRefunds = 0;
+    let totalCommission = 0;
+    let totalStripe = 0;
+    const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds }
+
+    for (const order of orders) {
+      // Stripe fee is once per order (platform cost)
+      const orderGross = (order.items || []).reduce(
+        (s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0
+      );
+      const stripeFee = Number(order.stripeFeeAmount) ||
+        Math.round((orderGross * 0.014 + 0.20) * 100) / 100;
+      totalStripe += stripeFee;
+
+      for (const item of order.items || []) {
+        const gross = Number(item.price || 0) * Number(item.quantity || 0);
+        const commission = Math.round(gross * 0.08 * 100) / 100;
+
+        // Refund = actual money moved (mirrors vendorMetrics logic)
+        let refunded = 0;
+        if (item.status === 'Cancelled') {
+          refunded = gross;
+        } else if (Number(item.refundedQuantity) > 0) {
+          refunded = Number(item.refundedAmount) ||
+            Number(item.price || 0) * Number(item.refundedQuantity);
+        } else if (Number(item.returnQuantity) > 0) {
+          refunded = Number(item.price || 0) * Number(item.returnQuantity);
+        }
+
+        totalGross += gross;
+        totalRefunds += refunded;
+        totalCommission += commission;
+
+        const vid = String(item.vendorId || '');
+        if (vid && mongoose.Types.ObjectId.isValid(vid)) {
+          if (!vendorMap[vid]) vendorMap[vid] = { gross: 0, refunds: 0, commission: 0, orderIds: new Set() };
+          vendorMap[vid].gross += gross;
+          vendorMap[vid].refunds += refunded;
+          vendorMap[vid].commission += commission;
+          vendorMap[vid].orderIds.add(String(order._id));
+        }
+      }
+    }
+
+    // Payout totals (always all-time so admin sees full picture)
+    const allPayouts = await Payout.find({});
+    const pendingPayouts = allPayouts.filter(p => p.status === 'requested')
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const paidPayouts = allPayouts.filter(p => p.status === 'paid')
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const pendingCount = allPayouts.filter(p => p.status === 'requested').length;
+
+    // Enrich vendor rows with store info
+    const vendorIds = Object.keys(vendorMap);
+    const vendors = await Vendor.find({ _id: { $in: vendorIds } })
+      .populate('userId', 'email')
+      .select('storeName storeSlug status vatRegistered');
+
+    const vendorRows = vendors.map(v => {
+      const m = vendorMap[String(v._id)] || {};
+      const gross = m.gross || 0;
+      const refunds = m.refunds || 0;
+      const commission = Math.round(m.commission * 100) / 100 || 0;
+      return {
+        _id: v._id,
+        storeName: v.storeName || '—',
+        storeSlug: v.storeSlug || '',
+        email: v.userId?.email || '—',
+        status: v.status,
+        vatRegistered: v.vatRegistered || false,
+        orderCount: m.orderIds ? m.orderIds.size : 0,
+        gross: Math.round(gross * 100) / 100,
+        refunds: Math.round(refunds * 100) / 100,
+        commission,
+        netToVendor: Math.round((gross - refunds - commission) * 100) / 100,
+      };
+    }).sort((a, b) => b.gross - a.gross);
+
+    res.json({
+      summary: {
+        totalGross:        Math.round(totalGross * 100) / 100,
+        totalRefunds:      Math.round(totalRefunds * 100) / 100,
+        totalCommission:   Math.round(totalCommission * 100) / 100,
+        totalStripe:       Math.round(totalStripe * 100) / 100,
+        netProfit:         Math.round((totalCommission - totalStripe) * 100) / 100,
+        pendingPayouts:    Math.round(pendingPayouts * 100) / 100,
+        paidPayouts:       Math.round(paidPayouts * 100) / 100,
+        pendingCount,
+        orderCount:        orders.length,
+        vendorCount:       vendorIds.length,
+      },
+      vendors: vendorRows,
+    });
+  } catch (err) {
+    console.error('Financials error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    PAYOUT REQUESTS
 ====================================================== */
 
