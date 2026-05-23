@@ -49,9 +49,9 @@ footer p {
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
   max-width: 1100px;
-  margin: 2.5rem auto;
+  margin: 2.5rem auto 0;
   text-align: left;
-  padding: 0 20px;
+  padding: 0 20px 2rem;
 }
 
 .footer-col h4 {
@@ -123,6 +123,17 @@ footer p {
 .back-to-top:hover .back-to-top-arrow { background: rgba(255,255,255,0.35); }
 @media (max-width: 600px) {
   .back-to-top-text { display: none; }
+}
+
+/* Confirm modal — hidden globally; vendor.css shows it when needed */
+.confirm-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
 }
 
 .footer-top:hover {
