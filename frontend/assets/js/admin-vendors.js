@@ -162,6 +162,10 @@ function buildVendorPanel(v) {
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #e5e7eb;align-items:center">
         ${renderVendorActions(v)}
+        <a href="/account/admin/vendor-ledger.html?id=${v._id}" target="_blank"
+          style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
+          View Ledger ↗
+        </a>
         <a href="/account/admin/financials.html" target="_blank"
           style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
           Platform Financials ↗

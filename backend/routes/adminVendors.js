@@ -192,6 +192,250 @@ router.patch('/:id/reactivate', async (req, res) => {
 });
 
 /* ======================================================
+   VENDOR TRANSACTION LEDGER (admin view of any vendor)
+====================================================== */
+
+router.get('/:id/transactions', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid vendor ID' });
+    }
+
+    const vendor = await Vendor.findById(id).populate('userId', 'email');
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const VALID_PERIODS = ['week', 'month', 'quarter', 'year'];
+    const VALID_TYPES   = ['all', 'sales', 'refunds'];
+    const { period, type = 'all' } = req.query;
+
+    if (period && !VALID_PERIODS.includes(period)) {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    if (!VALID_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+
+    const now = new Date();
+    let periodStart = null;
+    if (period === 'week') {
+      periodStart = new Date(now); periodStart.setDate(periodStart.getDate() - 7);
+    } else if (period === 'month') {
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (period === 'quarter') {
+      const q = Math.floor(now.getMonth() / 3);
+      periodStart = new Date(now.getFullYear(), q * 3, 1);
+    } else if (period === 'year') {
+      periodStart = new Date(now.getFullYear(), 0, 1);
+    }
+
+    const orderFilter = { 'vendorOrders.vendorId': vendor._id };
+    if (periodStart) orderFilter.createdAt = { $gte: periodStart };
+
+    const LIMIT = 500;
+    const COMMISSION_RATE = 0.08;
+    const VAT_RATE = 20 / 120;
+    const STRIPE_PCT = 0.014;
+    const STRIPE_FIXED = 0.20;
+
+    const totalMatchingOrders = await Order.countDocuments(orderFilter);
+    const truncated = totalMatchingOrders > LIMIT;
+
+    const ordersRaw = await Order.find(orderFilter)
+      .populate('user', 'email')
+      .sort({ createdAt: -1 })
+      .limit(LIMIT);
+
+    const isVatRegistered = vendor.vatRegistered === true;
+    const transactions = [];
+    let totalSales = 0;
+    let totalRefunds = 0;
+    let totalCommission = 0;
+    let totalVat = 0;
+    let totalStripeFees = 0;
+
+    ordersRaw.forEach(order => {
+      const vendorOrder = order.vendorOrders.find(
+        vo => String(vo.vendorId) === String(vendor._id)
+      );
+      if (!vendorOrder) return;
+
+      const vendorItems = (order.items || []).filter(
+        item => String(item.vendorId) === String(vendor._id)
+      );
+
+      const paymentStatus = (order.paymentStatus || '').toLowerCase();
+      const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
+      const baseId = order.shortId || String(order._id).slice(0, 10).toUpperCase();
+      const displayId = baseId.startsWith('S4L-') ? baseId : `S4L-${baseId}`;
+
+      const itemsTotal = vendorItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
+      );
+
+      let orderRefundTotal = 0;
+      const refundEntries = [];
+
+      vendorItems.forEach(item => {
+        const price = Number(item.price || 0);
+        let refundQty = 0;
+        let refundAmount = 0;
+        let refundType = '';
+        let refundDate = order.createdAt;
+
+        if (item.status === 'Cancelled') {
+          refundQty    = Number(item.quantity || 0);
+          refundAmount = price * refundQty;
+          refundType   = 'cancelled';
+          refundDate   = item.cancelledAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.refundedQuantity) > 0) {
+          refundQty    = Number(item.refundedQuantity);
+          refundAmount = Number(item.refundedAmount) || price * refundQty;
+          refundType   = 'returned';
+          refundDate   = item.refundedAt || item.returnedAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.returnQuantity) > 0) {
+          refundQty    = Number(item.returnQuantity);
+          refundAmount = price * refundQty;
+          refundType   = 'returned';
+          refundDate   = item.returnedAt || order.updatedAt || order.createdAt;
+        } else if (Number(item.returnApprovedQuantity) > 0) {
+          refundQty    = Number(item.returnApprovedQuantity);
+          refundAmount = price * refundQty;
+          refundType   = 'return_pending';
+          refundDate   = item.returnApprovedAt || order.updatedAt || order.createdAt;
+        }
+
+        if (refundQty > 0) {
+          const moneyMoved = refundType !== 'return_pending';
+          if (moneyMoved) orderRefundTotal += refundAmount;
+          refundEntries.push({
+            date:        refundDate,
+            orderId:     order._id,
+            displayId,
+            buyerEmail:  order.user?.email || '—',
+            type:        refundType,
+            description: refundType === 'cancelled'     ? 'Item cancelled'
+                       : refundType === 'returned'      ? 'Item returned'
+                       : 'Return pending (awaiting item)',
+            itemName:    item.name || 'Unknown item',
+            qty:         refundQty,
+            amount:      -refundAmount,
+            pending:     !moneyMoved,
+          });
+        }
+      });
+
+      const orderTotal = Number(order.total || 0);
+      const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
+      const rawStripeFee = Number(order.stripeFeeAmount || 0);
+      const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
+      const orderStripeFee = rawStripeFee > 0 ? rawStripeFee : estimatedFee;
+      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
+      const stripeIsEstimated = rawStripeFee === 0;
+
+      if (type === 'sales') {
+        const netAmount = itemsTotal - orderRefundTotal;
+        if (isPaid && netAmount > 0) {
+          const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
+          transactions.push({
+            date: order.createdAt, orderId: order._id, displayId,
+            buyerEmail: order.user?.email || '—',
+            type: 'sale', description: 'Order received', itemName: null, qty: null,
+            amount: netAmount, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+          });
+          totalSales      += netAmount;
+          totalCommission += commission;
+          totalVat        += vatAmount;
+          totalStripeFees += vendorStripeFee;
+        }
+      } else if (type === 'refunds') {
+        refundEntries.forEach(e => {
+          transactions.push(e);
+          if (!e.pending) totalRefunds += Math.abs(e.amount);
+        });
+      } else {
+        if (isPaid && itemsTotal > 0) {
+          const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((itemsTotal * VAT_RATE).toFixed(2)) : 0;
+          transactions.push({
+            date: order.createdAt, orderId: order._id, displayId,
+            buyerEmail: order.user?.email || '—',
+            type: 'sale', description: 'Order received', itemName: null, qty: null,
+            amount: itemsTotal, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+          });
+          totalSales      += itemsTotal;
+          totalCommission += commission;
+          totalVat        += vatAmount;
+          totalStripeFees += vendorStripeFee;
+        }
+        refundEntries.forEach(e => {
+          transactions.push(e);
+          if (!e.pending) totalRefunds += Math.abs(e.amount);
+        });
+      }
+
+      if (type !== 'sales') {
+        const vShare = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 0;
+        (order.disputes || []).forEach(disp => {
+          const ACTIVE = ['needs_response', 'warning_needs_response', 'under_review', 'warning_under_review'];
+          const isLost    = disp.status === 'lost';
+          const isPending = ACTIVE.includes(disp.status);
+          if (!isLost && !isPending) return;
+          const disputeShare = Number((disp.amount * vShare).toFixed(2));
+          if (disputeShare <= 0) return;
+          const reasonLabel = (disp.reason || 'dispute').replace(/_/g, ' ');
+          transactions.push({
+            date: disp.createdAt, orderId: order._id, displayId,
+            buyerEmail: order.user?.email || '—',
+            type: 'chargeback',
+            description: isLost ? `Chargeback lost – ${reasonLabel}` : `Chargeback open – ${reasonLabel}`,
+            itemName: null, qty: null,
+            amount: isLost ? -disputeShare : 0,
+            pending: isPending, chargebackStatus: disp.status,
+          });
+          if (isLost) totalRefunds += disputeShare;
+        });
+      }
+    });
+
+    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const net = Number((totalSales - totalRefunds).toFixed(2));
+    res.json({
+      vendor: {
+        _id:          vendor._id,
+        storeName:    vendor.storeName || '—',
+        storeSlug:    vendor.storeSlug || '',
+        email:        vendor.userId?.email || '—',
+        status:       vendor.status,
+        vatRegistered: isVatRegistered,
+        vatNumber:    vendor.vatNumber || '',
+      },
+      transactions,
+      summary: {
+        totalSales:      Number(totalSales.toFixed(2)),
+        totalRefunds:    Number(totalRefunds.toFixed(2)),
+        totalCommission: Number(totalCommission.toFixed(2)),
+        totalVat:        Number(totalVat.toFixed(2)),
+        totalStripeFees: Number(totalStripeFees.toFixed(2)),
+        net,
+        netAfterFees:    Number((net - totalCommission).toFixed(2)),
+        commissionRate:  COMMISSION_RATE,
+        vatRegistered:   isVatRegistered,
+      },
+      period:      period || 'all',
+      truncated,
+      showing:     ordersRaw.length,
+      totalOrders: totalMatchingOrders,
+    });
+  } catch (err) {
+    console.error('Admin vendor transactions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    PLATFORM FINANCIALS
 ====================================================== */
 
