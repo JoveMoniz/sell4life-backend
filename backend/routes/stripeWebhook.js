@@ -200,8 +200,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       // Fire emails (non-blocking)
       (async () => {
         try {
+          console.log('[email] Starting email dispatch for order:', order._id);
           const User = (await import('../models/user.js')).default;
           const buyer = await User.findById(userId).lean();
+          console.log('[email] Buyer found:', buyer ? buyer.email : 'NOT FOUND');
           if (buyer?.email) {
             await mailOrderConfirmation({
               to: buyer.email,
@@ -210,12 +212,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               total: order.total,
               shippingAddress: paymentIntent.metadata.shippingAddress || '',
             });
+            console.log('[email] Buyer confirmation sent to:', buyer.email);
           }
 
           const vendorIds = [...new Set(items.map(i => String(i.vendorId)))];
           for (const vid of vendorIds) {
             const vendor = await Vendor.findById(vid).populate('userId', 'email').lean();
             const vendorEmail = vendor?.userId?.email;
+            console.log('[email] Vendor email for', vid, ':', vendorEmail || 'NOT FOUND');
             if (vendorEmail) {
               const vendorItems = items.filter(i => String(i.vendorId) === vid);
               await mailNewOrderVendor({
@@ -224,10 +228,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
                 items: vendorItems.map(i => ({ name: i.name, qty: i.quantity })),
               });
+              console.log('[email] Vendor notification sent to:', vendorEmail);
             }
           }
         } catch (emailErr) {
-          console.warn('[email] Order email failed:', emailErr.message);
+          console.warn('[email] Order email failed:', emailErr.message, emailErr.stack);
         }
       })();
     }
