@@ -179,45 +179,48 @@ async function loadVendorSidebar() {
 function injectMobileBar() {
   if (document.querySelector('.vendor-mobile-bar')) return;
 
+  // Top bar: hamburger + avatar + store name
   const bar = document.createElement('div');
   bar.className = 'vendor-mobile-bar';
   bar.innerHTML = `
-    <button class="vendor-hamburger" aria-label="Open menu" type="button">&#9776;</button>
-    <span class="vendor-mobile-store" id="mobile-store-name"></span>
+    <button class="vendor-hamburger" type="button" aria-label="Open menu">&#9776;</button>
+    <div class="vendor-bar-identity">
+      <div class="vendor-bar-avatar" id="mobile-bar-avatar"></div>
+      <span class="vendor-bar-store" id="mobile-store-name"></span>
+    </div>
   `;
   document.body.prepend(bar);
 
-  const overlay = document.createElement('div');
-  overlay.className = 'sidebar-overlay';
-  document.body.appendChild(overlay);
+  // Dropdown nav
+  const currentPath = window.location.pathname;
+  const links = [
+    { href: '/account/vendor/dashboard.html',    label: 'Dashboard' },
+    { href: '/account/vendor/products.html',     label: 'Products' },
+    { href: '/account/vendor/add-product.html',  label: 'Add Product' },
+    { href: '/account/vendor/orders.html',       label: 'Orders' },
+    { href: '/account/vendor/transactions.html', label: 'Transactions' },
+    { href: '/account/signin.html',              label: 'Logout', cls: 'vendor-logout' },
+  ];
 
-  function openSidebar() {
-    const sidebar = document.getElementById('vendor-sidebar');
-    sidebar?.classList.add('sidebar-open');
-    overlay.classList.add('active');
-  }
+  const nav = document.createElement('div');
+  nav.className = 'vendor-mobile-nav';
+  nav.id = 'vendor-mobile-nav';
+  nav.innerHTML = links.map(l => {
+    const classes = [l.cls, l.href === currentPath ? 'active' : ''].filter(Boolean);
+    const cls = classes.length ? ` class="${classes.join(' ')}"` : '';
+    return `<a href="${l.href}"${cls}>${l.label}</a>`;
+  }).join('');
+  bar.after(nav);
 
-  function closeSidebar() {
-    const sidebar = document.getElementById('vendor-sidebar');
-    sidebar?.classList.remove('sidebar-open');
-    overlay.classList.remove('active');
-  }
-
-  // Toggle on hamburger tap
-  bar.querySelector('.vendor-hamburger').addEventListener('click', () => {
-    const sidebar = document.getElementById('vendor-sidebar');
-    if (sidebar?.classList.contains('sidebar-open')) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
+  // Toggle dropdown on hamburger
+  bar.querySelector('.vendor-hamburger').addEventListener('click', (e) => {
+    e.stopPropagation();
+    nav.classList.toggle('open');
   });
 
-  overlay.addEventListener('click', closeSidebar);
-
-  // Close on nav link or X button tap inside sidebar
-  document.getElementById('vendor-sidebar')?.addEventListener('click', (e) => {
-    if (e.target.closest('a') || e.target.closest('.sidebar-close-btn')) closeSidebar();
+  // Close on outside tap
+  document.addEventListener('click', (e) => {
+    if (!bar.contains(e.target)) nav.classList.remove('open');
   });
 }
 
@@ -259,9 +262,11 @@ async function populateVendorIdentity(container) {
       avatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
     }
 
-    // Show store name in mobile top bar
+    // Update mobile top bar identity
     const mobileStoreEl = document.getElementById('mobile-store-name');
     if (mobileStoreEl && vendor.storeName) mobileStoreEl.textContent = vendor.storeName;
+    const mobileAvatarEl = document.getElementById('mobile-bar-avatar');
+    if (mobileAvatarEl && vendor.storeName) mobileAvatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
   } catch (err) {
     console.warn('Vendor identity skipped', err);
   }

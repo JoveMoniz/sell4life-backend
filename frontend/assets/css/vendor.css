@@ -2090,23 +2090,12 @@ Vendor Products
 }
 
 /* ======================================================
-   MOBILE VENDOR BAR + SIDEBAR DRAWER
-   Hidden on desktop; shown + fixed on mobile
+   MOBILE VENDOR BAR + DROPDOWN NAV
+   Hidden on desktop; shown fixed on mobile (≤ 900px)
 ====================================================== */
 
 .vendor-mobile-bar {
   display: none;
-}
-
-.vendor-mobile-store {
-  font-size: 0.95rem;
-  font-weight: 700;
-  opacity: 0.95;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  margin-left: 10px;
 }
 
 .vendor-hamburger {
@@ -2117,51 +2106,77 @@ Vendor Products
   cursor: pointer;
   padding: 6px 8px;
   line-height: 1;
+  flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.vendor-bar-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vendor-bar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-/* Close (✕) button inside sidebar — only shown on mobile */
-.sidebar-close-btn {
-  display: none;
+.vendor-bar-store {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@media (max-width: 900px) {
-  .sidebar-close-btn {
-    display: block;
-    align-self: flex-end;
-    background: rgba(255, 255, 255, 0.15);
-    border: none;
-    color: #fff;
-    font-size: 1rem;
-    width: 34px;
-    height: 34px;
-    border-radius: 6px;
-    cursor: pointer;
-    line-height: 34px;
-    text-align: center;
-    margin-bottom: 8px;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-
-  .sidebar-close-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-  }
-}
-
-.sidebar-overlay {
+/* Dropdown nav panel */
+.vendor-mobile-nav {
   display: none;
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 150;
-  touch-action: none;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 299;
+  background: #155e59;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
-.sidebar-overlay.active {
+.vendor-mobile-nav.open {
   display: block;
+}
+
+.vendor-mobile-nav a {
+  display: block;
+  padding: 15px 20px;
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.vendor-mobile-nav a.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.vendor-mobile-nav a.vendor-logout {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* ======================================================
@@ -2169,7 +2184,7 @@ Vendor Products
 ====================================================== */
 
 @media (max-width: 900px) {
-  /* Fixed top bar — never overlaps content it's above */
+  /* Fixed top bar */
   .vendor-mobile-bar {
     display: flex;
     position: fixed;
@@ -2180,30 +2195,15 @@ Vendor Products
     height: 52px;
     background: #1f6f6a;
     color: #fff;
-    padding: 0 16px;
+    padding: 0 14px;
     align-items: center;
-    justify-content: space-between;
+    gap: 10px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
-  /* Sidebar: fixed slide-in drawer, clipped so off-screen portion
-     never creates tap targets on the visible page */
+  /* Desktop sidebar hidden on mobile — dropdown nav takes over */
   #vendor-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 200;
-    width: 280px;
-    height: 100%;
-    overflow: hidden;
-    transform: translateX(-105%); /* extra 5% ensures no edge bleed */
-    transition: transform 0.25s ease;
-    min-height: unset;
-  }
-
-  #vendor-sidebar.sidebar-open {
-    transform: translateX(0);
-    overflow-y: auto;
+    display: none;
   }
 
   /* Layout: stacks vertically, top gap for fixed bar */
