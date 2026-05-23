@@ -83,6 +83,7 @@
         gap: 10px;
         padding: 12px 16px;
         cursor: pointer;
+        -webkit-user-select: none;
         user-select: none;
       }
       .bo-order-header:hover { background: #fafafa; }
@@ -161,6 +162,24 @@
 
       .bo-loading { color: #9ca3af; text-align: center; padding: 40px; font-size: 14px; }
       .bo-body { max-width: 900px; margin: 0 auto; }
+
+      .bo-pagination {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px 50px;
+      }
+      .bo-pg-btn {
+        padding: 5px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .bo-pg-btn:disabled { opacity: .4; cursor: not-allowed; }
+      .bo-pg-btn:not(:disabled):hover { border-color: #0b6b6a; color: #0b6b6a; }
+      .bo-pg-info { font-size: 13px; color: #6b7280; }
     </style>
   </head>
 
@@ -181,7 +200,7 @@
           <a href="/account/admin/users.html" class="admin-back">← users</a>
           <h1 id="page-title">Buyer Orders</h1>
         </div>
-        <button id="logoutBtn">Log out</button>
+        <button type="button" id="logoutBtn">Log out</button>
       </div>
       <div id="bo-info-bar" class="bo-info" style="display:none"></div>
     </div>
@@ -203,11 +222,14 @@
         <div class="bo-loading">Loading…</div>
       </div>
 
+      <!-- PAGINATION -->
+      <div id="bo-pagination" class="bo-pagination"></div>
+
     </div>
 
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/require-admin.js"></script>
-    <script type="module" src="/assets/js/admin-buyer-orders.js?v=20260523a"></script>
+    <script type="module" src="/assets/js/admin-buyer-orders.js?v=20260523b"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>
 </html>

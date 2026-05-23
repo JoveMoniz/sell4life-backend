@@ -3,6 +3,10 @@
 // ======================================================
 
 const API = window.API_BASE;
+const PER_PAGE = 20;
+
+let allOrders = [];
+let currentPage = 1;
 
 function authFetch(url, opts = {}) {
   const token = localStorage.getItem('s4l_token');
@@ -37,15 +41,60 @@ async function loadBuyerOrders(userId) {
       return;
     }
     const data = await res.json();
+    allOrders = data.orders || [];
     renderInfoBar(data.user);
     renderCards(data.summary);
-    renderOrders(data.orders);
-    const countEl = document.getElementById('bo-count');
-    if (countEl) countEl.textContent = `${data.orders.length} order${data.orders.length !== 1 ? 's' : ''}`;
+    renderPage(1);
   } catch (err) {
     console.error('Buyer orders error:', err);
     document.getElementById('bo-list').innerHTML = '<div class="bo-loading">Failed to load.</div>';
   }
+}
+
+/* ======================================================
+   PAGINATION
+====================================================== */
+function renderPage(page) {
+  currentPage = page;
+  const total = allOrders.length;
+  const pages = Math.ceil(total / PER_PAGE);
+  const slice = allOrders.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const countEl = document.getElementById('bo-count');
+  if (countEl) {
+    countEl.textContent = total
+      ? `${(page - 1) * PER_PAGE + 1}–${Math.min(page * PER_PAGE, total)} of ${total} order${total !== 1 ? 's' : ''}`
+      : '0 orders';
+  }
+
+  renderOrders(slice);
+  renderPagination(page, pages);
+}
+
+function renderPagination(page, pages) {
+  const container = document.getElementById('bo-pagination');
+  if (!container) return;
+  container.innerHTML = '';
+  if (pages <= 1) return;
+
+  const prev = document.createElement('button');
+  prev.textContent = '← Prev';
+  prev.disabled = page <= 1;
+  prev.className = 'bo-pg-btn';
+  prev.onclick = () => { renderPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  container.appendChild(prev);
+
+  const info = document.createElement('span');
+  info.textContent = ` Page ${page} of ${pages} `;
+  info.className = 'bo-pg-info';
+  container.appendChild(info);
+
+  const next = document.createElement('button');
+  next.textContent = 'Next →';
+  next.disabled = page >= pages;
+  next.className = 'bo-pg-btn';
+  next.onclick = () => { renderPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  container.appendChild(next);
 }
 
 /* ======================================================
