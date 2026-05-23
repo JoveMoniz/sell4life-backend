@@ -145,19 +145,10 @@ footer p {
   font-weight: bold;
   letter-spacing: 3px;
   text-decoration: none;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: inline-block;
   padding-top: 15px;
-}
-.footer-logo::after {
-  content: '';
-  display: block;
-  height: 2px;
-  width: 100%;
-  background: #f28c28;
-  border-radius: 1px;
-  margin-top: 3px;
+  border-bottom: 2px solid #f28c28;
+  padding-bottom: 3px;
 }
 
 .logo-orange {
