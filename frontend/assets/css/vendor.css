@@ -642,20 +642,36 @@ Vendor Products
 }
 
 /* ==============================
-   ORDERS TOOLBAR (search + filters)
+   ORDERS STICKY HEADER (back + title + toolbar)
 ============================== */
-.orders-toolbar {
+.orders-sticky-header {
   position: sticky;
   top: 0;
   z-index: 50;
   background: #f5f6f8;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e2e6ea;
+}
+
+.orders-sticky-header .vendor-back-link {
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.orders-sticky-header .vendor-title {
+  margin-bottom: 8px;
+}
+
+/* ==============================
+   ORDERS TOOLBAR (search + filters)
+============================== */
+.orders-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: 12px;
-  padding: 10px 0 12px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #e2e6ea;
+  padding: 4px 0 8px;
 }
 
 .orders-search-input {
@@ -757,6 +773,50 @@ Vendor Products
 .vendor-pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* New client-side pagination controls for orders */
+.orders-pg-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.orders-pg-btn:hover:not(:disabled) {
+  background: #0b6b6a;
+  color: #fff;
+  border-color: #0b6b6a;
+}
+
+.orders-pg-btn.active {
+  background: #0b6b6a;
+  color: #fff;
+  border-color: #0b6b6a;
+  font-weight: 600;
+}
+
+.orders-pg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.orders-page-info {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.orders-pg-ellipsis {
+  padding: 0 4px;
+  color: #94a3b8;
+  font-size: 14px;
 }
 
 /* ===============================
@@ -2310,8 +2370,8 @@ Vendor Products
     top: 52px;
   }
 
-  /* Orders toolbar: not sticky on landscape mobile */
-  .orders-toolbar {
+  /* Orders sticky header: not sticky on landscape mobile */
+  .orders-sticky-header {
     position: static;
   }
 
@@ -2360,15 +2420,18 @@ Vendor Products
    PORTRAIT-ONLY — sticky orders toolbar below mobile bar
 ====================================================== */
 @media (max-width: 900px) and (orientation: portrait) {
-  .orders-toolbar {
+  .orders-sticky-header {
     position: sticky;
     top: 52px;
     z-index: 50;
     background: #f5f6f8;
+  }
+
+  .orders-toolbar {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-    padding: 8px 0 10px;
+    padding: 4px 0 8px;
   }
 
   .orders-search-input {

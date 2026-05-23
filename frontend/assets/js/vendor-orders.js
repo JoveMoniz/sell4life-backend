@@ -1,12 +1,7 @@
 // ======================================================
-// VENDOR ORDERS (CLEAN + ALIGNED + ITEM RETURN SUPPORT)
+// VENDOR ORDERS
 // ======================================================
 
-console.log('vendor orders loaded');
-
-/* ======================================================
-   AUTH FETCH — cookie + Authorization header (fallback)
-====================================================== */
 function authFetch(url, opts = {}) {
   const token = localStorage.getItem('s4l_token');
   const headers = { ...(opts.headers || {}) };
@@ -16,8 +11,12 @@ function authFetch(url, opts = {}) {
 
 let currentStatus = 'all';
 let currentQuery = '';
-
 let timerInterval;
+
+let lastOrders = [];
+let lastVendorId = null;
+let ordersPage = 1;
+const ORDERS_PER_PAGE = 20;
 
 /* ======================================================
    DISPLAY STATUS
@@ -40,126 +39,51 @@ function getDisplayStatus(o) {
 }
 
 /* ======================================================
-   LOAD ORDERS
+   RENDER ONE ORDER CARD
 ====================================================== */
-async function loadVendorOrders(status = 'all', q = '', page = 1) {
-  const container = document.getElementById('vendor-orders');
+function renderOrderCard(o, vendorId) {
+  const id = o._id || o.id;
+  if (!id) return '';
 
-  if (!container) return;
+  const displayId = o.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
 
-  const vendorRes = await authFetch(`${API_BASE}/vendor/me`);
+  const vendorItems = (o.items || []).filter(
+    (item) => String(item.vendorId) === String(vendorId)
+  );
 
-  if (!vendorRes.ok) {
-    if (vendorRes.status === 401) {
-      window.location.href = '/account/signin.html';
-      return;
-    }
-    container.innerHTML = '<p>Failed to load vendor profile</p>';
-    return;
-  }
+  const vendorTotal = vendorItems.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+    0
+  );
 
-  const vendorData = await vendorRes.json();
-  const vendor = vendorData.vendor;
+  const vendorOrder = (o.vendorOrders || []).find(
+    (vo) => String(vo.vendorId) === String(vendorId)
+  );
 
-  if (!vendor) {
-    container.innerHTML = '<p>Create your store first</p>';
-    return;
-  }
+  const safeStatus = o.status || vendorOrder?.status || 'Unknown';
+  const refundScheduledAt = vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
 
-  if (vendor.status === 'pending') {
-    container.innerHTML = '<p>Your store is under review</p>';
-    return;
-  }
+  const orderPayment = (o.paymentStatus || 'pending').toLowerCase();
+  const vendorRefStatuses = vendorItems.map(i => i.refundStatus || 'none');
+  const vendorHasReturnedItems = vendorItems.some(i =>
+    ['returned', 'partially_returned'].includes(i.returnStatus)
+  );
+  const vendorPaymentStatus = !['paid', 'partially_refunded', 'refunded', 'refund_scheduled'].includes(orderPayment)
+    ? orderPayment
+    : vendorRefStatuses.every(s => s === 'processed')
+      ? 'refunded'
+      : vendorRefStatuses.some(s => ['processed', 'partially_refunded'].includes(s))
+        ? 'partially_refunded'
+        : (orderPayment === 'refund_scheduled' && vendorHasReturnedItems)
+          ? 'refund_scheduled'
+          : 'paid';
 
-  if (vendor.status === 'suspended') {
-    container.innerHTML = '<p>Your store is suspended</p>';
-    return;
-  }
+  const hasPendingActions = (o.allowedActions || []).some(
+    a => ['Processing', 'Shipped', 'Delivered', 'Vendor Cancel',
+          'Return Approved', 'Return Rejected', 'Returned', 'Cancel Approved'].includes(a.type)
+  );
 
-  const vendorId = vendor._id;
-
-  try {
-    let url = `${API_BASE}/vendor/orders`;
-
-    const queryParams = [];
-
-    if (status !== 'all') queryParams.push(`status=${status}`);
-    if (q) queryParams.push(`q=${encodeURIComponent(q)}`);
-    queryParams.push(`page=${page}`);
-
-    if (queryParams.length) url += `?${queryParams.join('&')}`;
-
-    const res = await authFetch(url);
-
-    if (!res.ok) {
-      container.innerHTML = '<p>Failed to load orders</p>';
-      return;
-    }
-
-    const data = await res.json();
-
-    const orders = data.orders || [];
-    const currentPage = data.page || 1;
-    const totalPages = data.totalPages || 1;
-
-    if (!orders.length) {
-      container.innerHTML = '<p>No orders yet</p>';
-      renderPagination(currentPage, totalPages);
-      return;
-    }
-
-    container.innerHTML = orders
-      .map((o) => {
-        const id = o._id || o.id;
-
-        if (!id) {
-          console.error('BROKEN ORDER:', o);
-          return '';
-        }
-
-        const displayId = o.shortId || `S4L-${id.slice(0, 10).toUpperCase()}`;
-
-        const vendorItems = (o.items || []).filter(
-          (item) => String(item.vendorId) === String(vendorId)
-        );
-
-        const vendorTotal = vendorItems.reduce(
-          (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-          0
-        );
-
-        const vendorOrder = (o.vendorOrders || []).find(
-          (vo) => String(vo.vendorId) === String(vendorId)
-        );
-
-        const safeStatus = o.status || vendorOrder?.status || 'Unknown';
-
-        const refundScheduledAt = vendorOrder?.refundScheduledAt || o.refundScheduledAt || null;
-
-        const isRefundLocked = refundScheduledAt && new Date(refundScheduledAt) > new Date();
-
-        // Vendor-specific payment status — isolates this vendor from other vendors' refunds
-        const orderPayment = (o.paymentStatus || 'pending').toLowerCase();
-        const vendorRefStatuses = vendorItems.map(i => i.refundStatus || 'none');
-        const vendorHasReturnedItems = vendorItems.some(i =>
-          ['returned', 'partially_returned'].includes(i.returnStatus)
-        );
-        const vendorPaymentStatus = !['paid', 'partially_refunded', 'refunded', 'refund_scheduled'].includes(orderPayment)
-          ? orderPayment
-          : vendorRefStatuses.every(s => s === 'processed')
-            ? 'refunded'
-            : vendorRefStatuses.some(s => ['processed', 'partially_refunded'].includes(s))
-              ? 'partially_refunded'
-              : (orderPayment === 'refund_scheduled' && vendorHasReturnedItems)
-                ? 'refund_scheduled'
-                : 'paid';
-
-        const hasPendingActions = (o.allowedActions || []).some(
-          a => ['Processing', 'Shipped', 'Delivered', 'Vendor Cancel',
-                'Return Approved', 'Return Rejected', 'Returned', 'Cancel Approved'].includes(a.type)
-        );
-
-        return `
+  return `
 <div class="order-row">
 
   <div class="order-info">
@@ -197,11 +121,132 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 
 </div>
 `;
-      })
-      .join('');
+}
 
-    initRefundTimers();
-    renderPagination(currentPage, totalPages);
+/* ======================================================
+   RENDER PAGE
+====================================================== */
+function renderOrdersPage(page) {
+  const container = document.getElementById('vendor-orders');
+  if (!container) return;
+
+  if (!lastOrders.length) {
+    container.innerHTML = '<p>No orders yet</p>';
+    renderOrdersPagination();
+    return;
+  }
+
+  const start = (page - 1) * ORDERS_PER_PAGE;
+  const end = start + ORDERS_PER_PAGE;
+  container.innerHTML = lastOrders.slice(start, end)
+    .map(o => renderOrderCard(o, lastVendorId))
+    .join('');
+
+  initRefundTimers();
+  ordersPage = page;
+  renderOrdersPagination();
+}
+
+/* ======================================================
+   PAGINATION
+====================================================== */
+function renderOrdersPagination() {
+  const container = document.getElementById('vendor-pagination');
+  if (!container) return;
+
+  const totalPages = Math.ceil(lastOrders.length / ORDERS_PER_PAGE);
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const parts = [];
+  parts.push(`<span class="orders-page-info">Page ${ordersPage} of ${totalPages}</span>`);
+
+  const prev = ordersPage > 1;
+  parts.push(`<button class="orders-pg-btn" data-pg="${ordersPage - 1}" ${prev ? '' : 'disabled'}>‹ Prev</button>`);
+
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - ordersPage) <= 1) {
+      parts.push(`<button class="orders-pg-btn ${p === ordersPage ? 'active' : ''}" data-pg="${p}">${p}</button>`);
+    } else if (Math.abs(p - ordersPage) === 2) {
+      parts.push(`<span class="orders-pg-ellipsis">…</span>`);
+    }
+  }
+
+  const next = ordersPage < totalPages;
+  parts.push(`<button class="orders-pg-btn" data-pg="${ordersPage + 1}" ${next ? '' : 'disabled'}>Next ›</button>`);
+
+  container.innerHTML = parts.join('');
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.orders-pg-btn');
+  if (!btn || btn.disabled) return;
+  const pg = parseInt(btn.dataset.pg, 10);
+  if (pg && pg !== ordersPage) {
+    renderOrdersPage(pg);
+    document.querySelector('.vendor-orders-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+
+/* ======================================================
+   LOAD ORDERS
+====================================================== */
+async function loadVendorOrders(status = 'all', q = '') {
+  const container = document.getElementById('vendor-orders');
+  if (!container) return;
+
+  container.innerHTML = '<p class="orders-loading">Loading orders...</p>';
+
+  const vendorRes = await authFetch(`${API_BASE}/vendor/me`);
+
+  if (!vendorRes.ok) {
+    if (vendorRes.status === 401) {
+      window.location.href = '/account/signin.html';
+      return;
+    }
+    container.innerHTML = '<p>Failed to load vendor profile</p>';
+    return;
+  }
+
+  const vendorData = await vendorRes.json();
+  const vendor = vendorData.vendor;
+
+  if (!vendor) {
+    container.innerHTML = '<p>Create your store first</p>';
+    return;
+  }
+
+  if (vendor.status === 'pending') {
+    container.innerHTML = '<p>Your store is under review</p>';
+    return;
+  }
+
+  if (vendor.status === 'suspended') {
+    container.innerHTML = '<p>Your store is suspended</p>';
+    return;
+  }
+
+  lastVendorId = vendor._id;
+
+  try {
+    let url = `${API_BASE}/vendor/orders`;
+
+    const queryParams = [];
+    if (status !== 'all') queryParams.push(`status=${status}`);
+    if (q) queryParams.push(`q=${encodeURIComponent(q)}`);
+    if (queryParams.length) url += `?${queryParams.join('&')}`;
+
+    const res = await authFetch(url);
+
+    if (!res.ok) {
+      container.innerHTML = '<p>Failed to load orders</p>';
+      return;
+    }
+
+    const data = await res.json();
+    lastOrders = data.orders || [];
+    ordersPage = 1;
+    renderOrdersPage(1);
+
   } catch (err) {
     console.error(err);
     container.innerHTML = '<p>Could not load orders</p>';
@@ -214,25 +259,21 @@ async function loadVendorOrders(status = 'all', q = '', page = 1) {
 function initRefundTimers() {
   const timers = document.querySelectorAll('.refund-timer');
   if (!timers.length) return;
-   
+
   if (timerInterval) clearInterval(timerInterval);
 
   function update() {
     const now = Date.now();
-
     timers.forEach((el) => {
       const target = new Date(el.dataset.time).getTime();
       const diff = target - now;
-
       if (diff <= 0) {
         el.textContent = ' • processing...';
         return;
       }
-
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-
       el.textContent = ` • ${h}h ${m}m ${s}s`;
     });
   }
@@ -257,11 +298,9 @@ document.addEventListener('click', async (e) => {
   try {
     btn.disabled = true;
     btn.textContent = 'Updating...';
-
     await updateStatus(id, itemId, label);
-
     setTimeout(() => {
-      loadVendorOrders(currentStatus, currentQuery, 1);
+      loadVendorOrders(currentStatus, currentQuery);
     }, 400);
   } catch (err) {
     alert(err.message);
@@ -278,12 +317,9 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
 
   currentStatus = btn.dataset.status;
-
   document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
-
   btn.classList.add('active');
-
-  loadVendorOrders(currentStatus, currentQuery, 1);
+  loadVendorOrders(currentStatus, currentQuery);
 });
 
 /* ======================================================
@@ -298,18 +334,15 @@ if (searchInput) {
 
     if (!value) {
       currentQuery = '';
-      loadVendorOrders(currentStatus, '', 1);
+      loadVendorOrders(currentStatus, '');
       return;
     }
 
     currentQuery = value.toUpperCase().startsWith('S4L-') ? value.slice(4) : value;
-
     clearTimeout(searchTimer);
-
     if (currentQuery.length < 2) return;
-
     searchTimer = setTimeout(() => {
-      loadVendorOrders(currentStatus, currentQuery, 1);
+      loadVendorOrders(currentStatus, currentQuery);
     }, 200);
   });
 }
@@ -323,35 +356,19 @@ async function updateStatus(orderId, itemId, status) {
 
   if (status === 'Return Approved') {
     if (!itemId) throw new Error('Missing return item');
-
     url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/approve-return`;
-
-    body = {
-      quantity: 1,
-    };
+    body = { quantity: 1 };
   } else if (status === 'Return Rejected') {
     if (!itemId) throw new Error('Missing return item');
-
     url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/reject-return`;
-
-    body = {
-      reason: 'Rejected by vendor',
-    };
+    body = { reason: 'Rejected by vendor' };
   } else if (status === 'Returned') {
     if (!itemId) throw new Error('Missing return item');
-
     url = `${API_BASE}/vendor/orders/${orderId}/items/${itemId}/mark-returned`;
-
-    body = {
-      quantity: 1,
-      condition: 'used',
-    };
+    body = { quantity: 1, condition: 'used' };
   } else {
     url = `${API_BASE}/vendor/orders/${orderId}/status`;
-
-    body = {
-      status,
-    };
+    body = { status };
   }
 
   const res = await authFetch(url, {
@@ -367,50 +384,10 @@ async function updateStatus(orderId, itemId, status) {
 }
 
 /* ======================================================
-   PAGINATION
-====================================================== */
-function renderPagination(currentPage, totalPages) {
-  const container = document.getElementById('vendor-pagination');
-  if (!container) return;
-
-  if (totalPages <= 1) {
-    container.innerHTML = '';
-    return;
-  }
-
-  let html = '';
-
-  if (currentPage > 1) {
-    html += `<button data-page="${currentPage - 1}">←</button>`;
-  }
-
-  for (let i = 1; i <= totalPages; i++) {
-    html += `
-      <button data-page="${i}" class="${i === currentPage ? 'active' : ''}">
-        ${i}
-      </button>
-    `;
-  }
-
-  if (currentPage < totalPages) {
-    html += `<button data-page="${currentPage + 1}">→</button>`;
-  }
-
-  container.innerHTML = html;
-}
-
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-page]');
-  if (!btn) return;
-
-  loadVendorOrders(currentStatus, currentQuery, Number(btn.dataset.page));
-});
-
-/* ======================================================
    INIT
 ====================================================== */
 loadVendorOrders();
 
 startLiveUpdates(() => {
-  loadVendorOrders(currentStatus, currentQuery, 1);
+  loadVendorOrders(currentStatus, currentQuery);
 });
