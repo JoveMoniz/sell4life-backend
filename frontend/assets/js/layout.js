@@ -342,21 +342,10 @@ async function applyVendorBadge() {
     });
     if (!r.ok) return; // 403 = not a vendor
 
-    document.querySelectorAll('.dd-vendor').forEach(a => { a.style.display = 'block'; });
-
     const { count } = await r.json();
     if (!count) return;
 
     const label = count > 99 ? '99+' : String(count);
-
-    document.querySelectorAll('.dd-vendor').forEach(a => {
-      if (!a.querySelector('.acct-order-badge')) {
-        const b = document.createElement('span');
-        b.className = 'acct-order-badge';
-        b.textContent = label;
-        a.appendChild(b);
-      }
-    });
 
     ['accountBtnDesktop', 'accountBtnMobile'].forEach(id => {
       const btn = document.getElementById(id);

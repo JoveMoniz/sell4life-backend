@@ -359,10 +359,6 @@ footer p {
   text-decoration: none;
 }
 
-.account-dropdown .dd-vendor {
-  display: flex;
-  align-items: center;
-}
 
 .acct-order-badge {
   display: inline-block;

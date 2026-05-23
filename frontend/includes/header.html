@@ -70,14 +70,13 @@
 
         <!-- account -->
         <div class="account-menu">
-          <button id="accountBtnDesktop">Account ▾</button>
+          <button type="button" id="accountBtnDesktop">Account ▾</button>
 
           <div class="account-dropdown" id="accountDropdownDesktop">
             <a href="/account/signin.html" class="auth dd-login">Sign in</a>
             <a href="/account/register.html" class="auth dd-register">Register</a>
             <a href="/account/orders.html" class="auth dd-orders">My Orders</a>
-            <a href="/account/vendor/dashboard.html" class="auth dd-vendor">Vendor Dashboard</a>
-            <button class="dd-logout">Logout</button>
+            <button type="button" class="dd-logout">Logout</button>
           </div>
         </div>
       </div>
@@ -113,14 +112,13 @@
           <!-- Mobile account -->
 
           <div class="account-menu">
-            <button id="accountBtnMobile">Account ▾</button>
+            <button type="button" id="accountBtnMobile">Account ▾</button>
 
             <div class="account-dropdown" id="accountDropdownMobile">
               <a href="/account/signin.html" class="auth dd-login">Sign in</a>
               <a href="/account/register.html" class="auth dd-register">Register</a>
               <a href="/account/orders.html" class="auth dd-orders">My Orders</a>
-              <a href="/account/vendor/dashboard.html" class="auth dd-vendor">Vendor Dashboard</a>
-              <button class="dd-logout">Logout</button>
+              <button type="button" class="dd-logout">Logout</button>
             </div>
           </div>
         </div>
@@ -142,8 +140,8 @@
             placeholder="Search products..."
             autocomplete="off"
           />
-          <button type="submit">
-            <img src="/assets/images/hero/search.png" />
+          <button type="submit" aria-label="Search">
+            <img src="/assets/images/hero/search.png" alt="Search" />
           </button>
           <div class="search-autocomplete mobile-ac"></div>
         </form>
