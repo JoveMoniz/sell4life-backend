@@ -2098,10 +2098,15 @@ Vendor Products
   display: none;
 }
 
-.vendor-mobile-title {
+.vendor-mobile-store {
   font-size: 0.95rem;
   font-weight: 700;
-  opacity: 0.9;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  margin-left: 10px;
 }
 
 .vendor-hamburger {
@@ -2114,6 +2119,36 @@ Vendor Products
   line-height: 1;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+/* Close (✕) button inside sidebar — only shown on mobile */
+.sidebar-close-btn {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar-close-btn {
+    display: block;
+    align-self: flex-end;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    cursor: pointer;
+    line-height: 34px;
+    text-align: center;
+    margin-bottom: 8px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .sidebar-close-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+  }
 }
 
 .sidebar-overlay {

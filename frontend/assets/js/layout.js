@@ -183,7 +183,7 @@ function injectMobileBar() {
   bar.className = 'vendor-mobile-bar';
   bar.innerHTML = `
     <button class="vendor-hamburger" aria-label="Open menu" type="button">&#9776;</button>
-    <span class="vendor-mobile-title">Vendor Panel</span>
+    <span class="vendor-mobile-store" id="mobile-store-name"></span>
   `;
   document.body.prepend(bar);
 
@@ -203,12 +203,21 @@ function injectMobileBar() {
     overlay.classList.remove('active');
   }
 
-  bar.querySelector('.vendor-hamburger').addEventListener('click', openSidebar);
+  // Toggle on hamburger tap
+  bar.querySelector('.vendor-hamburger').addEventListener('click', () => {
+    const sidebar = document.getElementById('vendor-sidebar');
+    if (sidebar?.classList.contains('sidebar-open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  });
+
   overlay.addEventListener('click', closeSidebar);
 
-  // Close when a nav link is tapped inside the sidebar
+  // Close on nav link or X button tap inside sidebar
   document.getElementById('vendor-sidebar')?.addEventListener('click', (e) => {
-    if (e.target.closest('a')) closeSidebar();
+    if (e.target.closest('a') || e.target.closest('.sidebar-close-btn')) closeSidebar();
   });
 }
 
@@ -249,6 +258,10 @@ async function populateVendorIdentity(container) {
     if (avatarEl && vendor.storeName) {
       avatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
     }
+
+    // Show store name in mobile top bar
+    const mobileStoreEl = document.getElementById('mobile-store-name');
+    if (mobileStoreEl && vendor.storeName) mobileStoreEl.textContent = vendor.storeName;
   } catch (err) {
     console.warn('Vendor identity skipped', err);
   }
