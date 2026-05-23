@@ -47,10 +47,10 @@ export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddr
   return sendMail({
     to,
     subject: `Order confirmed – ${orderRef}`,
-    html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-      <h2 style="color:#0b6b6a">Your order is confirmed</h2>
-      <p>Thank you for your purchase. Your order reference is <strong>${orderRef}</strong>.</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;margin-top:12px">
+    html: `<div style="font-family:sans-serif;font-size:14px;max-width:560px;margin:0 auto">
+      <h2 style="color:#0b6b6a;font-size:18px;margin:0 0 10px">Your order is confirmed</h2>
+      <p style="margin:0 0 12px">Thank you for your purchase. Your order reference is <strong>${orderRef}</strong>.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;margin-top:12px;font-size:14px">
         ${itemRows}
         <tr><td colspan="2" style="padding-top:8px;font-weight:700">Total</td><td style="padding-top:8px;font-weight:700" align="right">£${Number(total).toFixed(2)}</td></tr>
       </table>
