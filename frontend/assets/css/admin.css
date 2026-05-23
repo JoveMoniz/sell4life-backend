@@ -118,7 +118,17 @@ button {
   color: #fdf4e7;
 }
 .admin-logo .logo-four {
-  color: #00bfff;
+  color: #f28c28;
+}
+
+.admin-logo::after {
+  content: '';
+  display: block;
+  height: 2px;
+  background: #f28c28;
+  border-radius: 1px;
+  margin-top: 3px;
+  width: 100%;
 }
 
 /* Title */
@@ -870,7 +880,9 @@ select:disabled {
   color: #6b7280;
 }
 
-.dash-badge--hidden { display: none; }
+.dash-badge--hidden {
+  display: none;
+}
 
 .vendor-card {
   border: 1px solid #ccc;
@@ -1475,7 +1487,9 @@ body.admin-users .admin-users-table thead th {
   cursor: pointer;
 }
 
-.btn-payout-paid:hover { background: #15803d; }
+.btn-payout-paid:hover {
+  background: #15803d;
+}
 
 .btn-payout-reject {
   background: #fff;
@@ -1488,7 +1502,9 @@ body.admin-users .admin-users-table thead th {
   cursor: pointer;
 }
 
-.btn-payout-reject:hover { background: #fee2e2; }
+.btn-payout-reject:hover {
+  background: #fee2e2;
+}
 
 .admin-payout-empty {
   padding: 16px 8px;
@@ -1510,4 +1526,7 @@ body.admin-users .admin-users-table thead th {
   font-size: 12px;
   cursor: pointer;
 }
-.admin-toolbar-btn:hover { border-color: #0b6b6a; color: #0b6b6a; }
+.admin-toolbar-btn:hover {
+  border-color: #0b6b6a;
+  color: #0b6b6a;
+}
