@@ -377,6 +377,27 @@ document.addEventListener('headerLoaded', () => {
 })();
 
 // =====================================================
+// SCROLL-TO-TOP BUTTON
+// =====================================================
+
+(function injectScrollTopBtn() {
+  const btn = document.createElement('button');
+  btn.id = 'scroll-top-btn';
+  btn.className = 'scroll-top-btn';
+  btn.setAttribute('aria-label', 'Back to top');
+  btn.innerHTML = '&#8593;';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('visible', window.scrollY > 280);
+  }, { passive: true });
+})();
+
+// =====================================================
 // START
 // =====================================================
 
