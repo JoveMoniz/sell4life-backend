@@ -11,6 +11,7 @@ import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
+import stripe from '../config/stripe.js';
 
 const router = express.Router();
 
@@ -709,6 +710,76 @@ router.patch('/payouts/:id', async (req, res) => {
   } catch (err) {
     console.error('Admin payout update error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   LIST DISPUTES  (across all orders)
+====================================================== */
+router.get('/disputes', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find(
+      { 'disputes.0': { $exists: true } },
+      { shortId: 1, _id: 1, disputes: 1, vendorOrders: 1, user: 1 }
+    )
+      .populate('user', 'email')
+      .lean();
+
+    const disputes = [];
+    for (const order of orders) {
+      for (const d of order.disputes) {
+        disputes.push({
+          ...d,
+          orderId: order._id,
+          orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
+          buyerEmail: order.user?.email || '—',
+        });
+      }
+    }
+
+    // Sort newest first
+    disputes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ disputes });
+  } catch (err) {
+    console.error('Admin disputes list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   SUBMIT EVIDENCE to Stripe
+====================================================== */
+router.post('/disputes/:disputeId/respond', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { disputeId } = req.params;
+    const {
+      product_description,
+      customer_communication,
+      uncategorized_text,
+      customer_name,
+      submit,
+    } = req.body;
+
+    if (!disputeId || !disputeId.startsWith('dp_')) {
+      return res.status(400).json({ error: 'Invalid dispute ID' });
+    }
+
+    const evidence = {};
+    if (product_description)    evidence.product_description    = String(product_description).slice(0, 20000);
+    if (customer_communication) evidence.customer_communication = String(customer_communication).slice(0, 20000);
+    if (uncategorized_text)     evidence.uncategorized_text     = String(uncategorized_text).slice(0, 20000);
+    if (customer_name)          evidence.customer_name          = String(customer_name).slice(0, 200);
+
+    const updated = await stripe.disputes.update(disputeId, {
+      evidence,
+      submit: submit === true,
+    });
+
+    res.json({ success: true, dispute: { id: updated.id, status: updated.status } });
+  } catch (err) {
+    console.error('Dispute respond error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 });
 
