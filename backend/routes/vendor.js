@@ -855,6 +855,53 @@ router.get('/me', authMiddleware, async (req, res) => {
 });
 
 /* ======================================================
+   UPDATE STORE SETTINGS
+====================================================== */
+
+router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, type } = req.body;
+
+    const update = {};
+
+    if (storeName !== undefined) {
+      const name = String(storeName).trim();
+      if (!name) return res.status(400).json({ error: 'Store name cannot be empty' });
+      update.storeName = name;
+    }
+
+    if (storeSlug !== undefined) {
+      const raw = String(storeSlug).trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (!raw) return res.status(400).json({ error: 'Invalid store slug' });
+      const conflict = await Vendor.findOne({ storeSlug: raw, _id: { $ne: vendor._id } });
+      if (conflict) return res.status(409).json({ error: 'That store URL is already taken' });
+      update.storeSlug = raw;
+    }
+
+    if (storeDescription !== undefined) update.storeDescription = String(storeDescription).trim();
+    if (storeLogo !== undefined)        update.storeLogo = String(storeLogo).trim();
+    if (storeBanner !== undefined)      update.storeBanner = String(storeBanner).trim();
+    if (type !== undefined) {
+      if (!['casual', 'professional'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid store type' });
+      }
+      update.type = type;
+    }
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    const updated = await Vendor.findByIdAndUpdate(vendor._id, update, { new: true });
+    res.json({ success: true, vendor: updated });
+  } catch (err) {
+    console.error('Vendor settings update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    UPDATE VAT STATUS
 ====================================================== */
 
