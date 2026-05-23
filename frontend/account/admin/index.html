@@ -9,7 +9,7 @@
 
     <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
 
-    <link rel="stylesheet" href="/assets/css/admin.css?v=20260522b" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260523c" />
     <title>Admin Dashboard</title>
   </head>
 
@@ -31,16 +31,24 @@
       <ul class="dashboard-nav">
         <li><a href="/account/admin/orders.html">Orders</a></li>
         <li><a href="/account/admin/users.html">Users</a></li>
-        <li><a href="/account/admin/vendors.html">Vendors</a></li>
+        <li>
+          <a href="/account/admin/vendors.html">
+            Vendors
+            <span id="badge-vendors" class="dash-badge dash-badge--hidden"></span>
+          </a>
+          <span id="badge-payouts-wrap" class="dash-badge--hidden">
+            &nbsp;·&nbsp;<span id="badge-payouts" class="dash-badge-secondary"></span> payout request<span id="badge-payouts-plural">s</span> pending
+          </span>
+        </li>
         <li><a href="/account/admin/financials.html">Platform Financials</a></li>
       </ul>
 
       <button id="logoutBtn">Log out</button>
     </div>
 
-    <script>
-      window.__pageScripts = ['/assets/js/admin-dashboard.js'];
-    </script>
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/require-admin.js"></script>
+    <script src="/assets/js/admin-dashboard.js?v=20260523a"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>
 </html>

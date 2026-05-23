@@ -192,6 +192,23 @@ router.patch('/:id/reactivate', async (req, res) => {
 });
 
 /* ======================================================
+   NOTIFICATION COUNTS
+====================================================== */
+
+router.get('/counts', async (req, res) => {
+  try {
+    const [pendingVendors, pendingPayouts] = await Promise.all([
+      Vendor.countDocuments({ status: 'pending' }),
+      Payout.countDocuments({ status: 'requested' }),
+    ]);
+    res.json({ pendingVendors, pendingPayouts });
+  } catch (err) {
+    console.error('Admin counts error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    VENDOR TRANSACTION LEDGER (admin view of any vendor)
 ====================================================== */
 
