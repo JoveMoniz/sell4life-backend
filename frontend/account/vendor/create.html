@@ -3,60 +3,165 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-
-    <title>Create Vendor</title>
-    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523l" />
+    <title>Create Your Store | Sell4Life</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <style>
+      .create-wrap {
+        max-width: 520px;
+        margin: 48px auto 80px;
+        padding: 0 20px;
+      }
+      .create-wrap h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 6px;
+      }
+      .create-wrap .create-sub {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0 0 28px;
+      }
+      .create-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .form-field label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+      }
+      .form-field input,
+      .form-field textarea,
+      .form-field select {
+        padding: 9px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .form-field input:focus,
+      .form-field textarea:focus,
+      .form-field select:focus { border-color: #0b6b6a; }
+      .form-field textarea { resize: vertical; min-height: 80px; }
+      .form-field .hint {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .create-submit {
+        padding: 11px;
+        background: #0b6b6a;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-top: 4px;
+      }
+      .create-submit:hover { background: #095f5e; }
+      .create-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+      .create-msg {
+        font-size: 14px;
+        margin-top: 4px;
+        min-height: 20px;
+      }
+      .create-notice {
+        margin-top: 20px;
+        padding: 14px 16px;
+        background: #f0fdf9;
+        border: 1px solid #a7f3d0;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #065f46;
+        display: none;
+      }
+      .create-back {
+        font-size: 13px;
+        color: #0b6b6a;
+        text-decoration: none;
+      }
+      .create-title {
+        margin-top: 16px;
+      }
+      .label-optional {
+        font-weight: 400;
+        color: #9ca3af;
+      }
+    </style>
   </head>
-  <body class="vendor-create-page">
-    <div class="vendor-create-container">
-      <a href="/index.html" class="create-back-link">← Back to home</a>
+  <body>
 
-      <h1>Create Your Store</h1>
+    <div class="create-wrap">
+      <a href="/sell/" class="create-back">← Back</a>
+      <h1 class="create-title">Create Your Store</h1>
+      <p class="create-sub">Fill in your store details. We'll review your application within 48 hours.</p>
 
-      <form id="vendorForm">
-        <input type="text" id="storeName" placeholder="Store Name" required />
-        <input
-          type="text"
-          id="storeSlug"
-          placeholder="Store Slug (e.g. my-store)"
-          required
-          pattern="[a-z0-9-]+"
-          title="Only lowercase letters, numbers, and hyphens"
-        />
-        <button type="submit" class="btn-create-store">Create Store</button>
+      <form class="create-form" id="vendorForm">
+        <div class="form-field">
+          <label for="storeName">Store name</label>
+          <input type="text" id="storeName" placeholder="e.g. Jake's Electronics" required />
+        </div>
+
+        <div class="form-field">
+          <label for="storeSlug">Store URL</label>
+          <input type="text" id="storeSlug" placeholder="e.g. jakes-electronics" required pattern="[a-z0-9-]+" />
+          <span class="hint">sell4life.com/stores/<span id="slug-preview">…</span></span>
+        </div>
+
+        <div class="form-field">
+          <label for="storeDescription">Store description <span class="label-optional">(optional)</span></label>
+          <textarea id="storeDescription" placeholder="Tell buyers what you sell…"></textarea>
+        </div>
+
+        <div class="form-field">
+          <label for="storeType">Seller type</label>
+          <select id="storeType">
+            <option value="casual">Casual — selling personal items</option>
+            <option value="professional">Professional — business / regular seller</option>
+          </select>
+        </div>
+
+        <div class="create-msg" id="msg"></div>
+        <button type="submit" class="create-submit">Apply to Sell</button>
       </form>
 
-      <p id="msg"></p>
+      <div class="create-notice" id="successNotice">
+        Your application has been submitted. We'll review it within 48 hours and email you when it's approved.
+      </div>
     </div>
 
     <script src="/assets/js/config-global.js"></script>
-
     <script>
+      // Auth guard — must be logged in to apply
+      const token = localStorage.getItem('s4l_token');
+      if (!token) {
+        window.location.replace('/account/signin.html');
+      }
+
+      // Already a vendor? Go to dashboard
       (async () => {
-        const token = localStorage.getItem('s4l_token');
-
-        if (!token) return; // allow guest → will be redirected later
-
+        if (!token) return;
         try {
           const res = await fetch(`${window.API_BASE}/vendor/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-
           const data = await res.json();
-
-          if (data.isVendor) {
-            // already vendor → no reason to be here
-            window.location.href = '/account/vendor/dashboard.html';
-          }
-        } catch {
-          // silent fail
-        }
+          if (data.isVendor) window.location.replace('/account/vendor/dashboard.html');
+        } catch { /* silent */ }
       })();
     </script>
-
+    <script src="/assets/js/layout.js"></script>
     <script src="/assets/js/vendor-create.js"></script>
   </body>
 </html>

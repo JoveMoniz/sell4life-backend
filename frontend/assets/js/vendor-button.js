@@ -15,10 +15,9 @@ document.addEventListener('click', (e) => {
   const isVendor = btn.dataset.isVendor === 'true';
   const vendorStatus = btn.dataset.vendorStatus;
 
-  // 🔴 NOT LOGGED IN → SAVE INTENT + GO LOGIN
+  // 🔴 NOT LOGGED IN → SELL LANDING PAGE
   if (!token) {
-    localStorage.setItem('s4l_intent', 'sell'); // 🔥 THIS IS THE KEY
-    window.location.href = '/account/signin.html';
+    window.location.href = '/sell/';
     return;
   }
 
