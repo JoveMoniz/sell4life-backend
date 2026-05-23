@@ -148,6 +148,19 @@ body {
   color: #a7f3d0;
 }
 
+.vendor-order-badge {
+  display: inline-block;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* ================================
    MAIN CONTENT
 ================================ */

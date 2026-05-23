@@ -674,6 +674,31 @@ router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) 
 });
 
 /* ======================================================
+   PENDING ORDER COUNT (for sidebar badge)
+====================================================== */
+
+router.get('/orders/pending-count', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendor = await getVendor(req);
+    if (!vendor) return res.status(403).json({ error: 'Vendor not found' });
+
+    const count = await Order.countDocuments({
+      'vendorOrders': {
+        $elemMatch: {
+          vendorId: vendor._id,
+          'items.status': 'Pending',
+        },
+      },
+    });
+
+    res.json({ count });
+  } catch (err) {
+    console.error('Pending count error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    GET ORDERS
 ====================================================== */
 

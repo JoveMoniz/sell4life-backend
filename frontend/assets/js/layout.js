@@ -171,8 +171,46 @@ async function loadVendorSidebar() {
 
     // Populate vendor identity
     populateVendorIdentity(container);
+
+    // Orders badge
+    loadOrderBadge(container);
   } catch (err) {
     console.warn('Sidebar skipped', err);
+  }
+}
+
+async function loadOrderBadge(container) {
+  try {
+    const token = localStorage.getItem('s4l_token');
+    const res = await fetch(`${window.API_BASE}/vendor/orders/pending-count`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+    });
+    if (!res.ok) return;
+    const { count } = await res.json();
+    if (!count) return;
+
+    const ordersLink = container.querySelector('a[href="/account/vendor/orders.html"]');
+    if (!ordersLink) return;
+
+    const badge = document.createElement('span');
+    badge.className = 'vendor-order-badge';
+    badge.textContent = count > 99 ? '99+' : count;
+    ordersLink.appendChild(badge);
+
+    // Mobile nav badge
+    const mobileNav = document.getElementById('vendor-mobile-nav');
+    if (mobileNav) {
+      const mobileLink = mobileNav.querySelector('a[href="/account/vendor/orders.html"]');
+      if (mobileLink) {
+        const mobileBadge = document.createElement('span');
+        mobileBadge.className = 'vendor-order-badge';
+        mobileBadge.textContent = badge.textContent;
+        mobileLink.appendChild(mobileBadge);
+      }
+    }
+  } catch {
+    // badge is non-critical
   }
 }
 
