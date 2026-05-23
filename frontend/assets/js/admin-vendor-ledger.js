@@ -201,9 +201,9 @@ function renderCount(showing, total, truncated) {
   if (truncEl) {
     if (truncated) {
       truncEl.textContent = `Only the most recent 500 orders are shown (${total} total). Use period filters to narrow the range.`;
-      truncEl.style.display = 'block';
+      truncEl.classList.remove('vl-truncated--hidden');
     } else {
-      truncEl.style.display = 'none';
+      truncEl.classList.add('vl-truncated--hidden');
     }
   }
 }

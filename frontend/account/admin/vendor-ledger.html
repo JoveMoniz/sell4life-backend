@@ -162,6 +162,7 @@
       .vl-buyer { font-size: 11px; color: #9ca3af; }
 
       .vl-loading { color: #9ca3af; text-align: center; padding: 40px; font-size: 14px; }
+      .vl-truncated--hidden { display: none; }
       .vl-truncated {
         background: #fef9c3;
         border: 1px solid #fde68a;
@@ -209,6 +210,7 @@
         <button type="button" class="vl-filter-btn" data-period="week">This Week</button>
         <button type="button" class="vl-filter-btn" data-period="month">This Month</button>
         <button type="button" class="vl-filter-btn" data-period="quarter">This Quarter</button>
+        <button type="button" class="vl-filter-btn" data-period="rolling12">Last 12 Months</button>
         <button type="button" class="vl-filter-btn" data-period="year">Year to Date</button>
         <div class="vl-sep"></div>
         <!-- Type -->
@@ -227,12 +229,12 @@
 
       <!-- TOOLBAR -->
       <div class="vl-toolbar">
-        <button class="vl-export-btn" id="vl-export-csv">Export CSV</button>
+        <button type="button" class="vl-export-btn" id="vl-export-csv">Export CSV</button>
         <span class="vl-count" id="vl-count"></span>
       </div>
 
       <!-- TRUNCATION WARNING -->
-      <div id="vl-truncated" style="display:none" class="vl-truncated"></div>
+      <div id="vl-truncated" class="vl-truncated vl-truncated--hidden"></div>
 
       <!-- TRANSACTION TABLE -->
       <div class="vl-table-wrap">

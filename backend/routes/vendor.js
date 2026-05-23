@@ -128,12 +128,13 @@ async function getVendor(req) {
 function getPeriodStart(period) {
   const now = new Date();
   switch (period) {
-    case 'today':   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    case 'week':    { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
-    case 'month':   return new Date(now.getFullYear(), now.getMonth(), 1);
-    case 'quarter': return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-    case 'year':    return new Date(now.getFullYear(), 0, 1);
-    default:        return null;
+    case 'today':    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    case 'week':     { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
+    case 'month':    return new Date(now.getFullYear(), now.getMonth(), 1);
+    case 'quarter':  return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    case 'rolling12':{ const d = new Date(now); d.setFullYear(d.getFullYear() - 1); return d; }
+    case 'year':     return new Date(now.getFullYear(), 0, 1);
+    default:         return null;
   }
 }
 
@@ -146,7 +147,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
     const vendor = req.vendor; // set by requireVendor — no second DB lookup needed
     const vendorId = vendor._id;
 
-    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'year'];
+    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'rolling12', 'year'];
     const period = req.query.period;
     if (period && !VALID_PERIODS.includes(period)) {
       return res.status(400).json({ error: 'Invalid period' });
@@ -275,7 +276,7 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
     const vendor = req.vendor; // set by requireVendor — no second DB lookup needed
     const vendorId = vendor._id;
 
-    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'year'];
+    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'rolling12', 'year'];
     const VALID_TYPES   = ['all', 'sales', 'refunds'];
     const { period, type = 'all' } = req.query;
 

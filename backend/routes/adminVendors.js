@@ -222,7 +222,7 @@ router.get('/:id/transactions', async (req, res) => {
     const vendor = await Vendor.findById(id).populate('userId', 'email');
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
-    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'year'];
+    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'rolling12', 'year'];
     const VALID_TYPES   = ['all', 'sales', 'refunds'];
     const { period, type = 'all' } = req.query;
 
@@ -244,6 +244,8 @@ router.get('/:id/transactions', async (req, res) => {
     } else if (period === 'quarter') {
       const q = Math.floor(now.getMonth() / 3);
       periodStart = new Date(now.getFullYear(), q * 3, 1);
+    } else if (period === 'rolling12') {
+      periodStart = new Date(now); periodStart.setFullYear(periodStart.getFullYear() - 1);
     } else if (period === 'year') {
       periodStart = new Date(now.getFullYear(), 0, 1);
     }
@@ -475,6 +477,9 @@ router.get('/financials', async (req, res) => {
     } else if (period === 'quarter') {
       const q = Math.floor(now.getMonth() / 3);
       dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), q * 3, 1) } };
+    } else if (period === 'rolling12') {
+      const s = new Date(now); s.setFullYear(s.getFullYear() - 1);
+      dateFilter = { createdAt: { $gte: s } };
     } else if (period === 'year') {
       dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), 0, 1) } };
     }
