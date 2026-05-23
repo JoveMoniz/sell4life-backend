@@ -352,10 +352,33 @@ footer p {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  position: relative;
 }
 
 .account-dropdown .auth {
   text-decoration: none;
+}
+
+.acct-order-badge {
+  display: inline-block;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.acct-order-badge--btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  margin: 0;
+  font-size: 9px;
+  padding: 2px 4px;
 }
 
 .account-dropdown {

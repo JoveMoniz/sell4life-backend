@@ -367,22 +367,57 @@ document.addEventListener('headerLoaded', () => {
 
     const token = localStorage.getItem('s4l_token');
 
-    const login = menu.querySelector('.dd-login');
-    const register = menu.querySelector('.dd-register');
-    const orders = menu.querySelector('.dd-orders');
-    const logoutBtn = menu.querySelector('.dd-logout');
+    const login      = menu.querySelector('.dd-login');
+    const register   = menu.querySelector('.dd-register');
+    const orders     = menu.querySelector('.dd-orders');
+    const vendorLink = menu.querySelector('.dd-vendor');
+    const logoutBtn  = menu.querySelector('.dd-logout');
 
     if (token) {
-      login && (login.style.display = 'none');
+      login    && (login.style.display    = 'none');
       register && (register.style.display = 'none');
-      orders && (orders.style.display = 'block');
+      orders   && (orders.style.display   = 'block');
       logoutBtn && (logoutBtn.style.display = 'block');
       logoutBtn && logoutBtn.addEventListener('click', logout);
+      vendorLink && (vendorLink.style.display = 'none'); // hidden until confirmed vendor
+
+      // Check if vendor and fetch pending order count in one request
+      (async () => {
+        try {
+          const r = await fetch(`${window.API_BASE}/vendor/orders/pending-count`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          });
+          if (!r.ok) return; // 403 = not a vendor, silently skip
+
+          if (vendorLink) vendorLink.style.display = 'block';
+
+          const { count } = await r.json();
+          if (!count) return;
+
+          const label = count > 99 ? '99+' : String(count);
+
+          // Badge inside dropdown link
+          if (vendorLink) {
+            const dropBadge = document.createElement('span');
+            dropBadge.className = 'acct-order-badge';
+            dropBadge.textContent = label;
+            vendorLink.appendChild(dropBadge);
+          }
+
+          // Badge on the Account button itself
+          const acctBadge = document.createElement('span');
+          acctBadge.className = 'acct-order-badge acct-order-badge--btn';
+          acctBadge.textContent = label;
+          btn.appendChild(acctBadge);
+        } catch { /* non-critical */ }
+      })();
     } else {
-      orders && (orders.style.display = 'none');
-      logoutBtn && (logoutBtn.style.display = 'none');
-      login && (login.style.display = 'block');
-      register && (register.style.display = 'block');
+      orders     && (orders.style.display    = 'none');
+      vendorLink && (vendorLink.style.display = 'none');
+      logoutBtn  && (logoutBtn.style.display  = 'none');
+      login      && (login.style.display      = 'block');
+      register   && (register.style.display   = 'block');
     }
   }
 
