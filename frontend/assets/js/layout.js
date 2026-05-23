@@ -393,23 +393,28 @@ document.addEventListener('headerLoaded', () => {
           if (vendorLink) vendorLink.style.display = 'block';
 
           const { count } = await r.json();
-          if (!count) return;
 
-          const label = count > 99 ? '99+' : String(count);
+          const label = count > 99 ? '99+' : String(count || '');
 
           // Badge inside dropdown link
           if (vendorLink) {
-            const dropBadge = document.createElement('span');
-            dropBadge.className = 'acct-order-badge';
-            dropBadge.textContent = label;
-            vendorLink.appendChild(dropBadge);
+            vendorLink.querySelectorAll('.acct-order-badge').forEach(b => b.remove());
+            if (count > 0) {
+              const dropBadge = document.createElement('span');
+              dropBadge.className = 'acct-order-badge';
+              dropBadge.textContent = label;
+              vendorLink.appendChild(dropBadge);
+            }
           }
 
           // Badge on the Account button itself
-          const acctBadge = document.createElement('span');
-          acctBadge.className = 'acct-order-badge acct-order-badge--btn';
-          acctBadge.textContent = label;
-          btn.appendChild(acctBadge);
+          btn.querySelectorAll('.acct-order-badge').forEach(b => b.remove());
+          if (count > 0) {
+            const acctBadge = document.createElement('span');
+            acctBadge.className = 'acct-order-badge acct-order-badge--btn';
+            acctBadge.textContent = label;
+            btn.appendChild(acctBadge);
+          }
         } catch { /* non-critical */ }
       })();
     } else {

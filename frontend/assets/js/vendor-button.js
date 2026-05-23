@@ -128,15 +128,15 @@ async function initVendorButtons() {
           });
           if (cr.ok) {
             const { count } = await cr.json();
-            if (count > 0) {
-              const label = count > 99 ? '99+' : String(count);
-              buttons.forEach((btn) => {
+            buttons.forEach((btn) => {
+              btn.querySelectorAll('.vendor-btn-badge').forEach(b => b.remove());
+              if (count > 0) {
                 const badge = document.createElement('span');
                 badge.className = 'vendor-btn-badge';
-                badge.textContent = label;
+                badge.textContent = count > 99 ? '99+' : count;
                 btn.appendChild(badge);
-              });
-            }
+              }
+            });
           }
         } catch { /* non-critical */ }
       }
