@@ -41,22 +41,22 @@ export async function sendMail({ to, subject, html }) {
 
 export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddress }) {
   const itemRows = items.map(i =>
-    `<tr><td style="padding:4px 0">${i.name}</td><td style="padding:4px 8px" align="right">x${i.qty}</td><td style="padding:4px 0" align="right">£${Number(i.price).toFixed(2)}</td></tr>`
+    `<tr><td style="padding:4px 0;font-size:13px">${i.name}</td><td style="padding:4px 8px;font-size:13px" align="right">x${i.qty}</td><td style="padding:4px 0;font-size:13px" align="right">£${Number(i.price).toFixed(2)}</td></tr>`
   ).join('');
 
   return sendMail({
     to,
     subject: `Order confirmed – ${orderRef}`,
-    html: `<div style="font-family:sans-serif;font-size:14px;max-width:560px;margin:0 auto">
-      <h2 style="color:#0b6b6a;font-size:18px;margin:0 0 10px">Your order is confirmed</h2>
-      <p style="margin:0 0 12px">Thank you for your purchase. Your order reference is <strong>${orderRef}</strong>.</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;margin-top:12px;font-size:14px">
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Order confirmed</p>
+      <p style="margin:0 0 10px;color:#374151">Thank you for your purchase. Reference: <strong>${orderRef}</strong></p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;margin-top:10px;font-size:13px">
         ${itemRows}
-        <tr><td colspan="2" style="padding-top:8px;font-weight:700">Total</td><td style="padding-top:8px;font-weight:700" align="right">£${Number(total).toFixed(2)}</td></tr>
+        <tr><td colspan="2" style="padding-top:8px;font-weight:600">Total</td><td style="padding-top:8px;font-weight:600" align="right">£${Number(total).toFixed(2)}</td></tr>
       </table>
-      ${shippingAddress ? `<p style="margin-top:16px;color:#6b7280;font-size:13px">Shipping to: ${shippingAddress}</p>` : ''}
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-      <p style="font-size:12px;color:#9ca3af">Sell4Life · You're receiving this because you placed an order.</p>
+      ${shippingAddress ? `<p style="margin-top:12px;color:#6b7280;font-size:12px">Shipping to: ${shippingAddress}</p>` : ''}
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · You're receiving this because you placed an order.</p>
     </div>`,
   });
 }
