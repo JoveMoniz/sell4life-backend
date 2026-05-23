@@ -108,7 +108,7 @@ async function loadLayout() {
     }
 
     try {
-      if (!document.querySelector('.site-footer')) {
+      if (!document.querySelector('.s4l-footer')) {
         const res = await fetch('/includes/footer.html', { cache: 'no-store' });
         const html = await res.text();
         document.body.insertAdjacentHTML('beforeend', html);
