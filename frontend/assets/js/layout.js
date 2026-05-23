@@ -152,6 +152,9 @@ async function loadVendorSidebar() {
   const container = document.getElementById('vendor-sidebar');
   if (!container) return;
 
+  // Inject mobile bar immediately (before async fetch) so it appears instantly
+  injectMobileBar();
+
   try {
     const res = await fetch('/account/vendor/vendor-sidebar.html', {
       cache: 'no-store',
@@ -171,8 +174,6 @@ async function loadVendorSidebar() {
   } catch (err) {
     console.warn('Sidebar skipped', err);
   }
-
-  injectMobileBar();
 }
 
 function injectMobileBar() {
@@ -181,7 +182,7 @@ function injectMobileBar() {
   const bar = document.createElement('div');
   bar.className = 'vendor-mobile-bar';
   bar.innerHTML = `
-    <button class="vendor-hamburger" aria-label="Open menu">&#9776;</button>
+    <button class="vendor-hamburger" aria-label="Open menu" type="button">&#9776;</button>
     <span class="vendor-mobile-title">Vendor Panel</span>
   `;
   document.body.prepend(bar);
@@ -190,24 +191,23 @@ function injectMobileBar() {
   overlay.className = 'sidebar-overlay';
   document.body.appendChild(overlay);
 
-  const sidebar = document.getElementById('vendor-sidebar');
-
   function openSidebar() {
+    const sidebar = document.getElementById('vendor-sidebar');
     sidebar?.classList.add('sidebar-open');
     overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
   }
 
   function closeSidebar() {
+    const sidebar = document.getElementById('vendor-sidebar');
     sidebar?.classList.remove('sidebar-open');
     overlay.classList.remove('active');
-    document.body.style.overflow = '';
   }
 
   bar.querySelector('.vendor-hamburger').addEventListener('click', openSidebar);
   overlay.addEventListener('click', closeSidebar);
 
-  sidebar?.addEventListener('click', (e) => {
+  // Close when a nav link is tapped inside the sidebar
+  document.getElementById('vendor-sidebar')?.addEventListener('click', (e) => {
     if (e.target.closest('a')) closeSidebar();
   });
 }
