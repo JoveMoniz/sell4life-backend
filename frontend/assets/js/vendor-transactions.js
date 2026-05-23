@@ -85,9 +85,12 @@ async function loadTransactions() {
 
     if (!txns.length) {
       tbody.innerHTML = '<tr><td colspan="6" class="txn-empty">No transactions for this period</td></tr>';
+      lastRows = [];
+      renderTxnPagination();
       return;
     }
 
+    // Each entry = all <tr>s for one transaction (so pagination cuts cleanly between transactions)
     const rows = [];
     txns.forEach(t => {
       const date = new Date(t.date).toLocaleDateString('en-GB', {
@@ -120,7 +123,8 @@ async function loadTransactions() {
         dueByNote = ` <span class="txn-chargeback-due">Evidence due ${due}</span>`;
       }
 
-      rows.push(`
+      const txnRows = [];
+      txnRows.push(`
 <tr class="txn-row ${rowClass}">
   <td class="txn-date">${date}</td>
   <td class="txn-order">
@@ -133,7 +137,7 @@ async function loadTransactions() {
 </tr>`);
 
       if (isSale && Number(t.commission) > 0) {
-        rows.push(`
+        txnRows.push(`
 <tr class="txn-row txn-row-commission">
   <td class="txn-date"></td>
   <td class="txn-order"></td>
@@ -144,7 +148,7 @@ async function loadTransactions() {
 
       if (isSale && Number(t.stripeFee) > 0) {
         const est = t.stripeIsEstimated ? ' (est.)' : '';
-        rows.push(`
+        txnRows.push(`
 <tr class="txn-row txn-row-stripe">
   <td class="txn-date"></td>
   <td class="txn-order"></td>
@@ -154,7 +158,7 @@ async function loadTransactions() {
       }
 
       if (isSale && Number(t.vatAmount) > 0) {
-        rows.push(`
+        txnRows.push(`
 <tr class="txn-row txn-row-vat">
   <td class="txn-date"></td>
   <td class="txn-order"></td>
@@ -162,6 +166,8 @@ async function loadTransactions() {
   <td class="txn-amount txn-vat-amount">£${Number(t.vatAmount).toFixed(2)}</td>
 </tr>`);
       }
+
+      rows.push(txnRows.join(''));
     });
     lastRows = rows;
     txnPage = 1;
