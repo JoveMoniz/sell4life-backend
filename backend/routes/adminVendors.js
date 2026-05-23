@@ -192,6 +192,44 @@ router.patch('/:id/reactivate', async (req, res) => {
 });
 
 /* ======================================================
+   VENDOR PRODUCTS (admin view)
+====================================================== */
+
+router.get('/:id/products', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid vendor ID' });
+    }
+
+    const vendor = await Vendor.findById(id).populate('userId', 'email').select('storeName storeSlug status');
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const Product = (await import('../models/product.js')).default;
+    const products = await Product.find({ vendor: id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      vendor: {
+        _id:       vendor._id,
+        storeName: vendor.storeName,
+        storeSlug: vendor.storeSlug,
+        email:     vendor.userId?.email,
+        status:    vendor.status,
+      },
+      products,
+      total: products.length,
+      active: products.filter(p => !p.archived).length,
+      archived: products.filter(p => p.archived).length,
+    });
+  } catch (err) {
+    console.error('Admin vendor products error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    NOTIFICATION COUNTS
 ====================================================== */
 

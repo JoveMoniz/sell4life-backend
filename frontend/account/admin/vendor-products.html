@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Vendor Products | Admin</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260523c" />
+    <style>
+      #logoutBtn { padding: 5px 10px; font-size: 12px; font-weight: 500; }
+
+      .vp-info {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 20px;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 13px;
+      }
+
+      .vp-stats {
+        display: flex;
+        gap: 20px;
+        padding: 12px 20px;
+        font-size: 13px;
+        color: #6b7280;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .vp-stats strong { color: #111827; }
+
+      .vp-toolbar {
+        display: flex;
+        gap: 8px;
+        padding: 8px 20px 4px;
+        align-items: center;
+      }
+      .vp-count { font-size: 12px; color: #9ca3af; margin-left: auto; }
+
+      /* filter tabs */
+      .vp-filter-btn {
+        padding: 4px 13px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .vp-filter-btn.active,
+      .vp-filter-btn:hover { background: #0b6b6a; color: #fff; border-color: #0b6b6a; }
+
+      /* product grid */
+      .vp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+        padding: 12px 20px 60px;
+      }
+      .vp-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        font-size: 13px;
+      }
+      .vp-card-img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        background: #f3f4f6;
+        display: block;
+      }
+      .vp-card-img-placeholder {
+        width: 100%;
+        height: 140px;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #d1d5db;
+        font-size: 28px;
+      }
+      .vp-card-body { padding: 12px; }
+      .vp-card-name {
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .vp-card-price { font-size: 15px; font-weight: 700; color: #0b6b6a; }
+      .vp-card-meta { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+      .vp-archived-tag {
+        display: inline-block;
+        font-size: 10px;
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 1px 6px;
+        border-radius: 8px;
+        margin-left: 4px;
+      }
+
+      .vp-loading { color: #9ca3af; text-align: center; padding: 40px; font-size: 14px; }
+      .vp-body { max-width: 1100px; margin: 0 auto; }
+
+      /* pagination */
+      .vp-pagination {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 20px 50px;
+      }
+      .vp-pg-btn {
+        padding: 5px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .vp-pg-btn:disabled { opacity: .4; cursor: not-allowed; }
+      .vp-pg-btn:not(:disabled):hover { border-color: #0b6b6a; color: #0b6b6a; }
+      .vp-pg-info { font-size: 13px; color: #6b7280; }
+    </style>
+  </head>
+
+  <body class="admin">
+
+    <div class="admin-sticky">
+      <div class="admin-top">
+        <header class="admin-header">
+          <a href="/index.html" class="admin-logo">
+            <span class="logo-dollar">$</span>
+            <span class="logo-text">ell</span>
+            <span class="logo-four">4</span>
+            <span class="logo-text">Life</span>
+          </a>
+        </header>
+        <div class="admin-title">
+          <a href="/account/admin/vendors.html" class="admin-back">← vendors</a>
+          <h1 id="page-title">Vendor Products</h1>
+        </div>
+        <button type="button" id="logoutBtn">Log out</button>
+      </div>
+      <div id="vp-info-bar" class="vp-info" style="display:none"></div>
+    </div>
+
+    <div class="vp-body">
+      <div class="vp-stats" id="vp-stats"></div>
+
+      <div class="vp-toolbar">
+        <button type="button" class="vp-filter-btn active" data-filter="active">Active</button>
+        <button type="button" class="vp-filter-btn" data-filter="archived">Archived</button>
+        <button type="button" class="vp-filter-btn" data-filter="all">All</button>
+        <span class="vp-count" id="vp-count"></span>
+      </div>
+
+      <div class="vp-grid" id="vp-grid">
+        <div class="vp-loading">Loading…</div>
+      </div>
+
+      <div class="vp-pagination" id="vp-pagination"></div>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/require-admin.js"></script>
+    <script type="module" src="/assets/js/admin-vendor-products.js?v=20260523a"></script>
+    <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
+  </body>
+</html>

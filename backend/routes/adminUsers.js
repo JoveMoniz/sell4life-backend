@@ -27,7 +27,11 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
     const filter = {};
 
     if (q) {
-      filter.email = { $regex: q, $options: 'i' };
+      filter.$or = [
+        { email:    { $regex: q, $options: 'i' } },
+        { name:     { $regex: q, $options: 'i' } },
+        { username: { $regex: q, $options: 'i' } },
+      ];
     }
 
     const usersRaw = await User.find(filter)

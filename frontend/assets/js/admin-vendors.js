@@ -49,6 +49,7 @@ async function loadVendors(page = 1, q = '', status = 'all') {
    TABLE RENDER
 ========================================= */
 function renderVendorsTable(vendors) {
+  lastVendors = vendors || [];
   const tbody = document.getElementById('vendorsTable');
   if (!tbody) return;
 
@@ -165,6 +166,10 @@ function buildVendorPanel(v) {
         <a href="/account/admin/vendor-ledger.html?id=${v._id}" target="_blank"
           style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
           View Ledger ↗
+        </a>
+        <a href="/account/admin/vendor-products.html?id=${v._id}" target="_blank"
+          style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
+          View Products ↗
         </a>
         <a href="/account/admin/financials.html" target="_blank"
           style="padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.8rem;color:#374151;text-decoration:none">
@@ -380,6 +385,44 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
     alert('Network error');
     btn.disabled = false;
   }
+});
+
+/* =========================================
+   CSV EXPORT
+========================================= */
+let lastVendors = [];
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#vendors-export-csv')) return;
+  if (!lastVendors.length) { alert('No vendors loaded to export.'); return; }
+
+  const header = ['Vendor', 'Short ID', 'Email', 'Status', 'Orders', 'Gross (£)', 'Refunds (£)', 'Commission (£)', 'Net to Vendor (£)', 'Created'];
+  const rows = lastVendors.map(v => {
+    const shortId = '...' + String(v._id || '').slice(-6).toUpperCase();
+    const commission = ((v.grossRevenue || 0) * 0.08).toFixed(2);
+    const created = v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-GB') : '';
+    return [
+      `"${(v.storeName || '').replace(/"/g, '""')}"`,
+      shortId,
+      v.userId?.email || '',
+      v.status || '',
+      v.orders || 0,
+      Number(v.grossRevenue || 0).toFixed(2),
+      Number(v.refunds || 0).toFixed(2),
+      commission,
+      Number(v.netRevenue || 0).toFixed(2),
+      created,
+    ].join(',');
+  });
+
+  const csv = [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vendors-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 /* =========================================

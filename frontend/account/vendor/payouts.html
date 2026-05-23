@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Payouts | Sell4Life</title>
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523k" />
+    <style>
+      .payouts-wrap { max-width: 700px; }
+
+      /* balance cards */
+      .payout-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .payout-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      }
+      .payout-card-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6b7280;
+        margin-bottom: 5px;
+      }
+      .payout-card-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+      }
+      .payout-card-value.highlight { color: #0b6b6a; }
+      .payout-card-value.negative  { color: #b91c1c; }
+      .payout-card-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+      /* request box */
+      .payout-request-box {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 24px;
+      }
+      .payout-request-box h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .payout-request-btn {
+        padding: 9px 22px;
+        background: #0b6b6a;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .payout-request-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+      .payout-request-btn:not(:disabled):hover { background: #085756; }
+      .payout-msg { font-size: 13px; margin-top: 8px; }
+      .payout-msg.success { color: #15803d; }
+      .payout-msg.error   { color: #b91c1c; }
+      .payout-pending-note {
+        font-size: 13px;
+        color: #b45309;
+        background: #fef9c3;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
+
+      /* history table */
+      .payout-history-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6b7280;
+        margin: 0 0 10px;
+      }
+      .payout-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .payout-table th {
+        text-align: left;
+        padding: 7px 10px;
+        background: #f9fafb;
+        border-bottom: 2px solid #e5e7eb;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #6b7280;
+      }
+      .payout-table td {
+        padding: 10px;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+      }
+      .payout-table tr:last-child td { border-bottom: none; }
+      .payout-status {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .payout-status.requested { background: #fef9c3; color: #854d0e; }
+      .payout-status.paid      { background: #dcfce7; color: #166534; }
+      .payout-status.rejected  { background: #fee2e2; color: #991b1b; }
+      .payout-empty { color: #9ca3af; text-align: center; padding: 30px; font-size: 14px; }
+    </style>
+  </head>
+
+  <body class="page-payouts">
+    <div class="vendor-layout">
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/account/vendor/dashboard.html" class="vendor-back-link">← Back to Dashboard</a>
+          <h1 class="vendor-title">Payouts</h1>
+
+          <div class="payouts-wrap" id="payouts-wrap">
+            <p style="color:#9ca3af">Loading…</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script src="/assets/js/layout.js?v=20260523h"></script>
+    <script type="module" src="/assets/js/vendor-payouts.js?v=20260523a"></script>
+  </body>
+</html>

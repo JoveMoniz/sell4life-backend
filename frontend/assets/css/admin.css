@@ -1495,3 +1495,19 @@ body.admin-users .admin-users-table thead th {
   color: #9ca3af;
   text-align: center;
 }
+
+/* ── Generic admin toolbar ── */
+.admin-toolbar {
+  padding: 8px 16px 4px;
+  display: flex;
+  gap: 8px;
+}
+.admin-toolbar-btn {
+  padding: 5px 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.admin-toolbar-btn:hover { border-color: #0b6b6a; color: #0b6b6a; }
