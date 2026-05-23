@@ -324,7 +324,8 @@ router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
 
       const paymentStatus = (order.paymentStatus || '').toLowerCase();
       const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
-      const displayId = order.shortId ? `S4L-${order.shortId}` : `S4L-${String(order._id).slice(0, 10).toUpperCase()}`;
+      const baseId = order.shortId || String(order._id).slice(0, 10).toUpperCase();
+      const displayId = baseId.startsWith('S4L-') ? baseId : `S4L-${baseId}`;
 
       // Gross sale amount = original full item prices × quantities
       const itemsTotal = vendorItems.reduce(

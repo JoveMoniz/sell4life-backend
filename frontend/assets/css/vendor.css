@@ -2333,6 +2333,12 @@ Vendor Products
   bottom: 74px;
 }
 
+@media (max-width: 900px) and (orientation: portrait) {
+  .page-transactions .scroll-top-btn {
+    bottom: 100px;
+  }
+}
+
 /* ======================================================
    RESPONSIVE — MOBILE (≤ 900px covers landscape iPhones)
 ====================================================== */
