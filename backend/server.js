@@ -32,6 +32,7 @@ import adminOrdersRoute from './routes/adminOrders.js';
 import adminUsersRoute from './routes/adminUsers.js';
 import adminVendorsRoutes from './routes/adminVendors.js';
 import storesRoute from './routes/stores.js';
+import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
 
 // ======================================================
@@ -202,6 +203,7 @@ app.use('/api/admin/users', adminUsersRoute);
 
 app.use('/api/admin/vendors', adminVendorsRoutes);
 app.use('/api/stores', storesRoute);
+app.use('/api/account', accountRoute);
 
 // ======================================================
 // 404 HANDLER

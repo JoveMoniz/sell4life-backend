@@ -415,6 +415,7 @@ document.addEventListener('headerLoaded', () => {
     const login      = menu.querySelector('.dd-login');
     const register   = menu.querySelector('.dd-register');
     const orders     = menu.querySelector('.dd-orders');
+    const settings   = menu.querySelector('.dd-settings');
     const vendorLink = menu.querySelector('.dd-vendor');
     const logoutBtn  = menu.querySelector('.dd-logout');
 
@@ -422,11 +423,13 @@ document.addEventListener('headerLoaded', () => {
       login    && (login.style.display    = 'none');
       register && (register.style.display = 'none');
       orders   && (orders.style.display   = 'block');
+      settings && (settings.style.display = 'block');
       logoutBtn && (logoutBtn.style.display = 'block');
       logoutBtn && logoutBtn.addEventListener('click', logout);
       vendorLink && (vendorLink.style.display = 'none');
     } else {
       orders     && (orders.style.display    = 'none');
+      settings   && (settings.style.display  = 'none');
       vendorLink && (vendorLink.style.display = 'none');
       logoutBtn  && (logoutBtn.style.display  = 'none');
       login      && (login.style.display      = 'block');

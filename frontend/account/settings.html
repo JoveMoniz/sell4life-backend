@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Account Settings | Sell4Life</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <style>
+      .acct-wrap {
+        max-width: 520px;
+        margin: 40px auto 80px;
+        padding: 0 20px;
+      }
+      .acct-wrap h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 24px;
+      }
+      .acct-section {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 20px 22px;
+        margin-bottom: 16px;
+      }
+      .acct-section-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #6b7280;
+        margin: 0 0 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .acct-field { margin-bottom: 14px; }
+      .acct-field:last-child { margin-bottom: 0; }
+      .acct-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+      .acct-input {
+        width: 100%;
+        padding: 8px 11px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        font-family: inherit;
+        box-sizing: border-box;
+        transition: border-color .15s;
+      }
+      .acct-input:focus { outline: none; border-color: #0b6b6a; box-shadow: 0 0 0 3px rgba(11,107,106,.1); }
+      .acct-save-bar { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+      .acct-save-btn {
+        padding: 8px 20px;
+        background: #0b6b6a;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s;
+      }
+      .acct-save-btn:hover { background: #085756; }
+      .acct-save-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+      .acct-msg { font-size: 13px; }
+      .acct-msg.success { color: #15803d; }
+      .acct-msg.error   { color: #b91c1c; }
+    </style>
+  </head>
+  <body>
+    <div class="acct-wrap">
+      <a href="/" style="font-size:13px;color:#0b6b6a;text-decoration:none">← Back to home</a>
+      <h1 style="margin-top:16px">Account Settings</h1>
+
+      <!-- Personal Info -->
+      <div class="acct-section">
+        <div class="acct-section-title">Personal Info</div>
+        <div class="acct-field">
+          <label class="acct-label" for="acct-name">Full name</label>
+          <input class="acct-input" id="acct-name" type="text" autocomplete="name" />
+        </div>
+        <div class="acct-save-bar">
+          <button class="acct-save-btn" id="save-name">Save</button>
+          <span class="acct-msg" id="msg-name"></span>
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div class="acct-section">
+        <div class="acct-section-title">Email Address</div>
+        <div class="acct-field">
+          <label class="acct-label" for="acct-email">New email</label>
+          <input class="acct-input" id="acct-email" type="email" autocomplete="email" />
+        </div>
+        <div class="acct-field">
+          <label class="acct-label" for="acct-email-pass">Current password</label>
+          <input class="acct-input" id="acct-email-pass" type="password" autocomplete="current-password" />
+        </div>
+        <div class="acct-save-bar">
+          <button class="acct-save-btn" id="save-email">Update Email</button>
+          <span class="acct-msg" id="msg-email"></span>
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="acct-section">
+        <div class="acct-section-title">Change Password</div>
+        <div class="acct-field">
+          <label class="acct-label" for="acct-cur-pass">Current password</label>
+          <input class="acct-input" id="acct-cur-pass" type="password" autocomplete="current-password" />
+        </div>
+        <div class="acct-field">
+          <label class="acct-label" for="acct-new-pass">New password</label>
+          <input class="acct-input" id="acct-new-pass" type="password" autocomplete="new-password" />
+        </div>
+        <div class="acct-save-bar">
+          <button class="acct-save-btn" id="save-password">Update Password</button>
+          <span class="acct-msg" id="msg-password"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script>
+      const token = localStorage.getItem('s4l_token');
+      if (!token) window.location.replace('/account/signin.html');
+    </script>
+    <script src="/assets/js/layout.js"></script>
+    <script src="/assets/js/account-settings.js"></script>
+  </body>
+</html>
