@@ -39,8 +39,8 @@ export async function sendMail({ to, subject, html }) {
 
 // ---- Shared logo header ----
 const logoHeader = `
-  <div style="background:#0b6b6a;padding:16px 20px;border-radius:6px 6px 0 0;margin-bottom:20px">
-    <span style="font-family:Arial,sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;color:#fff">
+  <div style="margin-bottom:18px">
+    <span style="display:inline-block;background:#0b6b6a;padding:8px 14px;border-radius:6px;font-family:Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;color:#fff">
       <span style="color:#f28c28">$</span>ell<span style="color:#f28c28">4</span>Life
     </span>
   </div>`;
