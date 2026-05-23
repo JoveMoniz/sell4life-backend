@@ -145,10 +145,18 @@ footer p {
   font-weight: bold;
   letter-spacing: 3px;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
   padding-top: 15px;
-  border-bottom: 2px solid #f28c28;
-  padding-bottom: 3px;
+}
+.footer-logo-line {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: #f28c28;
+  border-radius: 1px;
+  margin-top: 3px;
 }
 
 .logo-orange {
