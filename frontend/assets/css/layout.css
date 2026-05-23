@@ -48,11 +48,10 @@ footer p {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
-  width: 100%;
-  height: auto;
-  margin: 3rem auto;
+  max-width: 1100px;
+  margin: 2.5rem auto;
   text-align: left;
-  padding-left: 20px;
+  padding: 0 20px;
 }
 
 .footer-col h4 {
@@ -71,20 +70,18 @@ footer p {
 
 .footer-col ul li {
   margin-bottom: 8px;
-  transition: 0.3s;
 }
 
 .footer-col ul li a {
   color: #d7e6e6;
   text-decoration: none;
-  transition: color 0.3s;
+  transition: color 0.2s, padding-left 0.2s;
+  padding-left: 0;
 }
 
 .footer-col ul li a:hover {
-  text-decoration: underline 0.8px #f18c28;
-  margin: 3px;
-  font-size: 18px;
-  font-weight: 800;
+  color: #f18c28;
+  padding-left: 4px;
 }
 
 .footer-top {
