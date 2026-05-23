@@ -683,10 +683,15 @@ router.get('/orders/pending-count', authMiddleware, requireVendor, async (req, r
     if (!vendor) return res.status(403).json({ error: 'Vendor not found' });
 
     const count = await Order.countDocuments({
-      'vendorOrders': {
+      paymentStatus: 'paid',
+      vendorOrders: {
         $elemMatch: {
           vendorId: vendor._id,
-          'items.status': 'Pending',
+          items: {
+            $elemMatch: {
+              $or: [{ status: { $exists: false } }, { status: null }],
+            },
+          },
         },
       },
     });
