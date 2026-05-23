@@ -2,10 +2,12 @@
 // SELL4LIFE – STRIPE WEBHOOK (HARDENED VERSION)
 // ======================================================
 import { pushUniqueHistory } from '../utils/historyLogic.js';
+import { mailOrderConfirmation, mailNewOrderVendor } from '../utils/email.js';
 import express from 'express';
 import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
 import Product from '../models/product.js';
+import Vendor from '../models/vendor.js';
 
 const router = express.Router();
 
@@ -194,6 +196,40 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       await order.save();
 
       console.log('🎉 Order created:', order._id);
+
+      // Fire emails (non-blocking)
+      (async () => {
+        try {
+          const User = (await import('../models/user.js')).default;
+          const buyer = await User.findById(userId).lean();
+          if (buyer?.email) {
+            await mailOrderConfirmation({
+              to: buyer.email,
+              orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
+              items: items.map(i => ({ name: i.name, qty: i.quantity, price: i.subtotal })),
+              total: order.total,
+              shippingAddress: paymentIntent.metadata.shippingAddress || '',
+            });
+          }
+
+          const vendorIds = [...new Set(items.map(i => String(i.vendorId)))];
+          for (const vid of vendorIds) {
+            const vendor = await Vendor.findById(vid).populate('userId', 'email').lean();
+            const vendorEmail = vendor?.userId?.email;
+            if (vendorEmail) {
+              const vendorItems = items.filter(i => String(i.vendorId) === vid);
+              await mailNewOrderVendor({
+                to: vendorEmail,
+                storeName: vendor.storeName || 'Your Store',
+                orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
+                items: vendorItems.map(i => ({ name: i.name, qty: i.quantity })),
+              });
+            }
+          }
+        } catch (emailErr) {
+          console.warn('[email] Order email failed:', emailErr.message);
+        }
+      })();
     }
 
     /* ======================================================

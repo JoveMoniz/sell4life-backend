@@ -1,4 +1,5 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
+import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -111,12 +112,16 @@ router.patch('/:id/approve', async (req, res) => {
         approvedAt: new Date(),
       },
       { new: true }
-    );
+    ).populate('userId', 'email');
 
     if (!vendor) {
       return res.status(400).json({
         message: 'Vendor not found or not in pending state',
       });
+    }
+
+    if (vendor.userId?.email) {
+      mailVendorStatusChange({ to: vendor.userId.email, storeName: vendor.storeName, status: 'approved' }).catch(() => {});
     }
 
     res.json({ message: 'Vendor approved', vendor });
@@ -144,12 +149,16 @@ router.patch('/:id/suspend', async (req, res) => {
         suspendedAt: new Date(),
       },
       { new: true }
-    );
+    ).populate('userId', 'email');
 
     if (!vendor) {
       return res.status(400).json({
         message: 'Vendor not found or not in approved state',
       });
+    }
+
+    if (vendor.userId?.email) {
+      mailVendorStatusChange({ to: vendor.userId.email, storeName: vendor.storeName, status: 'suspended' }).catch(() => {});
     }
 
     res.json({ message: 'Vendor suspended', vendor });
@@ -176,12 +185,16 @@ router.patch('/:id/reactivate', async (req, res) => {
         status: 'approved',
       },
       { new: true }
-    );
+    ).populate('userId', 'email');
 
     if (!vendor) {
       return res.status(400).json({
         message: 'Vendor not found or not in suspended state',
       });
+    }
+
+    if (vendor.userId?.email) {
+      mailVendorStatusChange({ to: vendor.userId.email, storeName: vendor.storeName, status: 'reactivated' }).catch(() => {});
     }
 
     res.json({ message: 'Vendor reactivated', vendor });
@@ -677,8 +690,20 @@ router.patch('/payouts/:id', async (req, res) => {
       if (reference) update.reference = reference;
     }
 
-    const payout = await Payout.findByIdAndUpdate(id, update, { new: true });
+    const payout = await Payout.findByIdAndUpdate(id, update, { new: true }).populate({
+      path: 'vendorId',
+      select: 'storeName userId',
+      populate: { path: 'userId', select: 'email' },
+    });
     if (!payout) return res.status(404).json({ error: 'Payout not found' });
+
+    if (status === 'paid') {
+      const vendorEmail = payout.vendorId?.userId?.email;
+      const storeName   = payout.vendorId?.storeName || 'Your Store';
+      if (vendorEmail) {
+        mailPayoutProcessed({ to: vendorEmail, storeName, amount: payout.amount, reference: payout.reference }).catch(() => {});
+      }
+    }
 
     res.json({ success: true, payout });
   } catch (err) {
