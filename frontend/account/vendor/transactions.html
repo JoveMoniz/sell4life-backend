@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/assets/css/vendor.css" />
   </head>
 
-  <body>
+  <body class="page-transactions">
     <div class="vendor-layout">
       <div id="vendor-sidebar"></div>
 
@@ -108,39 +108,38 @@
           <!-- Pagination -->
           <div id="txn-pagination" class="txn-pagination"></div>
 
-          <!-- Payout section -->
+          <!-- Payout history at bottom of page -->
           <div class="payout-section">
-            <h2 class="payout-title">Payout</h2>
-
-            <div class="payout-balance-card">
-              <div class="payout-balance-label">Available for Payout</div>
-              <div class="payout-balance-amount" id="payout-balance">£—</div>
-              <div class="payout-balance-note" id="payout-balance-note"></div>
-              <button type="button" id="btn-request-payout" class="btn-payout" disabled>
-                Request Payout
-              </button>
-            </div>
-
-            <div class="payout-history-wrap">
-              <h3 class="payout-history-title">Payout History</h3>
-              <table class="payout-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Reference / Note</th>
-                  </tr>
-                </thead>
-                <tbody id="payout-history-body">
-                  <tr><td colspan="4" class="txn-loading">Loading...</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <h2 class="payout-title">Payout History</h2>
+            <table class="payout-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Reference / Note</th>
+                </tr>
+              </thead>
+              <tbody id="payout-history-body">
+                <tr><td colspan="4" class="txn-loading">Loading...</td></tr>
+              </tbody>
+            </table>
           </div>
 
         </div>
       </main>
+    </div>
+
+    <!-- Sticky payout bar — always visible at bottom -->
+    <div id="payout-sticky-bar" class="payout-sticky-bar">
+      <div class="payout-sticky-left">
+        <div class="payout-sticky-label">Available for Payout</div>
+        <div class="payout-sticky-amount" id="payout-balance">£—</div>
+      </div>
+      <div class="payout-sticky-note" id="payout-balance-note"></div>
+      <button type="button" id="btn-request-payout" class="btn-payout-sticky" disabled>
+        Request Payout
+      </button>
     </div>
 
     <script src="/assets/js/config-global.js"></script>
@@ -165,7 +164,7 @@
       })();
     </script>
 
-    <script src="/assets/js/layout.js?v=20260523b"></script>
-    <script src="/assets/js/vendor-transactions.js?v=20260523b"></script>
+    <script src="/assets/js/layout.js?v=20260523c"></script>
+    <script src="/assets/js/vendor-transactions.js?v=20260523c"></script>
   </body>
 </html>

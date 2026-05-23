@@ -1758,6 +1758,83 @@ Vendor Products
 }
 
 /* ======================================================
+   STICKY PAYOUT BAR
+====================================================== */
+
+.payout-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 220px; /* sidebar width */
+  right: 0;
+  z-index: 90;
+  background: linear-gradient(135deg, #1f6f6a 0%, #155e59 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.18);
+}
+
+.payout-sticky-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.payout-sticky-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.payout-sticky-amount {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.payout-sticky-note {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  flex: 1 1 160px;
+  margin: 0;
+}
+
+.btn-payout-sticky {
+  background: #fff;
+  color: #1f6f6a;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 22px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  margin-left: auto;
+}
+
+.btn-payout-sticky:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-payout-sticky:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+/* Extra bottom padding so page content isn't hidden under the bar */
+.page-transactions .vendor-container {
+  padding-bottom: 80px;
+}
+
+/* ======================================================
    PAYOUT SECTION
 ====================================================== */
 
@@ -2103,9 +2180,26 @@ Vendor Products
     top: 0;
   }
 
-  /* Payout card: full width */
-  .payout-balance-card {
-    border-radius: 8px;
+  /* Sticky payout bar: full width on mobile */
+  .payout-sticky-bar {
+    left: 0;
+    gap: 8px 12px;
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .payout-sticky-amount {
+    font-size: 1.2rem;
+  }
+
+  .btn-payout-sticky {
+    margin-left: 0;
+    padding: 8px 16px;
+  }
+
+  /* Transactions page: account for sticky bar + mobile bar */
+  .page-transactions .vendor-container {
+    padding-bottom: 90px;
   }
 
   /* Vendor products grid: 2 columns */
