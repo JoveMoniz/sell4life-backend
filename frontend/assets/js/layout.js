@@ -323,6 +323,54 @@ async function populateVendorIdentity(container) {
 }
 
 // =====================================================
+// VENDOR BADGE  (runs once, after header is in DOM)
+// =====================================================
+
+let _vendorBadgeDone = false;
+
+async function applyVendorBadge() {
+  if (_vendorBadgeDone) return;
+  _vendorBadgeDone = true;
+
+  const token = localStorage.getItem('s4l_token');
+  if (!token) return;
+
+  try {
+    const r = await fetch(`${window.API_BASE}/vendor/orders/pending-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!r.ok) return; // 403 = not a vendor
+
+    document.querySelectorAll('.dd-vendor').forEach(a => { a.style.display = 'block'; });
+
+    const { count } = await r.json();
+    if (!count) return;
+
+    const label = count > 99 ? '99+' : String(count);
+
+    document.querySelectorAll('.dd-vendor').forEach(a => {
+      if (!a.querySelector('.acct-order-badge')) {
+        const b = document.createElement('span');
+        b.className = 'acct-order-badge';
+        b.textContent = label;
+        a.appendChild(b);
+      }
+    });
+
+    ['accountBtnDesktop', 'accountBtnMobile'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn && !btn.querySelector('.acct-order-badge')) {
+        const b = document.createElement('span');
+        b.className = 'acct-order-badge acct-order-badge--btn';
+        b.textContent = label;
+        btn.appendChild(b);
+      }
+    });
+  } catch { /* non-critical */ }
+}
+
+// =====================================================
 // HEADER INTERACTIONS
 // =====================================================
 
@@ -392,47 +440,7 @@ document.addEventListener('headerLoaded', () => {
   setupAccount('accountBtnDesktop', 'accountDropdownDesktop');
   setupAccount('accountBtnMobile', 'accountDropdownMobile');
 
-  // Fetch vendor badge once — updates ALL dropdowns and buttons together
-  const token = localStorage.getItem('s4l_token');
-  if (token) {
-    (async () => {
-      try {
-        const r = await fetch(`${window.API_BASE}/vendor/orders/pending-count`, {
-          headers: { Authorization: `Bearer ${token}` },
-          credentials: 'include',
-        });
-        if (!r.ok) return; // 403 = not a vendor
-
-        // Show all vendor dashboard links
-        document.querySelectorAll('.dd-vendor').forEach(a => { a.style.display = 'block'; });
-
-        const { count } = await r.json();
-        if (!count) return;
-
-        const label = count > 99 ? '99+' : String(count);
-
-        // One badge per dropdown link
-        document.querySelectorAll('.dd-vendor').forEach(a => {
-          a.querySelectorAll('.acct-order-badge').forEach(b => b.remove());
-          const b = document.createElement('span');
-          b.className = 'acct-order-badge';
-          b.textContent = label;
-          a.appendChild(b);
-        });
-
-        // One badge per account button
-        ['accountBtnDesktop', 'accountBtnMobile'].forEach(id => {
-          const btn = document.getElementById(id);
-          if (!btn) return;
-          btn.querySelectorAll('.acct-order-badge').forEach(b => b.remove());
-          const b = document.createElement('span');
-          b.className = 'acct-order-badge acct-order-badge--btn';
-          b.textContent = label;
-          btn.appendChild(b);
-        });
-      } catch { /* non-critical */ }
-    })();
-  }
+  applyVendorBadge();
 });
 
 // =====================================================
