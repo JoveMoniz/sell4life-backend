@@ -231,4 +231,97 @@ router.patch('/:id/unban', authMiddleware, adminMiddleware, async (req, res) => 
   }
 });
 
+/* ======================================================
+   BUYER ORDER HISTORY (admin view)
+====================================================== */
+
+router.get('/:id/orders', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(id).select('email name username banned active role createdAt lastLogin');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const orders = await Order.find({ user: id })
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+
+    let totalSpent = 0;
+    let totalRefunds = 0;
+
+    const rows = orders.map(order => {
+      const ps = (order.paymentStatus || '').toLowerCase();
+      const isPaid = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled'].includes(ps);
+
+      const gross = Number(order.total || 0);
+      if (isPaid) totalSpent += gross;
+
+      // Per-order refund total
+      let refundTotal = 0;
+      (order.items || []).forEach(item => {
+        const price = Number(item.price || 0);
+        if (item.status === 'Cancelled') {
+          refundTotal += price * Number(item.quantity || 0);
+        } else if (Number(item.refundedQuantity) > 0) {
+          refundTotal += Number(item.refundedAmount) || price * Number(item.refundedQuantity);
+        } else if (Number(item.returnQuantity) > 0) {
+          refundTotal += price * Number(item.returnQuantity);
+        }
+      });
+      if (isPaid) totalRefunds += refundTotal;
+
+      const baseId = order.shortId || String(order._id).slice(0, 10).toUpperCase();
+      const displayId = baseId.startsWith('S4L-') ? baseId : `S4L-${baseId}`;
+
+      return {
+        _id:           order._id,
+        displayId,
+        createdAt:     order.createdAt,
+        status:        order.status,
+        paymentStatus: order.paymentStatus,
+        total:         gross,
+        refundTotal:   Math.round(refundTotal * 100) / 100,
+        itemCount:     (order.items || []).reduce((s, i) => s + Number(i.quantity || 0), 0),
+        items: (order.items || []).map(item => ({
+          name:       item.name || 'Unknown',
+          price:      Number(item.price || 0),
+          quantity:   Number(item.quantity || 0),
+          status:     item.status || '—',
+          vendorId:   item.vendorId,
+          vendorName: item.vendorName || '—',
+        })),
+        shippingAddress: order.shippingAddress || null,
+      };
+    });
+
+    res.json({
+      user: {
+        _id:       user._id,
+        email:     user.email,
+        name:      user.name || '',
+        username:  user.username || '',
+        banned:    user.banned,
+        active:    user.active,
+        role:      user.role,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+      },
+      orders: rows,
+      summary: {
+        orderCount:   orders.length,
+        totalSpent:   Math.round(totalSpent * 100) / 100,
+        totalRefunds: Math.round(totalRefunds * 100) / 100,
+        netSpent:     Math.round((totalSpent - totalRefunds) * 100) / 100,
+      },
+    });
+  } catch (err) {
+    console.error('Admin buyer orders error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

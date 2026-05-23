@@ -180,6 +180,10 @@ function buildUserPanel(user) {
           Save role
         </button>
         ${banBtn}
+        <a href="/account/admin/buyer-orders.html?id=${user._id}" target="_blank"
+          style="padding:5px 12px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:0.82rem;color:#374151;text-decoration:none;margin-left:auto">
+          View Orders ↗
+        </a>
       </div>
     </div>`;
 }
