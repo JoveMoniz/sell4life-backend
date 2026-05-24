@@ -106,6 +106,24 @@ export function mailPayoutProcessed({ to, storeName, amount, reference }) {
   });
 }
 
+export function mailPasswordReset({ to, name, resetUrl }) {
+  return sendMail({
+    to,
+    subject: 'Reset your Sell4Life password',
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Reset your password</p>
+      <p style="margin:0 0 16px;color:#374151">Hi ${name || 'there'},<br><br>We received a request to reset your Sell4Life password. Click the button below — this link expires in <strong>1 hour</strong>.</p>
+      <p style="margin:0 0 20px">
+        <a href="${resetUrl}" style="display:inline-block;background:#0b6b6a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">Reset Password</a>
+      </p>
+      <p style="color:#6b7280;font-size:12px">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · This link expires in 1 hour.</p>
+    </div>`,
+  });
+}
+
 export function mailVendorStatusChange({ to, storeName, status }) {
   const messages = {
     approved:    { heading: `Welcome, ${storeName}!`, body: 'Your vendor account has been approved. You can now list products and start selling.' },

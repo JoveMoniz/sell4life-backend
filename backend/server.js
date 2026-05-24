@@ -34,6 +34,7 @@ import adminVendorsRoutes from './routes/adminVendors.js';
 import storesRoute from './routes/stores.js';
 import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
+import passwordResetRoute from './routes/passwordReset.js';
 
 // ======================================================
 // APP INITIALIZATION
@@ -77,6 +78,8 @@ const authLimiter = rateLimit({
 app.use('/api', apiLimiter);
 app.post('/api/auth/login', authLimiter);
 app.post('/api/auth/register', authLimiter);
+app.post('/api/auth/forgot-password', authLimiter);
+app.post('/api/auth/reset-password', authLimiter);
 
 // ======================================================
 // CORS CONFIGURATION
@@ -193,6 +196,7 @@ if (!ownerId) {
 // API ROUTES
 // ======================================================
 app.use('/api/auth', authRoute);
+app.use('/api/auth', passwordResetRoute);
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/orders', ordersRoute);
 app.use('/api/products', productsRoute);
