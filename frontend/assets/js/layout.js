@@ -173,7 +173,7 @@ async function loadVendorSidebar() {
 
     // Mark active nav link
     const path = window.location.pathname;
-    container.querySelectorAll('.vendor-nav a').forEach(a => {
+    container.querySelectorAll('.vendor-nav a').forEach((a) => {
       if (a.getAttribute('href') === path) a.classList.add('active');
     });
 
@@ -186,7 +186,10 @@ async function loadVendorSidebar() {
     // Wire logout link
     const logoutLink = container.querySelector('.vendor-logout');
     if (logoutLink) {
-      logoutLink.addEventListener('click', e => { e.preventDefault(); logout(); });
+      logoutLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        logout();
+      });
     }
   } catch (err) {
     console.warn('Sidebar skipped', err);
@@ -246,28 +249,33 @@ function injectMobileBar() {
   // Dropdown nav
   const currentPath = window.location.pathname;
   const links = [
-    { href: '/account/vendor/dashboard.html',    label: 'Dashboard' },
-    { href: '/account/vendor/products.html',     label: 'Products' },
-    { href: '/account/vendor/add-product.html',  label: 'Add Product' },
-    { href: '/account/vendor/orders.html',       label: 'Orders' },
+    { href: '/account/vendor/dashboard.html', label: 'Dashboard' },
+    { href: '/account/vendor/products.html', label: 'Products' },
+    { href: '/account/vendor/add-product.html', label: 'Add Product' },
+    { href: '/account/vendor/orders.html', label: 'Orders' },
     { href: '/account/vendor/transactions.html', label: 'Transactions' },
-    { href: '/account/signin.html',              label: 'Logout', cls: 'vendor-logout' },
+    { href: '/account/signin.html', label: 'Logout', cls: 'vendor-logout' },
   ];
 
   const nav = document.createElement('div');
   nav.className = 'vendor-mobile-nav';
   nav.id = 'vendor-mobile-nav';
-  nav.innerHTML = links.map(l => {
-    const classes = [l.cls, l.href === currentPath ? 'active' : ''].filter(Boolean);
-    const cls = classes.length ? ` class="${classes.join(' ')}"` : '';
-    return `<a href="${l.href}"${cls}>${l.label}</a>`;
-  }).join('');
+  nav.innerHTML = links
+    .map((l) => {
+      const classes = [l.cls, l.href === currentPath ? 'active' : ''].filter(Boolean);
+      const cls = classes.length ? ` class="${classes.join(' ')}"` : '';
+      return `<a href="${l.href}"${cls}>${l.label}</a>`;
+    })
+    .join('');
   bar.after(nav);
 
   // Wire mobile logout
   const mobileLogout = nav.querySelector('.vendor-logout');
   if (mobileLogout) {
-    mobileLogout.addEventListener('click', e => { e.preventDefault(); logout(); });
+    mobileLogout.addEventListener('click', (e) => {
+      e.preventDefault();
+      logout();
+    });
   }
 
   // Toggle dropdown on hamburger
@@ -306,14 +314,14 @@ async function populateVendorIdentity(container) {
     const { vendor } = await vendorRes.json();
     if (!vendor) return;
 
-    const storeEl   = container.querySelector('#sidebar-store-name');
-    const slugEl    = container.querySelector('#sidebar-store-slug');
-    const userEl    = container.querySelector('#sidebar-user-name');
-    const avatarEl  = container.querySelector('#sidebar-avatar');
+    const storeEl = container.querySelector('#sidebar-store-name');
+    const slugEl = container.querySelector('#sidebar-store-slug');
+    const userEl = container.querySelector('#sidebar-user-name');
+    const avatarEl = container.querySelector('#sidebar-avatar');
 
     if (storeEl && vendor.storeName) storeEl.textContent = vendor.storeName;
-    if (slugEl  && vendor.storeSlug) slugEl.textContent  = `@${vendor.storeSlug}`;
-    if (userEl  && displayName)      userEl.textContent  = displayName;
+    if (slugEl && vendor.storeSlug) slugEl.textContent = `@${vendor.storeSlug}`;
+    if (userEl && displayName) userEl.textContent = displayName;
 
     // Avatar: first letter of store name
     if (avatarEl && vendor.storeName) {
@@ -324,7 +332,8 @@ async function populateVendorIdentity(container) {
     const mobileStoreEl = document.getElementById('mobile-store-name');
     if (mobileStoreEl && vendor.storeName) mobileStoreEl.textContent = vendor.storeName;
     const mobileAvatarEl = document.getElementById('mobile-bar-avatar');
-    if (mobileAvatarEl && vendor.storeName) mobileAvatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
+    if (mobileAvatarEl && vendor.storeName)
+      mobileAvatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
   } catch (err) {
     console.warn('Vendor identity skipped', err);
   }
@@ -355,7 +364,7 @@ async function applyVendorBadge() {
 
     const label = count > 99 ? '99+' : String(count);
 
-    ['accountBtnDesktop', 'accountBtnMobile'].forEach(id => {
+    ['accountBtnDesktop', 'accountBtnMobile'].forEach((id) => {
       const btn = document.getElementById(id);
       if (btn && !btn.querySelector('.acct-order-badge')) {
         const b = document.createElement('span');
@@ -364,7 +373,52 @@ async function applyVendorBadge() {
         btn.appendChild(b);
       }
     });
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
+}
+
+// =====================================================
+// BUYER NOTIFICATION BADGE
+// =====================================================
+
+let _buyerBadgeDone = false;
+
+async function applyBuyerBadge() {
+  if (_buyerBadgeDone) return;
+  _buyerBadgeDone = true;
+
+  const token = localStorage.getItem('s4l_token');
+  if (!token) return;
+
+  let since = localStorage.getItem('s4l_orders_seen');
+  if (!since) {
+    localStorage.setItem('s4l_orders_seen', Date.now());
+    return;
+  }
+
+  try {
+    const r = await fetch(`${window.API_BASE}/account/unseen-orders?since=${since}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return;
+    const { count } = await r.json();
+    if (!count) return;
+
+    const label = count > 99 ? '99+' : String(count);
+
+    ['accountBtnDesktop', 'accountBtnMobile'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn && !btn.querySelector('.buyer-notif-badge')) {
+        const b = document.createElement('span');
+        b.className = 'buyer-notif-badge';
+        b.textContent = label;
+        btn.appendChild(b);
+      }
+    });
+  } catch {
+    /* non-critical */
+  }
 }
 
 // =====================================================
@@ -412,28 +466,28 @@ document.addEventListener('headerLoaded', () => {
 
     const token = localStorage.getItem('s4l_token');
 
-    const login      = menu.querySelector('.dd-login');
-    const register   = menu.querySelector('.dd-register');
-    const orders     = menu.querySelector('.dd-orders');
-    const settings   = menu.querySelector('.dd-settings');
+    const login = menu.querySelector('.dd-login');
+    const register = menu.querySelector('.dd-register');
+    const orders = menu.querySelector('.dd-orders');
+    const settings = menu.querySelector('.dd-settings');
     const vendorLink = menu.querySelector('.dd-vendor');
-    const logoutBtn  = menu.querySelector('.dd-logout');
+    const logoutBtn = menu.querySelector('.dd-logout');
 
     if (token) {
-      login    && (login.style.display    = 'none');
+      login && (login.style.display = 'none');
       register && (register.style.display = 'none');
-      orders   && (orders.style.display   = 'block');
+      orders && (orders.style.display = 'block');
       settings && (settings.style.display = 'block');
       logoutBtn && (logoutBtn.style.display = 'block');
       logoutBtn && logoutBtn.addEventListener('click', logout);
       vendorLink && (vendorLink.style.display = 'none');
     } else {
-      orders     && (orders.style.display    = 'none');
-      settings   && (settings.style.display  = 'none');
+      orders && (orders.style.display = 'none');
+      settings && (settings.style.display = 'none');
       vendorLink && (vendorLink.style.display = 'none');
-      logoutBtn  && (logoutBtn.style.display  = 'none');
-      login      && (login.style.display      = 'block');
-      register   && (register.style.display   = 'block');
+      logoutBtn && (logoutBtn.style.display = 'none');
+      login && (login.style.display = 'block');
+      register && (register.style.display = 'block');
     }
   }
 
@@ -441,6 +495,7 @@ document.addEventListener('headerLoaded', () => {
   setupAccount('accountBtnMobile', 'accountDropdownMobile');
 
   applyVendorBadge();
+  applyBuyerBadge();
 });
 
 // =====================================================
@@ -478,7 +533,6 @@ document.addEventListener('headerLoaded', () => {
     });
   }
 })();
-
 
 // =====================================================
 // START

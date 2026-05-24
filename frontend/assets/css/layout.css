@@ -441,6 +441,22 @@ footer p {
   padding: 2px 4px;
 }
 
+.buyer-notif-badge {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 8px;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  margin: 0;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
 .vendor-btn-badge {
   display: inline-block;
   background: #fff;

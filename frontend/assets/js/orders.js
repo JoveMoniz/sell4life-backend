@@ -7,6 +7,7 @@ console.log('orders.js running');
 const API = window.API_BASE || '';
 
 async function initOrders() {
+  localStorage.setItem('s4l_orders_seen', Date.now());
   const token = localStorage.getItem('s4l_token');
 
   const loading = document.getElementById('orders-loading');

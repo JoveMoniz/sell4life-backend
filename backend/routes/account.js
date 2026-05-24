@@ -23,6 +23,20 @@ async function getUser(req, res) {
   return user;
 }
 
+router.get('/unseen-orders', async (req, res) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+    const since = req.query.since ? new Date(Number(req.query.since)) : new Date(0);
+    const Order = (await import('../models/order.js')).default;
+    const count = await Order.countDocuments({ user: user._id, updatedAt: { $gt: since } });
+    res.json({ count });
+  } catch (err) {
+    console.error('Unseen orders error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/me', async (req, res) => {
   try {
     const user = await getUser(req, res);
