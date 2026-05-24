@@ -93,6 +93,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           throw new Error('Invalid quantity');
         }
         const price = Number(product.price);
+        const shippingCost = Number(product.shippingCost || 0);
         const subtotal = price * quantity;
 
         items.push({
@@ -102,6 +103,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           price,
           quantity,
           subtotal,
+          shippingCost,
           image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
         });
       }
@@ -148,15 +150,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       const vendorOrders = Object.keys(vendorMap).map((vendorId) => {
         const list = vendorMap[vendorId];
-        const subtotal = list.reduce((s, i) => s + i.subtotal, 0);
+        const subtotal  = list.reduce((s, i) => s + i.subtotal, 0);
+        const shipping  = list.reduce((s, i) => s + Number(i.shippingCost || 0), 0);
 
         return {
           vendorId,
           items: list,
           subtotal,
-          shipping: 0,
+          shipping,
           tax: 0,
-          total: subtotal,
+          total: subtotal + shipping,
           status: 'Pending',
         };
       });

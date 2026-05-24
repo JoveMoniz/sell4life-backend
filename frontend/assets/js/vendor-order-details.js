@@ -311,9 +311,12 @@ async function loadOrder() {
             : 'paid';
     const paymentLabel = getPaymentLabel(paymentStatus);
 
-    const vendorTotal = vendorItems.reduce(
+    const vendorSubtotal = vendorItems.reduce(
       (sum, item) => sum + Number(item.price) * Number(item.quantity), 0
     );
+    const vendorShipping = vendorOrder?.shipping
+      ?? vendorItems.reduce((sum, item) => sum + Number(item.shippingCost || 0), 0);
+    const vendorTotal = vendorSubtotal + vendorShipping;
 
     // All actions are now per-item — build itemActionsMap only
     const allowed = Array.isArray(order.allowedActions) ? order.allowedActions : [];
@@ -350,7 +353,10 @@ async function loadOrder() {
               ).join('')}
         </div>
 
-        <div class="order-total">Total: £${vendorTotal.toFixed(2)}</div>
+        <div class="order-total">
+          ${vendorShipping > 0 ? `<div style="font-size:0.88rem;color:#6b7280;font-weight:400;text-align:right;margin-bottom:4px">Items: £${vendorSubtotal.toFixed(2)} + Shipping: £${vendorShipping.toFixed(2)}</div>` : ''}
+          Total: £${vendorTotal.toFixed(2)}
+        </div>
 
         <div class="tracking-section">
           <h3 style="margin:0 0 10px;font-size:1rem;color:#111827">Shipping &amp; Tracking</h3>
