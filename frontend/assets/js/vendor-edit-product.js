@@ -574,23 +574,12 @@ async function loadProduct() {
   const loading = document.getElementById('ep-loading');
 
   try {
-    const vendorRes = await fetch(`${window.API_BASE}/vendor/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const { vendor } = await vendorRes.json();
-
-    if (!vendor || vendor.status === 'pending' || vendor.status === 'suspended') {
-      window.location.replace('/account/vendor/products.html');
-      return;
-    }
-
-    const res = await fetch(`${window.API_BASE}/products/${productId}`, {
+    const res = await fetch(`${window.API_BASE}/vendor/products/${productId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!res.ok) {
-      window.showToast?.('Product not found', 'error');
-      setTimeout(() => window.location.replace('/account/vendor/products.html'), 1200);
+      if (loading) loading.innerHTML = '<p style="color:#dc2626">Product not found. <a href="/account/vendor/products.html">Go back</a></p>';
       return;
     }
 

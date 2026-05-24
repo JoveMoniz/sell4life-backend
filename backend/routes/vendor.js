@@ -675,6 +675,34 @@ router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) 
 });
 
 /* ======================================================
+   GET SINGLE VENDOR PRODUCT (including drafts)
+====================================================== */
+
+router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.id,
+      vendor: vendor._id,
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error('VENDOR GET PRODUCT ERROR:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    PENDING ORDER COUNT (for sidebar badge)
 ====================================================== */
 
