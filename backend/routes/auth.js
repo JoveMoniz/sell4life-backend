@@ -1,9 +1,12 @@
+import crypto from 'crypto';
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import User from '../models/user.js';
+import EmailVerification from '../models/emailVerification.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { mailEmailVerification } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -148,6 +151,25 @@ router.post('/register', async (req, res) => {
     const token = createToken(user);
 
     /* ======================================================
+       SEND VERIFICATION EMAIL (background)
+    ====================================================== */
+
+    (async () => {
+      try {
+        const verifyToken = crypto.randomBytes(32).toString('hex');
+        await EmailVerification.create({
+          userId:    user._id,
+          token:     verifyToken,
+          expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
+        });
+        const verifyUrl = `${process.env.FRONTEND_URL || 'https://sell4life.com'}/account/verify-email.html?token=${verifyToken}`;
+        await mailEmailVerification({ to: user.email, name: user.name, verifyUrl });
+      } catch (e) {
+        console.error('Verification email error:', e.message);
+      }
+    })();
+
+    /* ======================================================
        RESPONSE
     ====================================================== */
 
@@ -158,11 +180,12 @@ router.post('/register', async (req, res) => {
         ok: true,
         token,
         user: {
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          role: user.role,
+          id:            user._id,
+          name:          user.name,
+          username:      user.username,
+          email:         user.email,
+          role:          user.role,
+          emailVerified: user.emailVerified,
         },
       });
   } catch (err) {
@@ -258,11 +281,12 @@ router.post('/login', async (req, res) => {
         ok: true,
         token,
         user: {
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          role: user.role,
+          id:            user._id,
+          name:          user.name,
+          username:      user.username,
+          email:         user.email,
+          role:          user.role,
+          emailVerified: user.emailVerified,
         },
       });
   } catch (err) {
@@ -291,11 +315,12 @@ router.get('/me', authMiddleware, async (req, res) => {
 
     res.json({
       user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        role: user.role,
+        id:            user._id,
+        name:          user.name,
+        username:      user.username,
+        email:         user.email,
+        role:          user.role,
+        emailVerified: user.emailVerified,
       },
     });
   } catch (err) {
@@ -304,6 +329,56 @@ router.get('/me', authMiddleware, async (req, res) => {
     res.status(500).json({
       error: 'Failed to load user',
     });
+  }
+});
+
+/* ======================================================
+   VERIFY EMAIL
+====================================================== */
+
+router.get('/verify-email', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ ok: false, msg: 'Missing token' });
+
+  try {
+    const record = await EmailVerification.findOne({ token, expiresAt: { $gt: new Date() } });
+    if (!record) return res.status(400).json({ ok: false, msg: 'Invalid or expired link' });
+
+    await User.findByIdAndUpdate(record.userId, { emailVerified: true });
+    await EmailVerification.deleteMany({ userId: record.userId });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('VERIFY EMAIL ERROR:', err);
+    res.status(500).json({ ok: false, msg: 'Server error' });
+  }
+});
+
+/* ======================================================
+   RESEND VERIFICATION EMAIL
+====================================================== */
+
+router.post('/resend-verification', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ ok: false, msg: 'User not found' });
+    if (user.emailVerified) return res.json({ ok: true, msg: 'already_verified' });
+
+    await EmailVerification.deleteMany({ userId: user._id });
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await EmailVerification.create({
+      userId:    user._id,
+      token:     verifyToken,
+      expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
+    });
+    const verifyUrl = `${process.env.FRONTEND_URL || 'https://sell4life.com'}/account/verify-email.html?token=${verifyToken}`;
+    await mailEmailVerification({ to: user.email, name: user.name, verifyUrl });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('RESEND VERIFICATION ERROR:', err);
+    res.status(500).json({ ok: false, msg: 'Server error' });
   }
 });
 
