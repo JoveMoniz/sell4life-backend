@@ -547,12 +547,18 @@ function numOrNull(id) {
 // INIT
 // ======================================================
 
-window.addEventListener('load', () => {
+function initAddProduct() {
   bindSubcategory();
   bindImageUploads();
   bindStatusRadio();
   bindSeoToggle();
-});
+}
+
+if (document.readyState === 'complete') {
+  initAddProduct();
+} else {
+  window.addEventListener('load', initAddProduct, { once: true });
+}
 
 // ======================================================
 // SUBMIT

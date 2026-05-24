@@ -736,10 +736,17 @@ function reset(btn) {
 // INIT
 // ======================================================
 
-window.addEventListener('load', () => {
+function initEditProduct() {
   bindSubcategory();
   bindImageUploads();
   bindStatusRadio();
   bindSeoToggle();
   loadProduct();
-});
+}
+
+// Script is injected dynamically — window.load may have already fired.
+if (document.readyState === 'complete') {
+  initEditProduct();
+} else {
+  window.addEventListener('load', initEditProduct, { once: true });
+}
