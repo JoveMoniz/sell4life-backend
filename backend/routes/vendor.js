@@ -703,6 +703,98 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
 });
 
 /* ======================================================
+   CSV PRODUCT IMPORT
+====================================================== */
+
+router.post('/products/import', authMiddleware, requireApprovedVendor, express.text({ type: 'text/csv', limit: '2mb' }), async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    const raw = req.body;
+
+    if (!raw || typeof raw !== 'string') {
+      return res.status(400).json({ error: 'No CSV data received' });
+    }
+
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      return res.status(400).json({ error: 'CSV must have a header row and at least one product row' });
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
+
+    const REQUIRED = ['name', 'price'];
+    for (const r of REQUIRED) {
+      if (!headers.includes(r)) {
+        return res.status(400).json({ error: `Missing required column: ${r}` });
+      }
+    }
+
+    function parseRow(line) {
+      const values = [];
+      let cur = '';
+      let inQuote = false;
+      for (const ch of line) {
+        if (ch === '"') { inQuote = !inQuote; continue; }
+        if (ch === ',' && !inQuote) { values.push(cur.trim()); cur = ''; continue; }
+        cur += ch;
+      }
+      values.push(cur.trim());
+      return values;
+    }
+
+    function col(row, name) {
+      const idx = headers.indexOf(name);
+      return idx >= 0 ? (row[idx] || '').trim() : '';
+    }
+
+    const created = [];
+    const skipped = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseRow(lines[i]);
+
+      const name = col(row, 'name');
+      const priceRaw = col(row, 'price');
+
+      if (!name) { skipped.push({ row: i + 1, reason: 'Missing name' }); continue; }
+      const price = parseFloat(priceRaw);
+      if (!Number.isFinite(price) || price < 0) { skipped.push({ row: i + 1, reason: 'Invalid price' }); continue; }
+
+      const images = [];
+      ['image1','image2','image3'].forEach(k => { const v = col(row, k); if (v) images.push(v); });
+
+      const product = new Product({
+        vendor: vendor._id,
+        name,
+        description:   col(row, 'description'),
+        price,
+        comparePrice:  parseFloat(col(row, 'compareprice')) || undefined,
+        shippingCost:  parseFloat(col(row, 'shippingcost')) || 0,
+        stock:         parseInt(col(row, 'stock'), 10) || 0,
+        trackInventory: !!parseInt(col(row, 'stock'), 10),
+        category:      col(row, 'category').toLowerCase(),
+        subcategory:   col(row, 'subcategory').toLowerCase(),
+        sku:           col(row, 'sku'),
+        images,
+        active: true,
+      });
+
+      await product.save();
+      created.push(product._id);
+    }
+
+    res.json({
+      created: created.length,
+      skipped: skipped.length,
+      skippedDetails: skipped,
+    });
+  } catch (err) {
+    console.error('CSV IMPORT ERROR:', err);
+    res.status(500).json({ error: 'Import failed' });
+  }
+});
+
+/* ======================================================
    PENDING ORDER COUNT (for sidebar badge)
 ====================================================== */
 
