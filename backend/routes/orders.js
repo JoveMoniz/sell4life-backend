@@ -107,6 +107,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
         }
 
         const price = Number(product.price);
+        const shippingCost = Number(product.shippingCost || 0);
         const subtotal = Number((price * quantity).toFixed(2));
         return {
           productId: product._id,
@@ -119,6 +120,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           price,
           quantity,
           subtotal,
+          shippingCost,
 
           image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
 
@@ -127,13 +129,17 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
       })
     );
 
-    const total = Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
+    const subtotal = Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
+    const shippingAmount = Number(normalizedItems.reduce((sum, item) => sum + item.shippingCost, 0).toFixed(2));
+    const total = Number((subtotal + shippingAmount).toFixed(2));
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(total * 100),
       currency: 'gbp',
       automatic_payment_methods: { enabled: true },
       metadata: {
         userId: String(req.user._id),
+        shipping: String(shippingAmount),
         items: JSON.stringify(
           normalizedItems.map((item) => ({
             productId: String(item.productId),
@@ -147,6 +153,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 
     res.json({
       clientSecret: paymentIntent.client_secret,
+      shipping: shippingAmount,
     });
   } catch (err) {
     console.error('PAYMENT ERROR:', err);

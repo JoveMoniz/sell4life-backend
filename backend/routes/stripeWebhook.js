@@ -164,11 +164,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       // -----------------------------
       // CREATE ORDER
       // -----------------------------
+      const orderSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
+      const orderShipping = Number(paymentIntent.metadata.shipping || 0);
+
       const order = await Order.create({
         user: userId,
         items,
         vendorOrders,
-        subtotal: items.reduce((s, i) => s + i.subtotal, 0),
+        subtotal: orderSubtotal,
+        shippingAmount: orderShipping,
         total: paymentIntent.amount / 100,
         status: 'Pending',
         paymentStatus: 'paid',

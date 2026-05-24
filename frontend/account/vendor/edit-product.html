@@ -6,71 +6,289 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-
     <title>Edit Product | Sell4Life</title>
-
     <link rel="stylesheet" href="/assets/css/layout.css" />
-    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523l" />
+    <link rel="stylesheet" href="/assets/css/vendor.css" />
   </head>
-
   <body>
     <div class="vendor-layout">
-      <!-- Sidebar injected by layout.js -->
       <div id="vendor-sidebar"></div>
 
       <main class="vendor-main">
         <div class="vendor-container">
-          <h1 class="vendor-title">Edit Product</h1>
+          <a href="/account/vendor/products.html" class="vendor-back-link">← Products</a>
+          <h1 class="vendor-title" id="page-title">Edit Product</h1>
 
-          <form id="edit-product-form" class="vendor-form">
-            <div class="form-group">
-              <label>Product Name</label>
-              <input type="text" id="product-name" required />
+          <!-- Loading state -->
+          <div id="ep-loading" class="ep-loading">
+            <div class="ep-loading-spinner"></div>
+            <p>Loading product…</p>
+          </div>
+
+          <form id="edit-product-form" class="ap-form" style="display:none">
+
+            <!-- BASIC INFO -->
+            <div class="ap-section">
+              <div class="ap-section-head">Basic Info</div>
+
+              <div class="form-group">
+                <label>Product Name <span class="ap-req">*</span></label>
+                <input type="text" id="product-name" required maxlength="200" placeholder="e.g. Wireless Noise-Cancelling Headphones" />
+              </div>
+
+              <div class="form-group">
+                <label>Short Description <span class="ap-hint">Shown as tagline on the listing card</span></label>
+                <input type="text" id="product-short-desc" maxlength="160" placeholder="One-line summary…" />
+              </div>
+
+              <div class="form-group">
+                <label>Full Description</label>
+                <textarea id="product-description" rows="5" placeholder="Describe your product in detail — materials, dimensions, what's included…"></textarea>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label>Description</label>
-              <textarea id="product-description" rows="4"></textarea>
+            <!-- PRICING -->
+            <div class="ap-section">
+              <div class="ap-section-head">Pricing</div>
+              <div class="ap-row-3">
+                <div class="form-group">
+                  <label>Price (£) <span class="ap-req">*</span></label>
+                  <input type="number" id="product-price" step="0.01" min="0" placeholder="0.00" required />
+                </div>
+                <div class="form-group">
+                  <label>Compare Price / RRP (£)
+                    <span class="ap-hint">Shown crossed-out to highlight a saving</span>
+                  </label>
+                  <input type="number" id="product-compare-price" step="0.01" min="0" placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                  <label>Cost Price (£)
+                    <span class="ap-hint">Private — for profit tracking only</span>
+                  </label>
+                  <input type="number" id="product-cost-price" step="0.01" min="0" placeholder="0.00" />
+                </div>
+              </div>
+              <div class="ap-row-3">
+                <div class="form-group">
+                  <label>Shipping Cost (£)
+                    <span class="ap-hint">Charged to buyer at checkout. Enter 0 for free shipping.</span>
+                  </label>
+                  <input type="number" id="product-shipping-cost" step="0.01" min="0" placeholder="0.00" />
+                </div>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label>Price (£)</label>
-              <input type="number" id="product-price" step="0.01" min="0" />
-            </div>
+            <!-- IMAGES -->
+            <div class="ap-section">
+              <div class="ap-section-head">Images</div>
+              <p style="font-size:0.82rem;color:#888;margin-bottom:16px">
+                Tap a slot to replace or add a photo. Existing images are preserved unless you remove them.
+              </p>
+              <div class="ap-img-grid">
 
-            <div class="form-group">
-              <label>Stock</label>
-              <input type="number" id="product-stock" min="0" />
+                <div class="ap-img-slot">
+                  <div class="ap-upload-zone" data-slot="1">
+                    <input type="file" class="ap-file-input" id="img-input-1" accept="image/*" />
+                    <div class="ap-upload-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Main photo</span>
+                    </div>
+                    <img class="ap-img-preview" id="preview-1" alt="" />
+                    <div class="ap-upload-overlay" id="overlay-1"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" data-slot="1">&#x2715;</button>
+                  </div>
+                </div>
+
+                <div class="ap-img-slot">
+                  <div class="ap-upload-zone" data-slot="2">
+                    <input type="file" class="ap-file-input" id="img-input-2" accept="image/*" />
+                    <div class="ap-upload-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Photo 2</span>
+                    </div>
+                    <img class="ap-img-preview" id="preview-2" alt="" />
+                    <div class="ap-upload-overlay" id="overlay-2"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" data-slot="2">&#x2715;</button>
+                  </div>
+                </div>
+
+                <div class="ap-img-slot">
+                  <div class="ap-upload-zone" data-slot="3">
+                    <input type="file" class="ap-file-input" id="img-input-3" accept="image/*" />
+                    <div class="ap-upload-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Photo 3</span>
+                    </div>
+                    <img class="ap-img-preview" id="preview-3" alt="" />
+                    <div class="ap-upload-overlay" id="overlay-3"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" data-slot="3">&#x2715;</button>
+                  </div>
+                </div>
+
+                <div class="ap-img-slot">
+                  <div class="ap-upload-zone" data-slot="4">
+                    <input type="file" class="ap-file-input" id="img-input-4" accept="image/*" />
+                    <div class="ap-upload-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Photo 4</span>
+                    </div>
+                    <img class="ap-img-preview" id="preview-4" alt="" />
+                    <div class="ap-upload-overlay" id="overlay-4"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" data-slot="4">&#x2715;</button>
+                  </div>
+                </div>
+
+                <div class="ap-img-slot">
+                  <div class="ap-upload-zone" data-slot="5">
+                    <input type="file" class="ap-file-input" id="img-input-5" accept="image/*" />
+                    <div class="ap-upload-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Photo 5</span>
+                    </div>
+                    <img class="ap-img-preview" id="preview-5" alt="" />
+                    <div class="ap-upload-overlay" id="overlay-5"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" data-slot="5">&#x2715;</button>
+                  </div>
+                </div>
+
+              </div>
             </div>
 
             <!-- CATEGORY -->
-            <div class="form-group">
-              <label>Category</label>
-              <select id="product-category" required>
-                <option value="">Select category</option>
-                <option value="fashion">Fashion</option>
-                <option value="electronics">Electronics</option>
-                <option value="books">Books</option>
-                <option value="home">Home & Garden</option>
-                <option value="toys">Toys</option>
-                <option value="health">Health & Beauty</option>
-              </select>
+            <div class="ap-section">
+              <div class="ap-section-head">Category</div>
+              <div class="ap-row-2">
+                <div class="form-group">
+                  <label>Category <span class="ap-req">*</span></label>
+                  <select id="product-category" required>
+                    <option value="">Select category</option>
+                    <option value="fashion">Fashion & Clothing</option>
+                    <option value="electronics">Electronics & Technology</option>
+                    <option value="home">Home, Garden & DIY</option>
+                    <option value="books">Books & Media</option>
+                    <option value="toys">Toys & Games</option>
+                    <option value="health">Health & Beauty</option>
+                    <option value="sports">Sports & Outdoors</option>
+                    <option value="automotive">Automotive & Vehicles</option>
+                    <option value="food">Food & Drink</option>
+                    <option value="baby">Baby & Kids</option>
+                    <option value="pets">Pet Supplies</option>
+                    <option value="arts">Arts, Crafts & Hobbies</option>
+                    <option value="office">Office & Stationery</option>
+                    <option value="antiques">Antiques & Collectibles</option>
+                    <option value="travel">Travel & Luggage</option>
+                    <option value="software">Software & Digital</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Subcategory <span class="ap-req">*</span></label>
+                  <select id="product-subcategory" disabled>
+                    <option value="">Select subcategory</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Tags <span class="ap-hint">Comma-separated — helps buyers find your product</span></label>
+                <input type="text" id="product-tags" placeholder="e.g. vintage, red, gift, handmade" />
+              </div>
             </div>
 
-            <!-- SUBCATEGORY -->
-            <div class="form-group">
-              <label>Subcategory</label>
-              <select id="product-subcategory" disabled>
-                <option value="">Select subcategory</option>
-              </select>
+            <!-- INVENTORY -->
+            <div class="ap-section">
+              <div class="ap-section-head">Inventory</div>
+              <div class="ap-row-2">
+                <div class="form-group">
+                  <label>Stock Quantity <span class="ap-req">*</span></label>
+                  <input type="number" id="product-stock" value="1" min="0" required />
+                </div>
+                <div class="form-group">
+                  <label>SKU <span class="ap-hint">Your internal reference code</span></label>
+                  <input type="text" id="product-sku" placeholder="e.g. PROD-001" />
+                </div>
+              </div>
+              <div class="ap-toggle-group">
+                <label class="ap-toggle">
+                  <input type="checkbox" id="track-inventory" checked />
+                  <span class="ap-toggle-slider"></span>
+                  <span class="ap-toggle-label">Track inventory (reduce stock when orders are placed)</span>
+                </label>
+                <label class="ap-toggle">
+                  <input type="checkbox" id="allow-backorder" />
+                  <span class="ap-toggle-slider"></span>
+                  <span class="ap-toggle-label">Allow backorder when out of stock</span>
+                </label>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label>Image URL</label>
-              <input type="text" id="product-image" />
+            <!-- SHIPPING -->
+            <div class="ap-section">
+              <div class="ap-section-head">Shipping</div>
+              <div class="ap-row-2" style="margin-bottom:14px">
+                <div class="form-group">
+                  <label>Weight (kg) <span class="ap-hint">Used to estimate shipping costs</span></label>
+                  <input type="number" id="product-weight" step="0.001" min="0" placeholder="0.000" />
+                </div>
+                <div></div>
+              </div>
+              <div class="ap-row-3">
+                <div class="form-group">
+                  <label>Width (cm)</label>
+                  <input type="number" id="product-width" step="0.1" min="0" placeholder="0" />
+                </div>
+                <div class="form-group">
+                  <label>Height (cm)</label>
+                  <input type="number" id="product-height" step="0.1" min="0" placeholder="0" />
+                </div>
+                <div class="form-group">
+                  <label>Length / Depth (cm)</label>
+                  <input type="number" id="product-length" step="0.1" min="0" placeholder="0" />
+                </div>
+              </div>
             </div>
 
-            <button type="submit" class="btn-save-product">Update Product</button>
+            <!-- SEO (collapsible) -->
+            <div class="ap-section">
+              <div class="ap-section-head ap-section-toggle" id="seo-toggle">
+                SEO &amp; Search
+                <span class="ap-toggle-icon" id="seo-icon">▸</span>
+                <span class="ap-hint" style="font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px">Optional — improves visibility in search engines</span>
+              </div>
+              <div id="seo-body" style="display:none">
+                <div class="form-group">
+                  <label>SEO Title <span class="ap-hint">Max 70 characters. Defaults to product name.</span></label>
+                  <input type="text" id="product-seo-title" maxlength="70" placeholder="Leave blank to use product name" />
+                </div>
+                <div class="form-group">
+                  <label>SEO Description <span class="ap-hint">Max 160 characters. Shown in Google results.</span></label>
+                  <textarea id="product-seo-desc" rows="2" maxlength="160" placeholder="Briefly describe what makes this product great…"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- STATUS -->
+            <div class="ap-section">
+              <div class="ap-section-head">Status</div>
+              <div class="ap-status-row">
+                <label class="ap-status-opt selected" id="opt-active">
+                  <input type="radio" name="productStatus" value="active" checked />
+                  <strong>Active</strong>
+                  <span>Published and visible to buyers immediately</span>
+                </label>
+                <label class="ap-status-opt" id="opt-draft">
+                  <input type="radio" name="productStatus" value="draft" />
+                  <strong>Draft</strong>
+                  <span>Saved but not visible to buyers yet</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- SUBMIT -->
+            <div class="ap-submit-bar">
+              <button type="submit" class="btn-save-product">Save Changes</button>
+              <span id="form-msg" class="ap-form-msg"></span>
+            </div>
+
           </form>
         </div>
       </main>
@@ -78,7 +296,9 @@
 
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/vendor-guard.js"></script>
-    <script src="/assets/js/layout.js?v=20260523j"></script>
-    <script src="/assets/js/vendor-edit-product.js"></script>
+
+    <script>
+    window.__pageScripts = ['/assets/js/vendor-edit-product.js'];
+  </script>
   </body>
 </html>

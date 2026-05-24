@@ -42,6 +42,7 @@ const toast = (msg) => window.showToast && window.showToast(msg);
         if (fresh) {
           item.stock = fresh.stock;
           item.price = fresh.price;
+          item.shippingCost = fresh.shippingCost ?? 0;
 
           if (fresh.trackInventory && item.quantity > fresh.stock) {
             item.quantity = fresh.stock;
@@ -145,6 +146,11 @@ const toast = (msg) => window.showToast && window.showToast(msg);
     cartRows.innerHTML = '';
     if (!cart.length) {
       totalSpan.textContent = '£0.00';
+      cartRows.innerHTML = `
+        <div class="cart-empty">
+          <p>Your basket is empty.</p>
+          <a href="/shop/" class="btn-shop-now">Browse products →</a>
+        </div>`;
       return;
     }
 
@@ -191,7 +197,7 @@ const toast = (msg) => window.showToast && window.showToast(msg);
   <div class="col-product cart-product-info">
       <img class="cart-thumb" src="${item.image || '/assets/images/products/sell4life-placeholder.png'}">
       <a class="cart-product-link"
-         href="/${item.category}/${item.subcategory}/?id=${item.id || item.productId}">
+         href="/product/product.html?id=${item.id || item.productId}">
          ${item.name}
       </a>
 
@@ -227,25 +233,6 @@ const toast = (msg) => window.showToast && window.showToast(msg);
   }
 
   // ---------------------------------------------------------
-  // 7. MOBILE PRICE LINE
-  // ---------------------------------------------------------
-  function isRealTouchDevice() {
-    return 'ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
-  }
-
-  function updateMPriceLine() {
-    const width = window.innerWidth;
-    const portrait = window.matchMedia('(orientation: portrait)').matches;
-    const touch = isRealTouchDevice();
-
-    const show = width <= 480 && portrait && touch;
-
-    document.querySelectorAll('.m-price-line').forEach((el) => {
-      el.style.display = show ? 'flex' : 'none';
-    });
-  }
-
-  // ---------------------------------------------------------
   // 8. FULL REFRESH
   // ---------------------------------------------------------
   async function refreshAll() {
@@ -257,7 +244,6 @@ const toast = (msg) => window.showToast && window.showToast(msg);
     updateBadge();
     updateBasketState();
     renderCartPage();
-    updateMPriceLine();
   }
 
   await refreshAll();
@@ -515,12 +501,6 @@ const toast = (msg) => window.showToast && window.showToast(msg);
     );
   }
 
-  // =====================================================================
-  // 13. SCREEN & ORIENTATION
-  // =====================================================================
-  window.addEventListener('resize', updateMPriceLine);
-  window.matchMedia('(orientation: portrait)').addEventListener('change', updateMPriceLine);
-  window.matchMedia('(orientation: landscape)').addEventListener('change', updateMPriceLine);
 })(); // END wrapper
 
 // ======================================================================

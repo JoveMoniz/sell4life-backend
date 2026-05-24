@@ -35,6 +35,7 @@ import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
+import { mailOrderShipped } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -1456,5 +1457,55 @@ router.patch(
     }
   }
 );
+
+/* ======================================================
+   ADD / UPDATE TRACKING NUMBER
+====================================================== */
+
+router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    const { trackingNumber, carrier } = req.body;
+
+    if (!trackingNumber || !String(trackingNumber).trim()) {
+      return res.status(400).json({ error: 'Tracking number is required' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const vendorOwnsItems = order.items.some(
+      (i) => String(i.vendorId) === String(vendor._id)
+    );
+    if (!vendorOwnsItems) return res.status(403).json({ error: 'Not allowed' });
+
+    order.trackingNumber = String(trackingNumber).trim();
+    if (carrier) order.carrier = String(carrier).trim();
+    await order.save();
+
+    // Fire shipped email to buyer (non-blocking)
+    (async () => {
+      try {
+        const buyer = await User.findById(order.user).lean();
+        if (buyer?.email) {
+          await mailOrderShipped({
+            to: buyer.email,
+            orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
+            trackingNumber: order.trackingNumber,
+            carrier: order.carrier,
+            storeName: vendor.storeName,
+          });
+        }
+      } catch (e) {
+        console.error('Shipped email error:', e.message);
+      }
+    })();
+
+    res.json({ ok: true, trackingNumber: order.trackingNumber, carrier: order.carrier });
+  } catch (err) {
+    console.error('TRACKING ERROR:', err);
+    res.status(500).json({ error: 'Failed to save tracking number' });
+  }
+});
 
 export default router;

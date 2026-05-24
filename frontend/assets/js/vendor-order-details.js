@@ -351,6 +351,32 @@ async function loadOrder() {
         </div>
 
         <div class="order-total">Total: £${vendorTotal.toFixed(2)}</div>
+
+        <div class="tracking-section">
+          <h3 style="margin:0 0 10px;font-size:1rem;color:#111827">Shipping &amp; Tracking</h3>
+          ${order.trackingNumber
+            ? `<p style="font-size:0.88rem;color:#374151;margin:0 0 8px">Current: <strong>${order.trackingNumber}</strong>${order.carrier ? ` (${order.carrier})` : ''}</p>`
+            : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label style="display:block;font-size:0.8rem;color:#6b7280;margin-bottom:4px">Tracking number</label>
+              <input id="tracking-number" type="text" placeholder="e.g. JD123456789GB"
+                value="${order.trackingNumber || ''}"
+                style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.88rem;width:200px" />
+            </div>
+            <div>
+              <label style="display:block;font-size:0.8rem;color:#6b7280;margin-bottom:4px">Carrier (optional)</label>
+              <input id="tracking-carrier" type="text" placeholder="e.g. Royal Mail"
+                value="${order.carrier || ''}"
+                style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.88rem;width:160px" />
+            </div>
+            <button id="save-tracking-btn" data-order-id="${id}"
+              style="padding:7px 16px;background:#0b6b6a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.88rem;white-space:nowrap">
+              Save &amp; Notify Buyer
+            </button>
+          </div>
+          <p id="tracking-msg" style="font-size:0.8rem;margin:8px 0 0;min-height:18px"></p>
+        </div>
       </div>`;
 
     initTimer();
@@ -443,6 +469,42 @@ async function updateOrderStatus(oid, type) {
    CLICK HANDLER (DELEGATED)
 ====================================================== */
 document.addEventListener('click', async (e) => {
+  // Tracking save button
+  const trackingBtn = e.target.closest('#save-tracking-btn');
+  if (trackingBtn) {
+    const oid            = trackingBtn.dataset.orderId;
+    const trackingNumber = document.getElementById('tracking-number')?.value.trim();
+    const carrier        = document.getElementById('tracking-carrier')?.value.trim();
+    const msg            = document.getElementById('tracking-msg');
+
+    if (!trackingNumber) {
+      if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Enter a tracking number first.'; }
+      return;
+    }
+
+    trackingBtn.disabled = true;
+    trackingBtn.textContent = 'Saving…';
+    if (msg) msg.textContent = '';
+
+    try {
+      const res = await authFetch(`${API_BASE}/vendor/orders/${oid}/tracking`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ trackingNumber, carrier }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save tracking');
+      if (msg) { msg.style.color = '#15803d'; msg.textContent = 'Saved! Buyer has been notified by email.'; }
+      trackingBtn.textContent = 'Saved ✓';
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+      if (msg) { msg.style.color = '#dc2626'; msg.textContent = err.message || 'Save failed'; }
+      trackingBtn.disabled = false;
+      trackingBtn.textContent = 'Save & Notify Buyer';
+    }
+    return;
+  }
+
   // Per-item action buttons
   const itemBtn = e.target.closest('.vendor-item-btn');
   if (itemBtn) {

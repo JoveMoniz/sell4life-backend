@@ -76,6 +76,12 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    shippingCost: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     /* ==============================
        IMAGES
     ============================== */

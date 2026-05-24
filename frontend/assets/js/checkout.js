@@ -218,6 +218,16 @@ async function initPayment() {
     }
     order = data;
 
+    // Update shipping + total display with authoritative server values
+    if (shippingEl && order.shipping !== undefined) {
+      const shipping = Number(order.shipping);
+      shippingEl.textContent = shipping > 0 ? `£${shipping.toFixed(2)}` : 'Free';
+      if (totalEl) {
+        const subtotal = cart.reduce((s, i) => s + (Number(i.price || 0) * Number(i.quantity || 1)), 0);
+        totalEl.textContent = `£${(subtotal + shipping).toFixed(2)}`;
+      }
+    }
+
     currentOrder = {
       clientSecret: order.clientSecret,
     };

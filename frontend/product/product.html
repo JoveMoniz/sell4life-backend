@@ -4,16 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sell4Life | Product</title>
-
-  <!-- Shared global styles -->
+  <meta name="description" content="Shop on Sell4Life — thousands of products from independent sellers." />
+  <meta property="og:title" content="Sell4Life | Product" />
+  <meta property="og:description" content="Shop on Sell4Life — thousands of products from independent sellers." />
+  <meta property="og:type" content="product" />
   <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=20260206-dev" />
-  <link rel="stylesheet" href="/assets/css/product.css?v=20260206-dev"/>
-  <link rel="stylesheet" href="/assets/css/gallery-slider.css?v=20260206-dev"/>
+  <link rel="stylesheet" href="/assets/css/layout.css" />
+  <link rel="stylesheet" href="/assets/css/product.css" />
+  <link rel="stylesheet" href="/assets/css/gallery-slider.css" />
 </head>
-
 <body>
-  <body>
 
   <section class="product-page">
 
@@ -21,7 +21,6 @@
     <div class="product-gallery">
       <div class="custom-gallery side-layout">
         <div id="thumbnailGallery" class="thumbnail-gallery"></div>
-
         <div class="main-image-wrapper">
           <div class="slider-wrapper">
             <div id="sliderTrack" class="slider-track"></div>
@@ -30,37 +29,86 @@
           </div>
         </div>
       </div>
-
-      <div id="hidden-gallery" style="display:none;"></div>
+      <div id="hidden-gallery" class="pd-hidden-gallery"></div>
     </div>
 
     <!-- RIGHT: PRODUCT INFORMATION -->
     <div class="product-info">
+
       <h1 class="product-title"></h1>
       <p class="product-category"></p>
-      <p class="product-price"></p>
-      <p class="product-desc"></p>
 
-      <div class="product-actions">
-        <button class="btn-add">Add to Basket</button>
-        <button class="btn-buy">Buy Now</button>
+      <div class="pd-divider"></div>
+
+      <!-- Price row -->
+      <div class="pd-price-row">
+        <span class="product-price"></span>
+        <span class="product-compare-price" id="pd-compare-price"></span>
+        <span class="pd-stock-badge" id="pd-stock-badge"></span>
       </div>
-    </div>
+      <p class="pd-shipping-note" id="pd-shipping-note"></p>
 
+      <div class="pd-divider"></div>
+
+      <!-- Short description (tagline) -->
+      <p class="product-short-desc" id="pd-short-desc"></p>
+
+      <!-- Full description with read more -->
+      <div class="pd-desc-wrap" id="pd-desc-wrap">
+        <p class="product-desc"></p>
+        <button type="button" class="pd-read-more" id="pd-read-more">Read more ▾</button>
+      </div>
+
+      <div class="pd-divider" id="pd-divider-before-seller"></div>
+
+      <!-- Seller strip -->
+      <div class="pd-seller-strip" id="pd-seller-strip">
+        <div class="pd-seller-avatar" id="pd-seller-avatar">S</div>
+        <div class="pd-seller-info">
+          <span class="pd-seller-label">Sold by</span>
+          <div class="pd-seller-name-row">
+            <span class="pd-seller-name" id="pd-seller-name">Seller</span>
+            <span class="pd-verified-badge" id="pd-verified-badge">✓ Verified</span>
+          </div>
+          <a class="pd-seller-link" id="pd-seller-link" href="#">Visit Store →</a>
+        </div>
+      </div>
+
+      <div class="pd-divider" id="pd-divider-after-seller"></div>
+
+      <!-- Quantity stepper -->
+      <div class="pd-qty-wrap">
+        <span class="pd-qty-label">Quantity</span>
+        <div class="pd-qty-stepper">
+          <button type="button" class="pd-qty-btn" id="pd-qty-minus">−</button>
+          <span class="pd-qty-val" id="pd-qty-val">1</span>
+          <button type="button" class="pd-qty-btn" id="pd-qty-plus">+</button>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="product-actions">
+        <button type="button" class="btn-add">Add to Basket</button>
+        <button type="button" class="btn-buy">Buy Now</button>
+      </div>
+
+    </div>
   </section>
 
+  <!-- RELATED PRODUCTS -->
+  <section class="pd-related" id="pd-related">
+    <h2 class="pd-related-title">You might also like</h2>
+    <div class="pd-related-grid" id="pd-related-grid"></div>
+  </section>
 
-<!-- Page scripts LAST -->
+  <script src="/assets/js/config-global.js"></script>
 
-<script src="/assets/js/config-global.js"></script>
-<script src="/assets/js/layout.js"></script>
-
-<script>
-window.__pageScripts = [
-  "/assets/js/gallery-slider.js",
-  "/assets/js/product.js"
-];
-</script>  
+  <script>
+    window.__pageScripts = [
+      "/assets/js/gallery-slider.js",
+      "/assets/js/product.js"
+    ];
+  </script>
 
 </body>
 </html>
