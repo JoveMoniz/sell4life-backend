@@ -750,48 +750,85 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, express.t
     const created = [];
     const skipped = [];
 
+    // Parse all data rows, group by product name
+    const groups = new Map();
     for (let i = 1; i < lines.length; i++) {
       const row = parseRow(lines[i]);
-
       const name = col(row, 'name');
-      const priceRaw = col(row, 'price');
-
       if (!name) { skipped.push({ row: i + 1, reason: 'Missing name' }); continue; }
-      const price = parseFloat(priceRaw);
-      if (!Number.isFinite(price) || price < 0) { skipped.push({ row: i + 1, reason: 'Invalid price' }); continue; }
+      const key = name.toLowerCase().trim();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ row, lineNum: i + 1 });
+    }
 
+    for (const entries of groups.values()) {
+      const firstRow = entries[0].row;
+      const name     = col(firstRow, 'name');
+
+      const price = parseFloat(col(firstRow, 'price'));
+      if (!Number.isFinite(price) || price < 0) {
+        entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Invalid price' }));
+        continue;
+      }
+
+      // Collect unique images across all rows
+      const addedImgs = new Set();
       const images = [];
-      ['image1','image2','image3'].forEach(k => { const v = col(row, k); if (v) images.push(v); });
+      for (const e of entries) {
+        ['image1', 'image2'].forEach(k => {
+          const v = col(e.row, k);
+          if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
+        });
+      }
 
       const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
       let slug = baseSlug;
       let slugCounter = 1;
-      while (await Product.findOne({ slug })) {
-        slug = `${baseSlug}-${slugCounter++}`;
-      }
+      while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
+
+      // Build variants when multiple rows share the same product name
+      const makeVariants = entries.length > 1 || entries.some(e => col(e.row, 'variant'));
+      const variants = makeVariants ? entries.map(e => {
+        const r = e.row;
+        const vPrice = parseFloat(col(r, 'price'));
+        const variantVal = col(r, 'variant');
+        return {
+          attributes: variantVal ? { Variant: variantVal } : {},
+          price:  Number.isFinite(vPrice) ? vPrice : price,
+          stock:  parseInt(col(r, 'stock'), 10) || 0,
+          sku:    col(r, 'sku'),
+          image:  col(r, 'image1') || '',
+          color:  '',
+        };
+      }) : [];
+
+      const totalStock = variants.length
+        ? variants.reduce((s, v) => s + v.stock, 0)
+        : (parseInt(col(firstRow, 'stock'), 10) || 0);
 
       try {
         const product = new Product({
-          vendor: vendor._id,
+          vendor:       vendor._id,
           name,
           slug,
-          description:  col(row, 'description'),
+          description:  col(firstRow, 'description'),
           price,
-          comparePrice: parseFloat(col(row, 'compareprice')) || undefined,
-          shippingCost: parseFloat(col(row, 'shippingcost')) || 0,
-          stock:        parseInt(col(row, 'stock'), 10) || 0,
-          trackInventory: !!parseInt(col(row, 'stock'), 10),
-          category:     col(row, 'category').toLowerCase(),
-          subcategory:  col(row, 'subcategory').toLowerCase(),
-          sku:          col(row, 'sku'),
+          comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
+          shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+          stock:        totalStock,
+          trackInventory: totalStock > 0,
+          category:     col(firstRow, 'category').toLowerCase(),
+          subcategory:  col(firstRow, 'subcategory').toLowerCase(),
+          sku:          col(firstRow, 'sku'),
           images,
+          variants,
           active: true,
         });
 
         await product.save();
         created.push(product._id);
       } catch (rowErr) {
-        skipped.push({ row: i + 1, reason: rowErr.message || 'Save failed' });
+        entries.forEach(e => skipped.push({ row: e.lineNum, reason: rowErr.message || 'Save failed' }));
       }
     }
 
