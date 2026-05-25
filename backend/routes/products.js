@@ -311,6 +311,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'tags',
       'shippingCost',
       'variants',
+      'addOns',
     ];
 
     allowedFields.forEach((field) => {

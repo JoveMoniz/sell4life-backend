@@ -1,6 +1,19 @@
 import mongoose from 'mongoose';
 
 /* =================================
+   ADD-ON SCHEMA
+================================= */
+
+const addOnSchema = new mongoose.Schema(
+  {
+    name:  { type: String, required: true, trim: true },
+    price: { type: Number, required: true, min: 0 },
+    description: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
+/* =================================
    VARIANT SCHEMA
 ================================= */
 
@@ -122,6 +135,11 @@ const productSchema = new mongoose.Schema(
 
     variants: {
       type: [variantSchema],
+      default: [],
+    },
+
+    addOns: {
+      type: [addOnSchema],
       default: [],
     },
 
