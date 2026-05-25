@@ -44,6 +44,7 @@ const variantSchema = new mongoose.Schema(
     },
 
     image: String,
+    color: { type: String, default: '' },
   },
   { _id: false }
 );
