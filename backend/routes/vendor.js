@@ -763,24 +763,36 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, express.t
       const images = [];
       ['image1','image2','image3'].forEach(k => { const v = col(row, k); if (v) images.push(v); });
 
-      const product = new Product({
-        vendor: vendor._id,
-        name,
-        description:   col(row, 'description'),
-        price,
-        comparePrice:  parseFloat(col(row, 'compareprice')) || undefined,
-        shippingCost:  parseFloat(col(row, 'shippingcost')) || 0,
-        stock:         parseInt(col(row, 'stock'), 10) || 0,
-        trackInventory: !!parseInt(col(row, 'stock'), 10),
-        category:      col(row, 'category').toLowerCase(),
-        subcategory:   col(row, 'subcategory').toLowerCase(),
-        sku:           col(row, 'sku'),
-        images,
-        active: true,
-      });
+      const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+      let slug = baseSlug;
+      let slugCounter = 1;
+      while (await Product.findOne({ slug })) {
+        slug = `${baseSlug}-${slugCounter++}`;
+      }
 
-      await product.save();
-      created.push(product._id);
+      try {
+        const product = new Product({
+          vendor: vendor._id,
+          name,
+          slug,
+          description:  col(row, 'description'),
+          price,
+          comparePrice: parseFloat(col(row, 'compareprice')) || undefined,
+          shippingCost: parseFloat(col(row, 'shippingcost')) || 0,
+          stock:        parseInt(col(row, 'stock'), 10) || 0,
+          trackInventory: !!parseInt(col(row, 'stock'), 10),
+          category:     col(row, 'category').toLowerCase(),
+          subcategory:  col(row, 'subcategory').toLowerCase(),
+          sku:          col(row, 'sku'),
+          images,
+          active: true,
+        });
+
+        await product.save();
+        created.push(product._id);
+      } catch (rowErr) {
+        skipped.push({ row: i + 1, reason: rowErr.message || 'Save failed' });
+      }
     }
 
     res.json({
