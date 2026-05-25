@@ -310,6 +310,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'subcategory',
       'tags',
       'shippingCost',
+      'variants',
     ];
 
     allowedFields.forEach((field) => {
