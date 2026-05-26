@@ -116,6 +116,12 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
 
+    variantDisplay: {
+      type: String,
+      enum: ['color', 'image'],
+      default: 'color',
+    },
+
     /* ==============================
        INVENTORY
     ============================== */

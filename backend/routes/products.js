@@ -316,6 +316,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'addOns',
       'videoUrl',
       'videoUrl2',
+      'variantDisplay',
     ];
 
     allowedFields.forEach((field) => {
