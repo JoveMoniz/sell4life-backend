@@ -45,6 +45,7 @@ const variantSchema = new mongoose.Schema(
 
     image: String,
     color: { type: String, default: '' },
+    displayMode: { type: String, enum: ['color', 'image'], default: 'color' },
   },
   { _id: false }
 );
