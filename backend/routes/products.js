@@ -31,7 +31,7 @@ router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
 
-    const { name, description, price, images, stock, category, subcategory, tags, shippingCost, videoUrl } = req.body;
+    const { name, description, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2 } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -73,7 +73,8 @@ router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
       slug: uniqueSlug,
       vendor: vendor._id,
       shippingCost: Number(shippingCost) >= 0 ? Number(shippingCost) : 0,
-      videoUrl: videoUrl || '',
+      videoUrl:  videoUrl  || '',
+      videoUrl2: videoUrl2 || '',
     });
 
     res.status(201).json(product);
@@ -314,6 +315,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'variants',
       'addOns',
       'videoUrl',
+      'videoUrl2',
     ];
 
     allowedFields.forEach((field) => {

@@ -111,6 +111,11 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
 
+    videoUrl2: {
+      type: String,
+      default: '',
+    },
+
     /* ==============================
        INVENTORY
     ============================== */
