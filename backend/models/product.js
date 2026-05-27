@@ -72,6 +72,11 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
 
+    bulletPoints: {
+      type: String,
+      default: '',
+    },
+
     /* ==============================
        PRICING
     ============================== */

@@ -31,7 +31,7 @@ router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
 
-    const { name, description, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2 } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2 } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -64,6 +64,8 @@ router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
     const product = await Product.create({
       name,
       description,
+      shortDescription: shortDescription || '',
+      bulletPoints:     bulletPoints     || '',
       price,
       images,
       stock,
@@ -304,8 +306,12 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
 
     const allowedFields = [
       'name',
+      'shortDescription',
+      'bulletPoints',
       'description',
       'price',
+      'comparePrice',
+      'costPrice',
       'images',
       'stock',
       'category',
