@@ -279,6 +279,11 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
+    comingSoon: {
+      type: Boolean,
+      default: false,
+    },
+
     /* ==============================
        FLEX
     ============================== */

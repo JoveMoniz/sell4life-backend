@@ -323,6 +323,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => 
       'videoUrl',
       'videoUrl2',
       'variantDisplay',
+      'comingSoon',
     ];
 
     allowedFields.forEach((field) => {
