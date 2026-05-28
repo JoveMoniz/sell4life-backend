@@ -387,6 +387,34 @@ router.patch('/:id/archive', authMiddleware, requireApprovedVendor, async (req, 
 });
 
 /* ======================================================
+   UNARCHIVE PRODUCT
+====================================================== */
+
+router.patch('/:id/unarchive', authMiddleware, requireApprovedVendor, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const vendor  = req.vendor;
+    const product = await Product.findById(req.params.id);
+
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (product.vendor.toString() !== vendor._id.toString()) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    product.archived = false;
+    product.active   = true;
+    await product.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('UNARCHIVE PRODUCT ERROR:', err);
+    res.status(500).json({ error: 'Failed to unarchive product' });
+  }
+});
+
+/* ======================================================
    DELETE PRODUCT (VENDOR — own products only, no orders)
 ====================================================== */
 

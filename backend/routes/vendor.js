@@ -659,9 +659,10 @@ router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) 
   try {
     const vendor = req.vendor;
 
+    // Return ALL vendor products (active + draft + archived)
+    // Frontend splits them into the correct tabs
     const products = await Product.find({
       vendor: vendor._id,
-      archived: false,
     }).sort({
       createdAt: -1,
     });
