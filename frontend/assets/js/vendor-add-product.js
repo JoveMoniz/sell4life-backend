@@ -965,6 +965,7 @@ function addVariantRow(data) {
       <div class="ao-img-wrap">
         <img class="ao-img-preview vr-img-preview" src="${imgSrc}" alt="" style="${imgSrc ? '' : 'display:none'}" />
         <input type="text" class="vb-input ao-img-url vr-img-url" name="vr-image" value="${imgSrc}" placeholder="Paste image URL…" />
+        <button type="button" class="vr-img-clear" title="Clear image" style="${imgSrc ? '' : 'display:none'}">&#x2715; Clear image</button>
       </div>
     </td>
     <td><input type="number" class="vb-input vb-input-sm" name="vr-price" step="0.01" min="0" value="${data.price != null ? data.price : ''}" placeholder="0.00" /></td>
@@ -1102,15 +1103,26 @@ function bindVariants() {
     if (e.target.classList.contains('vb-remove-btn')) {
       e.target.closest('tr').remove();
     }
+    if (e.target.classList.contains('vr-img-clear')) {
+      const td  = e.target.closest('td');
+      const img = td.querySelector('.vr-img-preview');
+      const url = td.querySelector('[name="vr-image"]');
+      if (img) { img.src = ''; img.style.display = 'none'; }
+      if (url) { url.value = ''; }
+      e.target.style.display = 'none';
+    }
   });
   variantRows?.addEventListener('input', (e) => {
     if (e.target.classList.contains('vb-color-pick')) {
       e.target.dataset.userSet = 'true';
     }
     if (e.target.classList.contains('vr-img-url')) {
-      const url = e.target.value.trim();
-      const preview = e.target.closest('td').querySelector('.vr-img-preview');
+      const url     = e.target.value.trim();
+      const td      = e.target.closest('td');
+      const preview = td.querySelector('.vr-img-preview');
+      const clrBtn  = td.querySelector('.vr-img-clear');
       if (preview) { preview.src = url; preview.style.display = url ? '' : 'none'; }
+      if (clrBtn)  { clrBtn.style.display = url ? '' : 'none'; }
       if (url) sampleDominantColor(url, (hex) => {
         const picker = e.target.closest('tr')?.querySelector('[name="vr-color"]');
         if (picker) { picker.value = hex; picker.dataset.userSet = 'true'; }

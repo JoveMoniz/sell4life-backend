@@ -4251,6 +4251,24 @@ Vendor Products
   background: #f9fafb;
 }
 
+.vr-img-clear {
+  margin-top: 3px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: background 0.12s;
+}
+
+.vr-img-clear:hover {
+  background: #fee2e2;
+}
+
 .ao-img-url {
   font-size: 0.75rem !important;
   padding: 4px 6px !important;
