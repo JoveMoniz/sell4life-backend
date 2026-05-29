@@ -368,7 +368,9 @@ async function bulkAction(action) {
       });
       if (res.ok) {
         if (action === 'unarchive') {
+          const restored = _archivedProducts.find(p => (p._id || p.id) === id);
           _archivedProducts = _archivedProducts.filter(p => (p._id || p.id) !== id);
+          if (restored) { restored.archived = false; _allProducts.push(restored); }
         } else {
           _allProducts = _allProducts.filter(p => (p._id || p.id) !== id);
         }
@@ -579,7 +581,12 @@ document.addEventListener('click', async (e) => {
 
     if (!res.ok) throw new Error('Unarchive failed');
 
+    const restored = _archivedProducts.find(p => (p._id || p.id) === id);
     _archivedProducts = _archivedProducts.filter(p => (p._id || p.id) !== id);
+    if (restored) {
+      restored.archived = false;
+      _allProducts.push(restored);
+    }
     _saveArchivedCache();
     renderProducts();
     window.showToast?.('Product restored');
