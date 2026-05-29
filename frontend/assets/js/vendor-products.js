@@ -380,6 +380,14 @@ async function bulkAction(action) {
     } catch {}
   }));
 
+  // After bulk unarchive, switch to All so restored products are visible immediately
+  if (action === 'unarchive') {
+    _currentStatus = 'all';
+    document.querySelectorAll('.vp-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === 'all');
+    });
+  }
+
   renderProducts();
   updateBulkBar();
   const label = action === 'delete' ? 'deleted' : action === 'unarchive' ? 'restored' : 'archived';
@@ -588,6 +596,13 @@ document.addEventListener('click', async (e) => {
       _allProducts.push(restored);
     }
     _saveArchivedCache();
+
+    // Switch to All tab so the restored product is visible immediately
+    _currentStatus = 'all';
+    document.querySelectorAll('.vp-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.status === 'all');
+    });
+
     renderProducts();
     window.showToast?.('Product restored');
   } catch (err) {
