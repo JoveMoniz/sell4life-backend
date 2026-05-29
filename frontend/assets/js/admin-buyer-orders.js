@@ -15,7 +15,9 @@ function authFetch(url, opts = {}) {
   return fetch(url, { ...opts, credentials: 'include', headers });
 }
 
-function fmt(n) { return '£' + Number(n || 0).toFixed(2); }
+function fmt(n) {
+  return '£' + Number(n || 0).toFixed(2);
+}
 
 /* ======================================================
    INIT
@@ -24,7 +26,8 @@ function fmt(n) { return '£' + Number(n || 0).toFixed(2); }
   const params = new URLSearchParams(window.location.search);
   const userId = params.get('id');
   if (!userId) {
-    document.getElementById('bo-list').innerHTML = '<div class="bo-loading">No user ID in URL.</div>';
+    document.getElementById('bo-list').innerHTML =
+      '<div class="bo-loading">No user ID in URL.</div>';
     return;
   }
   loadBuyerOrders(userId);
@@ -81,7 +84,10 @@ function renderPagination(page, pages) {
   prev.textContent = '← Prev';
   prev.disabled = page <= 1;
   prev.className = 'bo-pg-btn';
-  prev.onclick = () => { renderPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  prev.onclick = () => {
+    renderPage(page - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   container.appendChild(prev);
 
   const info = document.createElement('span');
@@ -93,7 +99,10 @@ function renderPagination(page, pages) {
   next.textContent = 'Next →';
   next.disabled = page >= pages;
   next.className = 'bo-pg-btn';
-  next.onclick = () => { renderPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  next.onclick = () => {
+    renderPage(page + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   container.appendChild(next);
 }
 
@@ -166,17 +175,25 @@ function renderOrders(orders) {
     return;
   }
 
-  list.innerHTML = orders.map(o => {
-    const date = new Date(o.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const psClass = (o.paymentStatus || 'pending').toLowerCase().replace(/\s+/g, '_');
-    const refundTag = o.refundTotal > 0
-      ? `<span class="bo-refund-tag">−${fmt(o.refundTotal)} refunded</span>`
-      : '';
+  list.innerHTML = orders
+    .map((o) => {
+      const date = new Date(o.createdAt).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const psClass = (o.paymentStatus || 'pending').toLowerCase().replace(/\s+/g, '_');
+      const refundTag =
+        o.refundTotal > 0
+          ? `<span class="bo-refund-tag">−${fmt(o.refundTotal)} refunded</span>`
+          : '';
 
-    const itemRows = (o.items || []).map(item => {
-      const itemStatusCls = (item.status || '').toLowerCase();
-      const refundNote = item.status === 'Cancelled' ? ' <span class="bo-refund-tag">cancelled</span>' : '';
-      return `<tr>
+      const itemRows = (o.items || [])
+        .map((item) => {
+          const itemStatusCls = (item.status || '').toLowerCase();
+          const refundNote =
+            item.status === 'Cancelled' ? ' <span class="bo-refund-tag">cancelled</span>' : '';
+          return `<tr>
         <td>${item.name}${refundNote}</td>
         <td style="color:#6b7280;font-size:11px">${item.vendorName}</td>
         <td class="bo-num">${fmt(item.price)}</td>
@@ -184,18 +201,20 @@ function renderOrders(orders) {
         <td class="bo-num">${fmt(item.price * item.quantity)}</td>
         <td><span class="bo-badge ${itemStatusCls}">${item.status}</span></td>
       </tr>`;
-    }).join('');
+        })
+        .join('');
 
-    const addr = o.shippingAddress;
-    const addrHtml = addr && addr.address1
-      ? `<div class="bo-addr">
+      const addr = o.shippingAddress;
+      const addrHtml =
+        addr && addr.address1
+          ? `<div class="bo-addr">
            ${addr.name ? `<div><strong>${addr.name}</strong></div>` : ''}
            <div>${addr.address1}${addr.address2 ? ', ' + addr.address2 : ''}</div>
            <div>${[addr.city, addr.county, addr.postcode, addr.country].filter(Boolean).join(', ')}</div>
          </div>`
-      : '<div class="bo-addr" style="color:#9ca3af">No address</div>';
+          : '<div class="bo-addr" style="color:#9ca3af">No address</div>';
 
-    return `
+      return `
       <div class="bo-order">
         <div class="bo-order-header" data-order-id="${o._id}">
           <span class="bo-order-id">${o.displayId}</span>
@@ -233,10 +252,11 @@ function renderOrders(orders) {
           </div>
         </div>
       </div>`;
-  }).join('');
+    })
+    .join('');
 
   // Toggle expand/collapse
-  list.addEventListener('click', e => {
+  list.addEventListener('click', (e) => {
     const header = e.target.closest('.bo-order-header');
     if (!header) return;
     const body = document.getElementById('body-' + header.dataset.orderId);

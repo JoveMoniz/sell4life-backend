@@ -18,6 +18,8 @@ let currentQuery = '';
 let currentStatus = 'all';
 
 let searchInput;
+let searchTimer;
+let searchController;
 
 /* =================================
    HELPERS
@@ -45,30 +47,31 @@ function attachSearchHandlers() {
     const isEmail = /[a-z]/i.test(raw);
 
     if (isEmail) {
-      // EMAIL MODE
       currentQuery = raw.replace(/^S4L-/i, '');
-      return;
+    } else {
+      // ID MODE — auto-prefix with S4L-
+      let clean = raw.replace(/^S4L-/i, '').toUpperCase();
+      currentQuery = clean;
+
+      const cursorPos = searchInput.selectionStart;
+      const newValue = clean ? `S4L-${clean}` : '';
+      searchInput.value = newValue;
+      const offset = newValue.length - raw.length;
+      searchInput.setSelectionRange(cursorPos + offset, cursorPos + offset);
     }
 
-    // ID MODE
-    let clean = raw.replace(/^S4L-/i, '').toUpperCase();
-
-    currentQuery = clean;
-
-    // 🔥 SAFE PREFIX (NO CURSOR BREAK)
-    const cursorPos = searchInput.selectionStart;
-
-    const newValue = clean ? `S4L-${clean}` : '';
-
-    searchInput.value = newValue;
-
-    const offset = newValue.length - raw.length;
-    searchInput.setSelectionRange(cursorPos + offset, cursorPos + offset);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentPage = 1;
+      loadOrders(1, currentQuery, currentStatus);
+    }, 300);
   });
 
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      loadOrders(currentPage, currentQuery, currentStatus);
+      clearTimeout(searchTimer);
+      currentPage = 1;
+      loadOrders(1, currentQuery, currentStatus);
     }
   });
 }
@@ -77,22 +80,26 @@ function attachSearchHandlers() {
    LOAD ORDERS
 ================================= */
 async function loadOrders(page = 1, q = '', status = 'all') {
-  let url = `${API_BASE}/admin/orders?page=${page}`;
+  if (searchController) searchController.abort();
+  searchController = new AbortController();
 
+  let url = `${API}/admin/orders?page=${page}`;
   if (q) url += `&q=${encodeURIComponent(q)}`;
   if (status !== 'all') url += `&status=${status}`;
 
-  const res = await authFetch(url);
-
-  if (res.status === 401 || res.status === 403) {
-    window.location.href = '/account/admin/signin.html';
-    return;
-  }
-
-  const data = await res.json();
-
   const tbody = document.getElementById('ordersTable');
-  tbody.innerHTML = '';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#6b7280">Loading…</td></tr>';
+
+  try {
+    const res = await authFetch(url, { signal: searchController.signal });
+
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = '/account/admin/signin.html';
+      return;
+    }
+
+    const data = await res.json();
+    tbody.innerHTML = '';
 
   data.orders.forEach((order) => {
     const tr = document.createElement('tr');
@@ -171,7 +178,11 @@ async function loadOrders(page = 1, q = '', status = 'all') {
     tbody.appendChild(tr);
   });
 
-  renderPagination(data.page, data.totalPages);
+    renderPagination(data.page, data.totalPages);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#e53e3e">Failed to load orders.</td></tr>';
+  }
 }
 
 /* =================================

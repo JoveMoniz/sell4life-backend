@@ -1,13 +1,14 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Add Product | Sell4Life</title>
     <link rel="stylesheet" href="/assets/css/layout.css" />
-    <link rel="stylesheet" href="/assets/css/vendor.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style id="s4l-fouc">html{visibility:hidden}</style>
   </head>
-  <body>
+  <body class="s4l-loading">
     <div class="vendor-layout">
       <div id="vendor-sidebar"></div>
 
@@ -35,6 +36,11 @@
               <div class="form-group">
                 <label>Full Description</label>
                 <textarea id="product-description" rows="5" placeholder="Describe your product in detail — materials, dimensions, what's included..."></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>Bullet Points <span class="ap-hint">One point per line — shown as a highlights list on the product page</span></label>
+                <textarea id="product-bullet-points" rows="4" placeholder="Fast shipping&#10;1-year warranty&#10;Comes in 3 colours"></textarea>
               </div>
             </div>
 
@@ -72,11 +78,16 @@
             <!-- IMAGES -->
             <div class="ap-section">
               <div class="ap-section-head">Images</div>
-              <p style="font-size:0.82rem;color:#888;margin-bottom:16px">
-                Tap a slot to choose from your library or take a photo with your camera. The first image is your main listing photo.
+              <p style="font-size:0.82rem;color:#888;margin-bottom:12px">
+                Tap a slot to choose from your library or take a photo. The first image is your main listing photo.
               </p>
-              <div class="ap-img-grid">
 
+              <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+                <button type="button" class="ap-select-all-btn" id="ap-select-all-btn">&#128247; Upload multiple photos</button>
+                <input type="file" id="ap-multi-input" accept="image/*" multiple style="display:none" />
+              </div>
+
+              <div class="ap-img-grid">
                 <div class="ap-img-slot">
                   <div class="ap-upload-zone" data-slot="1">
                     <input type="file" class="ap-file-input" id="img-input-1" accept="image/*" />
@@ -89,7 +100,6 @@
                     <button type="button" class="ap-remove-btn" data-slot="1">&#x2715;</button>
                   </div>
                 </div>
-
                 <div class="ap-img-slot">
                   <div class="ap-upload-zone" data-slot="2">
                     <input type="file" class="ap-file-input" id="img-input-2" accept="image/*" />
@@ -102,7 +112,6 @@
                     <button type="button" class="ap-remove-btn" data-slot="2">&#x2715;</button>
                   </div>
                 </div>
-
                 <div class="ap-img-slot">
                   <div class="ap-upload-zone" data-slot="3">
                     <input type="file" class="ap-file-input" id="img-input-3" accept="image/*" />
@@ -115,7 +124,6 @@
                     <button type="button" class="ap-remove-btn" data-slot="3">&#x2715;</button>
                   </div>
                 </div>
-
                 <div class="ap-img-slot">
                   <div class="ap-upload-zone" data-slot="4">
                     <input type="file" class="ap-file-input" id="img-input-4" accept="image/*" />
@@ -128,7 +136,6 @@
                     <button type="button" class="ap-remove-btn" data-slot="4">&#x2715;</button>
                   </div>
                 </div>
-
                 <div class="ap-img-slot">
                   <div class="ap-upload-zone" data-slot="5">
                     <input type="file" class="ap-file-input" id="img-input-5" accept="image/*" />
@@ -141,7 +148,111 @@
                     <button type="button" class="ap-remove-btn" data-slot="5">&#x2715;</button>
                   </div>
                 </div>
+              </div>
 
+              <!-- Extra slots 6–10 (hidden until "Show more") -->
+              <div class="ap-extra-slots" id="ap-extra-slots">
+                <div class="ap-img-grid" style="margin-top:12px">
+                  <div class="ap-img-slot">
+                    <div class="ap-upload-zone" data-slot="6">
+                      <input type="file" class="ap-file-input" id="img-input-6" accept="image/*" />
+                      <div class="ap-upload-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>Photo 6</span>
+                      </div>
+                      <img class="ap-img-preview" id="preview-6" alt="" />
+                      <div class="ap-upload-overlay" id="overlay-6"><div class="ap-spinner"></div></div>
+                      <button type="button" class="ap-remove-btn" data-slot="6">&#x2715;</button>
+                    </div>
+                  </div>
+                  <div class="ap-img-slot">
+                    <div class="ap-upload-zone" data-slot="7">
+                      <input type="file" class="ap-file-input" id="img-input-7" accept="image/*" />
+                      <div class="ap-upload-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>Photo 7</span>
+                      </div>
+                      <img class="ap-img-preview" id="preview-7" alt="" />
+                      <div class="ap-upload-overlay" id="overlay-7"><div class="ap-spinner"></div></div>
+                      <button type="button" class="ap-remove-btn" data-slot="7">&#x2715;</button>
+                    </div>
+                  </div>
+                  <div class="ap-img-slot">
+                    <div class="ap-upload-zone" data-slot="8">
+                      <input type="file" class="ap-file-input" id="img-input-8" accept="image/*" />
+                      <div class="ap-upload-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>Photo 8</span>
+                      </div>
+                      <img class="ap-img-preview" id="preview-8" alt="" />
+                      <div class="ap-upload-overlay" id="overlay-8"><div class="ap-spinner"></div></div>
+                      <button type="button" class="ap-remove-btn" data-slot="8">&#x2715;</button>
+                    </div>
+                  </div>
+                  <div class="ap-img-slot">
+                    <div class="ap-upload-zone" data-slot="9">
+                      <input type="file" class="ap-file-input" id="img-input-9" accept="image/*" />
+                      <div class="ap-upload-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>Photo 9</span>
+                      </div>
+                      <img class="ap-img-preview" id="preview-9" alt="" />
+                      <div class="ap-upload-overlay" id="overlay-9"><div class="ap-spinner"></div></div>
+                      <button type="button" class="ap-remove-btn" data-slot="9">&#x2715;</button>
+                    </div>
+                  </div>
+                  <div class="ap-img-slot">
+                    <div class="ap-upload-zone" data-slot="10">
+                      <input type="file" class="ap-file-input" id="img-input-10" accept="image/*" />
+                      <div class="ap-upload-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>Photo 10</span>
+                      </div>
+                      <img class="ap-img-preview" id="preview-10" alt="" />
+                      <div class="ap-upload-overlay" id="overlay-10"><div class="ap-spinner"></div></div>
+                      <button type="button" class="ap-remove-btn" data-slot="10">&#x2715;</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" class="ap-show-more-btn" id="ap-show-more" style="margin-top:12px">+ Show more photo slots</button>
+            </div>
+
+            <!-- VIDEO -->
+            <div class="ap-section">
+              <div class="ap-section-head">Videos <span class="ap-hint" style="font-weight:400;text-transform:none;letter-spacing:0">Optional — upload or paste a YouTube / Vimeo URL</span></div>
+
+              <div class="ap-row-2">
+                <div>
+                  <div class="ap-video-zone" data-video="1">
+                    <input type="file" id="video-file-1" accept="video/*" style="display:none" />
+                    <div class="ap-video-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M10 8l5 3-5 3V8z"/></svg>
+                      <span>Upload video 1</span>
+                      <small>MP4 / WebM</small>
+                    </div>
+                    <video class="ap-video-preview" id="video-preview-1" controls style="display:none"></video>
+                    <div class="ap-upload-overlay" id="video-overlay-1" style="display:none"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" style="display:none">&#x2715;</button>
+                  </div>
+                  <input type="text" id="product-video-url" class="ap-video-url-input form-group input" placeholder="Or paste YouTube / Vimeo URL…" style="margin-top:8px;width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:0.85rem" />
+                </div>
+
+                <div>
+                  <div class="ap-video-zone" data-video="2">
+                    <input type="file" id="video-file-2" accept="video/*" style="display:none" />
+                    <div class="ap-video-idle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M10 8l5 3-5 3V8z"/></svg>
+                      <span>Upload video 2</span>
+                      <small>MP4 / WebM</small>
+                    </div>
+                    <video class="ap-video-preview" id="video-preview-2" controls style="display:none"></video>
+                    <div class="ap-upload-overlay" id="video-overlay-2" style="display:none"><div class="ap-spinner"></div></div>
+                    <button type="button" class="ap-remove-btn" style="display:none">&#x2715;</button>
+                  </div>
+                  <input type="text" id="product-video-url2" class="ap-video-url-input" placeholder="Or paste YouTube / Vimeo URL…" style="margin-top:8px;width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:0.85rem" />
+                </div>
               </div>
             </div>
 
@@ -153,22 +264,22 @@
                   <label>Category <span class="ap-req">*</span></label>
                   <select id="product-category" required>
                     <option value="">Select category</option>
-                    <option value="fashion">Fashion & Clothing</option>
-                    <option value="electronics">Electronics & Technology</option>
-                    <option value="home">Home, Garden & DIY</option>
-                    <option value="books">Books & Media</option>
-                    <option value="toys">Toys & Games</option>
-                    <option value="health">Health & Beauty</option>
-                    <option value="sports">Sports & Outdoors</option>
-                    <option value="automotive">Automotive & Vehicles</option>
-                    <option value="food">Food & Drink</option>
-                    <option value="baby">Baby & Kids</option>
+                    <option value="fashion">Fashion &amp; Clothing</option>
+                    <option value="electronics">Electronics &amp; Technology</option>
+                    <option value="home">Home, Garden &amp; DIY</option>
+                    <option value="books">Books &amp; Media</option>
+                    <option value="toys">Toys &amp; Games</option>
+                    <option value="health">Health &amp; Beauty</option>
+                    <option value="sports">Sports &amp; Outdoors</option>
+                    <option value="automotive">Automotive &amp; Vehicles</option>
+                    <option value="food">Food &amp; Drink</option>
+                    <option value="baby">Baby &amp; Kids</option>
                     <option value="pets">Pet Supplies</option>
-                    <option value="arts">Arts, Crafts & Hobbies</option>
-                    <option value="office">Office & Stationery</option>
-                    <option value="antiques">Antiques & Collectibles</option>
-                    <option value="travel">Travel & Luggage</option>
-                    <option value="software">Software & Digital</option>
+                    <option value="arts">Arts, Crafts &amp; Hobbies</option>
+                    <option value="office">Office &amp; Stationery</option>
+                    <option value="antiques">Antiques &amp; Collectibles</option>
+                    <option value="travel">Travel &amp; Luggage</option>
+                    <option value="software">Software &amp; Digital</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
@@ -182,6 +293,10 @@
               <div class="form-group">
                 <label>Tags <span class="ap-hint">Comma-separated — helps buyers find your product</span></label>
                 <input type="text" id="product-tags" placeholder="e.g. vintage, red, gift, handmade" />
+              </div>
+              <div class="ap-tag-suggestions" id="tag-suggestions" style="display:none">
+                <span class="ap-tag-sugg-label">Suggested tags:</span>
+                <div class="ap-tag-chips" id="tag-chips"></div>
               </div>
             </div>
 
@@ -209,6 +324,85 @@
                   <span class="ap-toggle-slider"></span>
                   <span class="ap-toggle-label">Allow backorder when out of stock</span>
                 </label>
+              </div>
+            </div>
+
+            <!-- VARIANTS -->
+            <div class="ap-section">
+              <div class="ap-section-head">Variants</div>
+              <div class="ap-toggle-group" style="margin-bottom:0">
+                <label class="ap-toggle">
+                  <input type="checkbox" id="has-variants" />
+                  <span class="ap-toggle-slider"></span>
+                  <span class="ap-toggle-label">This product has variants (e.g. sizes, colours)</span>
+                </label>
+              </div>
+
+              <div id="variant-builder" style="display:none;margin-top:18px">
+                <div class="vb-attr-names">
+                  <div class="form-group">
+                    <label>Attribute 1 name <span class="ap-hint">e.g. Colour, Size</span></label>
+                    <input type="text" id="attr-name-1" class="vb-input" placeholder="e.g. Colour" value="Colour" />
+                  </div>
+                  <div class="form-group">
+                    <label>Attribute 2 name <span class="ap-hint">Optional — leave blank if not needed</span></label>
+                    <input type="text" id="attr-name-2" class="vb-input" placeholder="e.g. Size (optional)" />
+                  </div>
+                </div>
+
+                <div class="vb-table-wrap">
+                  <table class="vb-table">
+                    <thead>
+                      <tr>
+                        <th id="vb-th-1">Colour</th>
+                        <th id="vb-th-2" class="vb-th-hidden">Attribute 2</th>
+                        <th>Swatch / Mode</th>
+                        <th>Image URL</th>
+                        <th>Price (£)</th>
+                        <th>Stock</th>
+                        <th>SKU</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="variant-rows"></tbody>
+                  </table>
+                </div>
+
+                <div class="vb-btn-row">
+                  <button type="button" id="btn-add-variant" class="vb-add-btn">+ Add variant</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ADD-ONS -->
+            <div class="ap-section">
+              <div class="ap-section-head">Add-Ons</div>
+              <div class="ap-toggle-group" style="margin-bottom:0">
+                <label class="ap-toggle">
+                  <input type="checkbox" id="has-addons" />
+                  <span class="ap-toggle-slider"></span>
+                  <span class="ap-toggle-label">Offer optional add-ons at checkout (e.g. extended warranty, gift wrap)</span>
+                </label>
+              </div>
+
+              <div id="addon-builder" style="display:none;margin-top:18px">
+                <div class="vb-table-wrap">
+                  <table class="vb-table">
+                    <thead>
+                      <tr>
+                        <th>Image</th>
+                        <th>Name</th>
+                        <th>Price (£)</th>
+                        <th>Description</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="addon-rows"></tbody>
+                  </table>
+                </div>
+                <div class="vb-btn-row">
+                  <button type="button" id="btn-add-addon" class="vb-add-btn">+ Add option</button>
+                </div>
               </div>
             </div>
 
@@ -242,7 +436,7 @@
             <div class="ap-section">
               <div class="ap-section-head ap-section-toggle" id="seo-toggle">
                 SEO &amp; Search
-                <span class="ap-toggle-icon" id="seo-icon">▸</span>
+                <span class="ap-toggle-icon" id="seo-icon">&#9658;</span>
                 <span class="ap-hint" style="font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px">Optional — improves visibility in search engines</span>
               </div>
               <div id="seo-body" style="display:none">
@@ -272,6 +466,13 @@
                   <span>Saved but not visible to buyers yet</span>
                 </label>
               </div>
+              <div class="ap-toggle-group" style="margin-top:16px">
+                <label class="ap-toggle">
+                  <input type="checkbox" id="coming-soon" />
+                  <span class="ap-toggle-slider"></span>
+                  <span class="ap-toggle-label">Coming Soon — product is visible but cannot be purchased</span>
+                </label>
+              </div>
             </div>
 
             <!-- SUBMIT -->
@@ -287,9 +488,9 @@
 
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/vendor-guard.js"></script>
-
+    <script src="/assets/js/layout.js?v=20260529"></script>
     <script>
-    window.__pageScripts = ['/assets/js/vendor-add-product.js'];
-  </script>
+      window.__pageScripts = ['/assets/js/vendor-add-product.js'];
+    </script>
   </body>
 </html>

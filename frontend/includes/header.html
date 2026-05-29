@@ -97,10 +97,12 @@
       <div class="mobile-top-row">
         <!-- Logo -->
         <a href="/index.html" class="mobile-logo">
-          <span class="logo-orange">$</span>
-          <span class="logo-white">ell</span>
-          <span class="logo-orange">4</span>
-          <span class="logo-white">Life</span>
+          <span class="logo-wordmark">
+            <span class="logo-orange">$</span>
+            <span class="logo-white">ell</span>
+            <span class="logo-orange">4</span>
+            <span class="logo-white">Life</span>
+          </span>
         </a>
 
         <div class="mobile-right-icons">
@@ -128,27 +130,50 @@
         </div>
       </div>
 
-      <!-- ROW 2: Menu + Search -->
+      <!-- ROW 2: Search + hamburger (tablet shows nav inline) -->
       <div class="mobile-menu-col">
+        <!-- Inline nav — visible on tablet, hidden on portrait phone -->
         <nav class="mobile-nav">
           <a href="/shop/">Buy</a>
           <a href="/sell/">Sell</a>
           <a href="/stores/">Stores</a>
         </nav>
 
-        <!-- SAME structure as desktop, DIFFERENT styling -->
-        <form id="mobile-search-form" class="mobile-search" role="search">
-          <input
-            id="mobile-search-input"
-            type="text"
-            placeholder="Search products..."
-            autocomplete="off"
-          />
-          <button type="submit" aria-label="Search">
-            <img src="/assets/images/hero/search.png" alt="Search" />
+        <!-- Search + hamburger row -->
+        <div class="mobile-search-row">
+          <form id="mobile-search-form" class="mobile-search" role="search">
+            <input
+              id="mobile-search-input"
+              type="text"
+              placeholder="Search products..."
+              autocomplete="off"
+            />
+            <button type="submit" aria-label="Search">
+              <img src="/assets/images/hero/search.png" alt="Search" />
+            </button>
+            <div class="search-autocomplete mobile-ac"></div>
+          </form>
+
+          <!-- Hamburger — hidden on tablet, shown on portrait phone -->
+          <button
+            id="mobile-hamburger"
+            class="mobile-hamburger"
+            type="button"
+            aria-label="Open menu"
+            aria-expanded="false"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
           </button>
-          <div class="search-autocomplete mobile-ac"></div>
-        </form>
+        </div>
+
+        <!-- Nav drawer — slides down when hamburger opens it -->
+        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
+          <a href="/shop/">Buy</a>
+          <a href="/sell/">Sell</a>
+          <a href="/stores/">Stores</a>
+        </div>
       </div>
     </div>
   </div>

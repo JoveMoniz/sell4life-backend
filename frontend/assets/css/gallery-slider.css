@@ -54,7 +54,8 @@
 
 .main-image-wrapper {
   flex: 1;
-  max-width: 100%;
+  max-width: 650px;
+  position: relative;
 }
 
 .slider-wrapper {
@@ -96,29 +97,33 @@
   width: 60px;
   max-width: 60px;
   background: transparent;
-  color: rgba(0,0,0,0.35);
+  color: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 38px;
   cursor: pointer;
   transition: 0.2s ease;
+  -webkit-user-select: none;
   user-select: none;
 }
 
 #main-prev:hover,
 #main-next:hover {
- background: transparent;
+  background: transparent;
 }
 
 #main-prev:active,
 #main-next:active {
-  
   transform: scale(0.96);
 }
 
-#main-prev { left: 0; }
-#main-next { right: 0; }
+#main-prev {
+  left: 0;
+}
+#main-next {
+  right: 0;
+}
 
 /* =========================================================
    RESPONSIVE
@@ -126,7 +131,6 @@
 
 /* Tablet / mobile: stack layout, horizontal thumbnails */
 @media (max-width: 1400px) {
-
   .custom-gallery.side-layout {
     flex-direction: column;
     align-items: center;
@@ -159,51 +163,89 @@
 /* MOBILE PORTRAIT — full bleed slider */
 /* FORCE full-height center on mobile portrait */
 @media (max-width: 600px) and (orientation: portrait) {
+  .main-image-wrapper {
+    position: static !important;
+  }
+
   .slider-wrapper {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: auto !important;
-    min-height: 65vh !important; /* Ensures vertical room */
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 65vh !important;
     padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .slider-track {
+    display: flex !important;
+    width: 100% !important;
   }
 
   .slide-img {
-    object-fit: contain !important;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
     max-height: 65vh !important;
+
+    object-fit: contain !important;
+    object-position: center center !important;
+
+    display: block !important;
+    background: #fff !important;
+  }
+
+  #main-prev,
+  #main-next {
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 60px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 20 !important;
+  }
+
+  #main-prev {
+    left: 0 !important;
+  }
+
+  #main-next {
+    right: 0 !important;
+  }
+
+  .thumbnail-gallery {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+
+    flex-wrap: nowrap !important;
+
+    justify-content: flex-start !important;
+
     width: 100% !important;
   }
 }
-
-
-
- /* MOBILE LANDSCAPE — image must be fully visible */
+/* MOBILE LANDSCAPE — image must be fully visible */
 @media (max-height: 600px) and (orientation: landscape) {
-
   .slider-wrapper,
   .main-image-wrapper,
   .product-gallery {
     width: 100%;
     max-width: 100%;
-
   }
-
-
 
   /* Image fits inside, no cropping */
   .slider-track img {
     width: 100%;
     height: 280px;
-    object-fit: contain;  /* <-- no cut image */
+    object-fit: contain; /* <-- no cut image */
     background: #fff;
   }
-  
 
-     .thumb-img {
+  .thumb-img {
     width: 40px;
     height: 40px;
   }
-
 
   .thumbnail-gallery {
     width: 100%;
@@ -215,7 +257,6 @@
 
 /* Full-width gallery on tablets + mobiles, including iPad Pro */
 @media (max-width: 1400px) {
-
   .main-image-wrapper {
     order: 1;
   }
@@ -223,7 +264,7 @@
     order: 2;
   }
 
-    /* Arrows still on edges */
+  /* Arrows still on edges */
   #main-prev,
   #main-next {
     position: absolute;
@@ -234,6 +275,10 @@
     z-index: 10;
   }
 
-  #main-prev { left: 0; }
-  #main-next { right: 0; }
+  #main-prev {
+    left: 0;
+  }
+  #main-next {
+    right: 0;
+  }
 }

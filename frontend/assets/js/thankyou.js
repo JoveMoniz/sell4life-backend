@@ -4,6 +4,35 @@
 // =======================================================
 
 // =======================================================
+// IMMEDIATE CART CLEAR
+// Runs synchronously before cart.js loads, so cart.js
+// reads an empty cart from localStorage from the start.
+// =======================================================
+
+(function () {
+  if (!new URLSearchParams(location.search).get('payment_intent')) return;
+
+  try {
+    const planRaw = localStorage.getItem('checkout_cleanup_plan');
+    const plan = planRaw ? JSON.parse(planRaw) : null;
+
+    if (plan && plan.buyNow) {
+      const backup = localStorage.getItem('cart_backup');
+      if (backup) localStorage.setItem('cart', backup);
+      else localStorage.removeItem('cart');
+      localStorage.removeItem('cart_backup');
+      localStorage.removeItem('buyNow');
+    } else {
+      localStorage.removeItem('cart');
+    }
+  } catch {
+    localStorage.removeItem('cart');
+  }
+
+  localStorage.removeItem('checkout_cleanup_plan');
+})();
+
+// =======================================================
 // BACK-FORWARD CACHE PROTECTION
 // =======================================================
 
@@ -115,48 +144,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function cleanupCart(order) {
     if (!order || order.paymentStatus !== 'paid') return;
-
-    console.log('🧹 Cleaning cart');
-
-    const planRaw = localStorage.getItem('checkout_cleanup_plan');
-
-    if (!planRaw) {
-      console.warn('No cleanup plan → force clear');
-
-      localStorage.removeItem('cart');
-      localStorage.setItem('checkout_completed', 'true');
-      document.dispatchEvent(new Event('cartUpdated'));
-      return;
-    }
-
-    let plan;
-
-    try {
-      plan = JSON.parse(planRaw);
-    } catch {
-      localStorage.removeItem('checkout_cleanup_plan');
-      localStorage.removeItem('cart');
-      return;
-    }
-
-    if (plan.buyNow) {
-      const backup = localStorage.getItem('cart_backup');
-
-      if (backup) {
-        localStorage.setItem('cart', backup);
-        localStorage.removeItem('cart_backup');
-      } else {
-        localStorage.removeItem('cart');
-      }
-
-      localStorage.removeItem('buyNow');
-    } else {
-      localStorage.removeItem('cart');
-    }
-
-    localStorage.removeItem('checkout_cleanup_plan');
+    // Cart was already cleared synchronously at page load.
+    // Just mark complete and update the badge.
     localStorage.setItem('checkout_completed', 'true');
-
     document.dispatchEvent(new Event('cartUpdated'));
   }
 

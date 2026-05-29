@@ -11,6 +11,9 @@ const noLayoutPages = [
   '/account/orders-details.html',
   '/account/signin.html',
   '/account/register.html',
+  '/account/forgot-password.html',
+  '/account/reset-password.html',
+  '/account/verify-email.html',
 ];
 
 const shouldInjectLayout = !noLayoutPages.some((route) => path.includes(route));
@@ -120,6 +123,10 @@ async function loadLayout() {
 
   await loadVendorSidebar();
 
+  // Reveal page now that header/sidebar are in the DOM
+  document.getElementById('s4l-fouc')?.remove();
+  document.body.classList.remove('s4l-loading');
+
   document.dispatchEvent(new Event('layoutReady'));
 }
 
@@ -142,6 +149,17 @@ document.addEventListener('click', (e) => {
   if (searchBox && !clickedInsideSearch) {
     searchBox.classList.remove('show');
   }
+
+  // Close mobile nav drawer on outside click
+  const navDrawer = document.getElementById('mobile-nav-drawer');
+  const hamburger = document.getElementById('mobile-hamburger');
+  if (navDrawer && hamburger && navDrawer.classList.contains('open')) {
+    if (!e.target.closest('.mobile-search-row, .mobile-nav-drawer')) {
+      navDrawer.classList.remove('open');
+      hamburger.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    }
+  }
 });
 
 // =====================================================
@@ -162,6 +180,22 @@ async function loadVendorSidebar() {
 
   // Inject mobile bar immediately (before async fetch) so it appears instantly
   injectMobileBar();
+
+  // Vendor pages don't load footer.html so toast + confirmModal would be missing
+  if (!document.getElementById('toast')) {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="toast" class="toast"></div>' +
+      '<div id="confirmModal" class="confirm-modal">' +
+        '<div class="confirm-box">' +
+          '<p id="confirmText">Are you sure?</p>' +
+          '<div class="confirm-actions">' +
+            '<button id="confirmYes" class="btn-danger">Confirm</button>' +
+            '<button id="confirmNo" class="btn-cancel">Cancel</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
 
   try {
     const res = await fetch('/account/vendor/vendor-sidebar.html', {
@@ -456,7 +490,29 @@ document.addEventListener('headerLoaded', () => {
   setupAccount('accountBtnDesktop', 'accountDropdownDesktop');
   setupAccount('accountBtnMobile', 'accountDropdownMobile');
 
+  // Mobile hamburger nav drawer
+  const hamburger = document.getElementById('mobile-hamburger');
+  const navDrawer = document.getElementById('mobile-nav-drawer');
+  if (hamburger && navDrawer) {
+    hamburger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = navDrawer.classList.contains('open');
+      navDrawer.classList.toggle('open');
+      hamburger.classList.toggle('open');
+      hamburger.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    navDrawer.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        navDrawer.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
   applyBuyerBadge();
+  initEmailVerificationBanner();
 });
 
 // =====================================================
@@ -464,6 +520,16 @@ document.addEventListener('headerLoaded', () => {
 // =====================================================
 
 (async function loadScripts() {
+  // Wait for full DOM parse before checking window.__pageScripts.
+  // Dynamic scripts are async (not deferred) so this guard is required.
+  await new Promise((resolve) => {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', resolve, { once: true });
+    } else {
+      resolve();
+    }
+  });
+
   let version;
 
   try {
@@ -471,35 +537,263 @@ document.addEventListener('headerLoaded', () => {
     const data = await res.json();
     version = data.version;
   } catch {
-    version = Date.now();
+    version = 'dev';
+  }
+
+  function loadScript(path) {
+    const clean = path.split('?')[0];
+    const s = document.createElement('script');
+    s.src = `${clean}?v=${version}&t=${Date.now()}`;
+    s.defer = true;
+    document.body.appendChild(s);
   }
 
   if (!window.__coreLoaded) {
     window.__coreLoaded = true;
-
-    ['/assets/js/cart.js', '/assets/js/search.js'].forEach((path) => {
-      const s = document.createElement('script');
-      s.src = `${path}?v=${version}`;
-      s.defer = true;
-      document.body.appendChild(s);
-    });
+    const _p = location.pathname;
+    const _isBackoffice = _p.includes('/account/admin/') || _p.includes('/account/vendor/');
+    // Buyer-facing scripts and cookie banner — skip on admin and vendor pages
+    if (!_isBackoffice) {
+      initCookieBanner();
+      loadScript('/assets/js/quick-add.js');
+      loadScript('/assets/js/cart.js');
+      loadScript('/assets/js/search.js');
+      loadScript('/assets/js/sticky-bar.js');
+    }
   }
 
   if (window.__pageScripts && Array.isArray(window.__pageScripts)) {
-    window.__pageScripts.forEach((path) => {
-      const s = document.createElement('script');
-      s.src = `${path}?v=${version}`;
-      s.defer = true;
-      document.body.appendChild(s);
-    });
+    window.__pageScripts.forEach(loadScript);
   }
 })();
+
+// =====================================================
+// EMAIL VERIFICATION BANNER
+// =====================================================
+
+function initEmailVerificationBanner() {
+  const token = localStorage.getItem('s4l_token');
+  if (!token) return;
+
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem('s4l_user') || 'null'); } catch {}
+  if (!user) return;
+  if (user.emailVerified !== false) return;
+  if (localStorage.getItem('s4l_verify_dismissed') === '1') return;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .s4l-verify-bar {
+      background: #fef3cd;
+      border-bottom: 1px solid #f0c040;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 9px 16px;
+      font-family: inherit;
+      font-size: 13px;
+      color: #5a4000;
+      flex-wrap: wrap;
+      text-align: center;
+    }
+    .s4l-verify-send {
+      background: #f28c28 !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: 5px !important;
+      padding: 5px 14px !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+      width: auto !important;
+      margin: 0 !important;
+      white-space: nowrap !important;
+    }
+    .s4l-verify-dismiss {
+      background: none !important;
+      border: none !important;
+      color: #5a4000 !important;
+      cursor: pointer !important;
+      font-size: 16px !important;
+      line-height: 1 !important;
+      padding: 0 4px !important;
+      width: auto !important;
+      margin: 0 !important;
+      opacity: 0.6;
+    }
+    .s4l-verify-dismiss:hover { opacity: 1; }
+  `;
+  document.head.appendChild(style);
+
+  const bar = document.createElement('div');
+  bar.className = 's4l-verify-bar';
+  bar.innerHTML = `
+    <span>Please verify your email address to keep your account secure.</span>
+    <button class="s4l-verify-send" id="verifyResendBtn">Send verification email</button>
+    <button class="s4l-verify-dismiss" id="verifyDismissBtn" title="Dismiss">×</button>`;
+  document.body.insertBefore(bar, document.body.firstChild);
+
+  document.getElementById('verifyDismissBtn').addEventListener('click', () => {
+    localStorage.setItem('s4l_verify_dismissed', '1');
+    bar.remove();
+  });
+
+  const resendBtn = document.getElementById('verifyResendBtn');
+  resendBtn.addEventListener('click', async () => {
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Sending…';
+    try {
+      const r = await fetch(`${window.API_BASE}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      if (d.ok && d.msg === 'already_verified') {
+        bar.remove();
+      } else if (d.ok) {
+        resendBtn.textContent = 'Email sent!';
+        resendBtn.style.setProperty('background', '#1a7f37', 'important');
+        setTimeout(() => bar.remove(), 3000);
+      } else {
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Try again';
+      }
+    } catch {
+      resendBtn.disabled = false;
+      resendBtn.textContent = 'Try again';
+    }
+  });
+}
+
+// =====================================================
+// COOKIE CONSENT BANNER
+// =====================================================
+
+function initCookieBanner() {
+  if (localStorage.getItem('s4l_cookies') === 'accepted') return;
+  // No cookie consent prompt needed on internal vendor/admin pages
+  const _cp = location.pathname;
+  if (_cp.includes('/account/vendor/') || _cp.includes('/account/admin/')) return;
+
+  const style = document.createElement('style');
+  style.id = 's4l-cookie-styles';
+  style.textContent = `
+    .s4l-cookie-banner {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 9999;
+      background: #0b6b6a;
+      border-top: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 20px;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+      transform: translateY(100%);
+      transition: transform 0.35s ease;
+    }
+    .s4l-cookie-banner.s4l-cookie-visible {
+      transform: translateY(0);
+    }
+    .s4l-cookie-text {
+      margin: 0;
+      font-size: 13px;
+      flex: 1;
+      min-width: 180px;
+      line-height: 1.4;
+      color: #fff;
+      font-family: inherit;
+    }
+    .s4l-cookie-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .s4l-cookie-btn {
+      background: #f28c28 !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: 6px !important;
+      padding: 7px 18px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+      width: auto !important;
+      margin: 0 !important;
+      line-height: 1.4 !important;
+      display: inline-block !important;
+    }
+    .s4l-cookie-link {
+      color: rgba(255,255,255,0.8) !important;
+      font-size: 12px;
+      text-decoration: underline;
+      white-space: nowrap;
+    }
+    @media (max-width: 600px) {
+      .s4l-cookie-banner {
+        padding: 8px 14px;
+        gap: 8px;
+      }
+      .s4l-cookie-text {
+        font-size: 11px;
+        min-width: 0;
+        line-height: 1.3;
+      }
+      .s4l-cookie-btn {
+        padding: 6px 14px !important;
+        font-size: 12px !important;
+      }
+      .s4l-cookie-link {
+        font-size: 11px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+
+  const banner = document.createElement('div');
+  banner.className = 's4l-cookie-banner';
+  banner.innerHTML = `
+    <p class="s4l-cookie-text">We use cookies to keep you signed in and process payments securely. No advertising or tracking.</p>
+    <div class="s4l-cookie-actions">
+      <button id="cookieAccept" class="s4l-cookie-btn">Accept</button>
+      <a href="/legal/privacy.html" class="s4l-cookie-link">Privacy Policy</a>
+    </div>`;
+  document.body.appendChild(banner);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => banner.classList.add('s4l-cookie-visible')));
+
+  document.getElementById('cookieAccept').addEventListener('click', () => {
+    localStorage.setItem('s4l_cookies', 'accepted');
+    banner.classList.remove('s4l-cookie-visible');
+    setTimeout(() => banner.remove(), 400);
+  });
+}
 
 // =====================================================
 // START
 // =====================================================
 
-loadLayout();
+loadLayout().catch(() => {
+  document.getElementById('s4l-fouc')?.remove();
+  document.body.classList.remove('s4l-loading');
+});
+
+// Safety: if layout not needed (noLayout pages), still reveal body
+if (!shouldInjectLayout) {
+  document.getElementById('s4l-fouc')?.remove();
+  document.body.classList.remove('s4l-loading');
+}
+
+// Hard timeout: never leave the body hidden more than 3 s
+setTimeout(() => {
+  document.getElementById('s4l-fouc')?.remove();
+  document.body.classList.remove('s4l-loading');
+}, 3000);
 
 // =====================================================
 // GLOBAL CART CLEANUP (POST PAYMENT)

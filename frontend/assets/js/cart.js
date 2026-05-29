@@ -109,18 +109,29 @@ const toast = (msg) => window.showToast && window.showToast(msg);
 
     let total = 0;
 
-    cart.forEach((item) => {
+    cart.forEach((item, i) => {
       const price = Number(item.price);
       const qty = Number(item.quantity);
       const sub = price * qty;
       total += sub;
 
+      const variantLabel = item.variant?.attributes
+        ? Object.entries(item.variant.attributes).map(([k, v]) => `${k}: ${v}`).join(' / ')
+        : '';
+      const addOnLabel = item.addOns?.length
+        ? item.addOns.map((ao) => ao.name).join(', ')
+        : '';
+
       const li = document.createElement('li');
       li.innerHTML = `
                 <div class="mini-cart-item">
-                    <img src="${item.image || '/assets/images/products/sell4life-placeholder.png'}" class="mini-cart-thumb">
+                    <div class="mini-cart-thumb-col">
+                        <img src="${item.image || '/assets/images/products/sell4life-placeholder.png'}" class="mini-cart-thumb">
+                        <button class="mini-cart-remove" data-index="${i}" title="Remove item">&times;</button>
+                    </div>
                     <div class="mini-cart-info">
-                        <div class="mini-cart-name">${item.name}</div>
+                        <div class="mini-cart-name">${item.name}${variantLabel ? `<span class="mini-cart-variant"> — ${variantLabel}</span>` : ''}</div>
+                        ${addOnLabel ? `<div class="mini-cart-variant">+ ${addOnLabel}</div>` : ''}
                         <div class="mini-cart-meta">£${price.toFixed(2)} × ${qty}</div>
                     </div>
                     <div class="mini-cart-sub">£${sub.toFixed(2)}</div>
@@ -131,8 +142,13 @@ const toast = (msg) => window.showToast && window.showToast(msg);
 
     miniCartTotal.innerHTML = `
             <div class="mini-cart-total-line">
-                <span class="mini-cart-total-label">Total:</span>
-                <span class="mini-cart-total-value">£${total.toFixed(2)}</span>
+                <div class="mini-cart-total-left">
+                    ${cart.length > 1 ? '<button class="mini-cart-clear-all">CLR</button>' : ''}
+                </div>
+                <div class="mini-cart-total-right">
+                    <span class="mini-cart-total-label">Total:</span>
+                    <span class="mini-cart-total-value">£${total.toFixed(2)}</span>
+                </div>
             </div>
         `;
   }
@@ -193,21 +209,26 @@ const toast = (msg) => window.showToast && window.showToast(msg);
       const row = document.createElement('div');
       row.classList.add('cart-row');
 
+      const cartVariantLabel = item.variant?.attributes
+        ? Object.entries(item.variant.attributes).map(([k, v]) => `${k}: ${v}`).join(' / ')
+        : '';
+      const cartAddOnLabel = item.addOns?.length
+        ? item.addOns.map((ao) => `${ao.name} (+£${Number(ao.price).toFixed(2)})`).join(', ')
+        : '';
+
       row.innerHTML = `
   <div class="col-product cart-product-info">
       <img class="cart-thumb" src="${item.image || '/assets/images/products/sell4life-placeholder.png'}">
-      <a class="cart-product-link"
-         href="/product/product.html?id=${item.id || item.productId}">
-         ${item.name}
-      </a>
-
-      ${
-        stockText
-          ? `<div class="stock-warning ${stockClass}">
-               ${stockText}
-             </div>`
-          : ''
-      }
+      <div class="cart-product-text">
+        <a class="cart-product-link"
+           href="/product/product.html?id=${item.id || item.productId}"
+           title="${item.name}">
+          <span>${item.name}</span>
+        </a>
+        ${cartVariantLabel ? `<div class="cart-variant-label">${cartVariantLabel}</div>` : ''}
+        ${cartAddOnLabel ? `<div class="cart-variant-label">+ ${cartAddOnLabel}</div>` : ''}
+        ${stockText ? `<div class="stock-warning ${stockClass}">${stockText}</div>` : ''}
+      </div>
   </div>
 
   <div class="col-qty qty-control">
@@ -230,6 +251,16 @@ const toast = (msg) => window.showToast && window.showToast(msg);
     });
 
     totalSpan.textContent = `£${total.toFixed(2)}`;
+
+    // Mark names that actually overflow — only those get the scroll animation
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.cart-product-link').forEach((link) => {
+        const span = link.querySelector('span');
+        if (span && span.scrollWidth > link.offsetWidth + 2) {
+          span.classList.add('scrollable');
+        }
+      });
+    });
   }
 
   // ---------------------------------------------------------
@@ -434,6 +465,76 @@ const toast = (msg) => window.showToast && window.showToast(msg);
 
     if (e.target.classList.contains('cancel-clear')) {
       document.querySelector('.clear-cart-modal')?.classList.remove('show');
+    }
+  });
+
+  // =====================================================================
+  // 10b. MINI CART — REMOVE ITEM + CLEAR ALL
+  // =====================================================================
+  document.addEventListener('click', (e) => {
+    // ── Single item remove ──────────────────────────────────────
+    if (e.target.classList.contains('mini-cart-remove')) {
+      const i   = +e.target.dataset.index;
+      const li  = e.target.closest('li');
+
+      if (!li) { cart.splice(i, 1); saveCart(); refreshAll(); return; }
+
+      // Lock current height so it can collapse
+      li.style.maxHeight  = li.offsetHeight + 'px';
+      li.style.overflow   = 'hidden';
+
+      requestAnimationFrame(() => {
+        li.style.transition = 'opacity 0.22s ease, transform 0.22s ease, max-height 0.35s ease 0.15s, padding 0.35s ease 0.15s';
+        li.style.opacity    = '0';
+        li.style.transform  = 'translateX(-24px)';
+
+        // After fade, collapse height
+        setTimeout(() => {
+          li.style.maxHeight  = '0';
+          li.style.paddingTop = '0';
+          li.style.paddingBottom = '0';
+        }, 160);
+      });
+
+      setTimeout(() => {
+        cart.splice(i, 1);
+        saveCart();
+        refreshAll();
+      }, 500);
+      return;
+    }
+
+    // ── Clear all — staggered cascade ───────────────────────────
+    if (e.target.classList.contains('mini-cart-clear-all')) {
+      const items = [...document.querySelectorAll('.mini-cart-items li')];
+
+      items.forEach((li, idx) => {
+        const delay = idx * 70; // 70 ms stagger per item
+
+        li.style.maxHeight = li.offsetHeight + 'px';
+        li.style.overflow  = 'hidden';
+
+        setTimeout(() => {
+          li.style.transition = 'opacity 0.2s ease, transform 0.2s ease, max-height 0.3s ease 0.15s';
+          li.style.opacity    = '0';
+          li.style.transform  = 'translateX(-24px)';
+
+          setTimeout(() => {
+            li.style.maxHeight     = '0';
+            li.style.paddingTop    = '0';
+            li.style.paddingBottom = '0';
+          }, 160);
+        }, delay);
+      });
+
+      // Wait for last item to finish before clearing
+      const totalDelay = items.length * 70 + 500;
+      setTimeout(() => {
+        cart = [];
+        saveCart();
+        refreshAll();
+      }, totalDelay);
+      return;
     }
   });
 

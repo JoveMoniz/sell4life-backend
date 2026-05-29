@@ -1,0 +1,29 @@
+[
+  {
+    "id": "welcome",
+    "headline": "Welcome to Sell4Life",
+    "subtext": "Thousands of products from independent UK sellers — all in one place.",
+    "cta": "Shop Now",
+    "href": "/shop/",
+    "image": "",
+    "bg": "#0b6b6a"
+  },
+  {
+    "id": "sell",
+    "headline": "Start Selling Today",
+    "subtext": "Open your store for free. Reach buyers across the UK with zero upfront cost.",
+    "cta": "Become a Seller",
+    "href": "/account/vendor/register.html",
+    "image": "",
+    "bg": "#094f4e"
+  },
+  {
+    "id": "electronics",
+    "headline": "Shop Electronics",
+    "subtext": "The latest tech, gadgets, and accessories from trusted independent sellers.",
+    "cta": "Browse Electronics",
+    "href": "/shop/?category=electronics",
+    "image": "",
+    "bg": "#0d3d3c"
+  }
+]

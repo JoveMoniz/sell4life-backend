@@ -20,7 +20,10 @@ function setMsg(id, text, type) {
 
 function clearMsg(id) {
   const el = document.getElementById(id);
-  if (el) { el.textContent = ''; el.className = 'acct-msg'; }
+  if (el) {
+    el.textContent = '';
+    el.className = 'acct-msg';
+  }
 }
 
 async function loadProfile() {
@@ -39,7 +42,10 @@ async function loadProfile() {
 document.getElementById('save-name').addEventListener('click', async () => {
   const btn = document.getElementById('save-name');
   const name = document.getElementById('acct-name').value.trim();
-  if (!name) { setMsg('msg-name', 'Name cannot be empty.', 'error'); return; }
+  if (!name) {
+    setMsg('msg-name', 'Name cannot be empty.', 'error');
+    return;
+  }
 
   btn.disabled = true;
   clearMsg('msg-name');
@@ -67,8 +73,14 @@ document.getElementById('save-email').addEventListener('click', async () => {
   const btn = document.getElementById('save-email');
   const email = document.getElementById('acct-email').value.trim();
   const currentPassword = document.getElementById('acct-email-pass').value;
-  if (!email) { setMsg('msg-email', 'Enter new email.', 'error'); return; }
-  if (!currentPassword) { setMsg('msg-email', 'Current password required.', 'error'); return; }
+  if (!email) {
+    setMsg('msg-email', 'Enter new email.', 'error');
+    return;
+  }
+  if (!currentPassword) {
+    setMsg('msg-email', 'Current password required.', 'error');
+    return;
+  }
 
   btn.disabled = true;
   clearMsg('msg-email');
@@ -98,9 +110,18 @@ document.getElementById('save-password').addEventListener('click', async () => {
   const btn = document.getElementById('save-password');
   const currentPassword = document.getElementById('acct-cur-pass').value;
   const newPassword = document.getElementById('acct-new-pass').value;
-  if (!currentPassword) { setMsg('msg-password', 'Enter current password.', 'error'); return; }
-  if (!newPassword) { setMsg('msg-password', 'Enter new password.', 'error'); return; }
-  if (newPassword.length < 8) { setMsg('msg-password', 'Min 8 characters.', 'error'); return; }
+  if (!currentPassword) {
+    setMsg('msg-password', 'Enter current password.', 'error');
+    return;
+  }
+  if (!newPassword) {
+    setMsg('msg-password', 'Enter new password.', 'error');
+    return;
+  }
+  if (newPassword.length < 8) {
+    setMsg('msg-password', 'Min 8 characters.', 'error');
+    return;
+  }
 
   btn.disabled = true;
   clearMsg('msg-password');

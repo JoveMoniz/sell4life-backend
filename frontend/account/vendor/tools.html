@@ -1,0 +1,116 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>Vendor Tools | Sell4Life</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style id="s4l-fouc">html{visibility:hidden}</style>
+  </head>
+  <body class="s4l-loading">
+    <div class="vendor-layout">
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/account/vendor/dashboard.html" class="vendor-back-link">← Back to Dashboard</a>
+          <h1 class="vendor-title">Vendor Tools</h1>
+
+          <!-- ── Image Converter ── -->
+          <section class="vp-section" style="margin-bottom:40px">
+            <h2 class="vp-section-title">Image Converter</h2>
+            <p style="color:#6b7280;font-size:0.9rem;margin-bottom:16px">Convert HEIC, PNG, or JPEG images to web-ready JPG or WebP. Drag &amp; drop multiple files at once.</p>
+
+            <div id="tool-drop-zone" class="tool-drop-zone">
+              <input type="file" id="tool-file-input" accept="image/*,.heic,.heif" multiple style="display:none" />
+              <span class="tool-drop-icon">🖼</span>
+              <span class="tool-drop-text">Drop images here or <u>click to browse</u></span>
+            </div>
+
+            <div class="tool-options">
+              <div class="tool-fmt-row">
+                <span class="tool-label">Output format:</span>
+                <button class="tool-fmt-btn active" data-fmt="image/jpeg">JPG</button>
+                <button class="tool-fmt-btn" data-fmt="image/webp">WebP</button>
+                <button class="tool-fmt-btn" data-fmt="image/png">PNG</button>
+              </div>
+              <div class="tool-quality-row" id="tool-quality-wrap">
+                <span class="tool-label">Quality:</span>
+                <input type="range" id="tool-quality" min="10" max="100" value="85" />
+                <span id="tool-quality-val">85</span>%
+              </div>
+            </div>
+
+            <button id="tool-clear-all" class="tool-clear-btn" style="display:none">Clear all</button>
+            <div id="tool-results" class="tool-results"></div>
+          </section>
+
+          <!-- ── Spreadsheet → CSV Converter ── -->
+          <section class="vp-section">
+            <h2 class="vp-section-title">Spreadsheet → CSV Converter</h2>
+            <p style="color:#6b7280;font-size:0.9rem;margin-bottom:16px">Upload an Excel or CSV file and map columns to Sell4Life product fields.</p>
+
+            <div id="csv-drop-zone" class="tool-drop-zone">
+              <input type="file" id="csv-file-input" accept=".xlsx,.xls,.csv,.ods" style="display:none" />
+              <span class="tool-drop-icon">📊</span>
+              <span class="tool-drop-text">Drop spreadsheet here or <u>click to browse</u></span>
+            </div>
+
+            <div id="csv-info-bar" class="csv-info-bar" style="display:none">
+              <span id="csv-file-name"></span>
+              <div id="csv-sheet-label" style="display:none">
+                Sheet: <select id="csv-sheet-select"></select>
+              </div>
+            </div>
+
+            <div id="csv-price-calc" class="csv-price-calc" style="display:none">
+              <h3 class="csv-section-label">Price Conversion</h3>
+              <div class="csv-calc-row">
+                <label>Currency rate:</label>
+                <select id="csv-currency">
+                  <option value="1">GBP (× 1.00)</option>
+                  <option value="0.79">USD → GBP (× 0.79)</option>
+                  <option value="0.86">EUR → GBP (× 0.86)</option>
+                  <option value="custom">Custom rate…</option>
+                </select>
+              </div>
+              <div id="csv-custom-rate-wrap" class="csv-calc-row" style="display:none">
+                <label>Custom rate:</label>
+                <input type="number" id="csv-custom-rate" min="0.001" step="0.001" placeholder="e.g. 0.79" style="width:100px" />
+              </div>
+              <div class="csv-calc-row">
+                <label>Markup %:</label>
+                <input type="number" id="csv-markup" min="0" max="999" value="0" style="width:80px" /> %
+              </div>
+              <div id="csv-calc-example" class="csv-calc-example"></div>
+            </div>
+
+            <div id="csv-mapper" class="csv-mapper" style="display:none">
+              <h3 class="csv-section-label">Map Columns</h3>
+              <div id="csv-mapper-grid" class="csv-mapper-grid"></div>
+            </div>
+
+            <div id="csv-preview" class="csv-preview" style="display:none">
+              <h3 class="csv-section-label">Preview <span id="csv-row-count"></span></h3>
+              <div class="csv-preview-scroll">
+                <table id="csv-preview-table"></table>
+              </div>
+            </div>
+
+            <div id="csv-actions" class="csv-actions" style="display:none">
+              <button id="csv-download-btn" class="vp-btn vp-btn-primary">↓ Download CSV</button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script>
+      window.__pageScripts = ['/assets/js/vendor-tools.js'];
+    </script>
+  </body>
+</html>

@@ -10,15 +10,39 @@
     <link rel="stylesheet" href="/assets/css/layout.css?v=20260206-dev" />
     <link rel="stylesheet" href="/assets/css/product.css?v=20260206-dev" />
     <link rel="stylesheet" href="/assets/css/shop.css?v=20260206-dev" />
+    <link rel="stylesheet" href="/assets/css/quick-add.css" />
+    <style id="s4l-fouc">html{visibility:hidden}</style>
   </head>
 
-  <body>
-    <h1 class="shop-title">Our Products</h1>
+  <body class="s4l-loading">
+    <h1 id="shop-title" class="shop-title">Our Products</h1>
+
+    <!-- Filter/sort controls (hidden in browse mode) -->
+    <div class="shop-controls">
+      <div id="shop-cat-pills" class="shop-cat-pills"></div>
+      <div class="shop-controls-right">
+        <div id="shop-active-filter" class="shop-active-filter">
+          Showing: <span id="shop-filter-label"></span>
+          <button type="button" id="shop-clear-filter" class="shop-clear-btn">× Clear</button>
+        </div>
+        <select id="shop-sort" class="shop-sort-sel">
+          <option value="newest">Newest</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="name-asc">Name A–Z</option>
+        </select>
+        <span id="shop-count" class="shop-count"></span>
+      </div>
+    </div>
+
+    <!-- Browse mode: horizontal rows by category -->
+    <div id="shop-browse"></div>
+
+    <!-- Grid mode: flat grid for search / filter results -->
     <div id="product-list" class="product-grid"></div>
 
     <!-- Page scripts LAST -->
     <script src="/assets/js/config-global.js"></script>
-    <script src="/assets/js/layout.js"></script>
     <script>
       window.__pageScripts = ['/assets/js/shop.js'];
     </script>

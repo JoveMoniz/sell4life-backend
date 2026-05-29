@@ -17,12 +17,12 @@ function authFetch(url, opts = {}) {
 async function loadVendors(page = 1, q = '', status = 'all') {
   const tbody = document.getElementById('vendorsTable');
 
-  currentPage  = page;
+  currentPage = page;
   currentQuery = q;
   currentStatus = status;
 
   let url = `${API}/admin/vendors?page=${page}`;
-  if (q)            url += `&q=${encodeURIComponent(q)}`;
+  if (q) url += `&q=${encodeURIComponent(q)}`;
   if (status !== 'all') url += `&status=${status}`;
 
   if (tbody) tbody.innerHTML = '<tr><td colspan="10">Loading vendors...</td></tr>';
@@ -60,13 +60,17 @@ function renderVendorsTable(vendors) {
     return;
   }
 
-  vendors.forEach(v => {
+  vendors.forEach((v) => {
     const tr = document.createElement('tr');
     tr.dataset.vendor = JSON.stringify(v);
 
     const created = v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-GB') : '—';
     const commission = ((v.grossRevenue || 0) * 0.08).toFixed(2);
-    const shortVId = '...' + String(v._id || '').slice(-6).toUpperCase();
+    const shortVId =
+      '...' +
+      String(v._id || '')
+        .slice(-6)
+        .toUpperCase();
     tr.innerHTML = `
       <td>
         ${v.storeName || 'No Name'}
@@ -93,9 +97,12 @@ function renderVendorsTable(vendors) {
 }
 
 function renderVendorActions(v) {
-  if (v.status === 'pending')   return `<button class="action-btn" data-id="${v._id}" data-action="approve">Approve</button>`;
-  if (v.status === 'approved')  return `<button class="action-btn" data-id="${v._id}" data-action="suspend">Suspend</button>`;
-  if (v.status === 'suspended') return `<button class="action-btn" data-id="${v._id}" data-action="reactivate">Reactivate</button>`;
+  if (v.status === 'pending')
+    return `<button class="action-btn" data-id="${v._id}" data-action="approve">Approve</button>`;
+  if (v.status === 'approved')
+    return `<button class="action-btn" data-id="${v._id}" data-action="suspend">Suspend</button>`;
+  if (v.status === 'suspended')
+    return `<button class="action-btn" data-id="${v._id}" data-action="reactivate">Reactivate</button>`;
   return '';
 }
 
@@ -103,14 +110,22 @@ function renderVendorActions(v) {
    INLINE VENDOR PANEL
 ========================================= */
 function buildVendorPanel(v) {
-  const shortVId  = '...' + String(v._id || '').slice(-6).toUpperCase();
-  const email     = v.userId?.email || '—';
-  const created   = v.createdAt   ? new Date(v.createdAt).toLocaleString()   : '—';
-  const approved  = v.approvedAt  ? new Date(v.approvedAt).toLocaleString()  : '—';
+  const shortVId =
+    '...' +
+    String(v._id || '')
+      .slice(-6)
+      .toUpperCase();
+  const email = v.userId?.email || '—';
+  const created = v.createdAt ? new Date(v.createdAt).toLocaleString() : '—';
+  const approved = v.approvedAt ? new Date(v.approvedAt).toLocaleString() : '—';
   const suspended = v.suspendedAt ? new Date(v.suspendedAt).toLocaleString() : null;
 
-  const verifiedBadge = v.verified  ? '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">✓ Verified</span>' : '';
-  const featuredBadge = v.featured  ? '<span style="background:#fef9c3;color:#92400e;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">Featured</span>' : '';
+  const verifiedBadge = v.verified
+    ? '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">✓ Verified</span>'
+    : '';
+  const featuredBadge = v.featured
+    ? '<span style="background:#fef9c3;color:#92400e;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">Featured</span>'
+    : '';
 
   const stripeInfo = v.stripeAccountId
     ? `<div><strong>Stripe account:</strong> <code style="font-size:0.78rem">${v.stripeAccountId}</code></div>
@@ -182,15 +197,18 @@ function buildVendorPanel(v) {
 /* =========================================
    CLICK HANDLER
 ========================================= */
-document.getElementById('vendorsTable').addEventListener('click', async e => {
+document.getElementById('vendorsTable').addEventListener('click', async (e) => {
   // Existing action buttons
   const actionBtn = e.target.closest('.action-btn');
   if (actionBtn) {
-    const id     = actionBtn.dataset.id;
+    const id = actionBtn.dataset.id;
     const action = actionBtn.dataset.action;
     try {
       const res = await authFetch(`${API}/admin/vendors/${id}/${action}`, { method: 'PATCH' });
-      if (!res.ok) { alert('Action failed'); return; }
+      if (!res.ok) {
+        alert('Action failed');
+        return;
+      }
       loadVendors(currentPage, currentQuery, currentStatus);
     } catch (err) {
       console.error(err);
@@ -202,7 +220,7 @@ document.getElementById('vendorsTable').addEventListener('click', async e => {
   const viewBtn = e.target.closest('.view-vendor-btn');
   if (!viewBtn) return;
 
-  const row    = viewBtn.closest('tr');
+  const row = viewBtn.closest('tr');
   const vendor = JSON.parse(row.dataset.vendor || '{}');
 
   let detailsRow = row.nextElementSibling;
@@ -212,7 +230,9 @@ document.getElementById('vendorsTable').addEventListener('click', async e => {
     const wrapper = detailsRow.querySelector('.inline-order-wrapper');
     if (wrapper) {
       wrapper.style.height = wrapper.scrollHeight + 'px';
-      requestAnimationFrame(() => { wrapper.style.height = '0px'; });
+      requestAnimationFrame(() => {
+        wrapper.style.height = '0px';
+      });
       setTimeout(() => detailsRow.remove(), 450);
     }
     return;
@@ -224,7 +244,9 @@ document.getElementById('vendorsTable').addEventListener('click', async e => {
     const openWrapper = openRow.querySelector('.inline-order-wrapper');
     if (openWrapper) {
       openWrapper.style.height = openWrapper.scrollHeight + 'px';
-      requestAnimationFrame(() => { openWrapper.style.height = '0px'; });
+      requestAnimationFrame(() => {
+        openWrapper.style.height = '0px';
+      });
       setTimeout(() => openRow.remove(), 450);
     }
   }
@@ -245,7 +267,9 @@ document.getElementById('vendorsTable').addEventListener('click', async e => {
   const fullHeight = wrapper.scrollHeight + 'px';
   wrapper.style.height = '0px';
   wrapper.offsetHeight;
-  requestAnimationFrame(() => { wrapper.style.height = fullHeight; });
+  requestAnimationFrame(() => {
+    wrapper.style.height = fullHeight;
+  });
 });
 
 /* =========================================
@@ -294,12 +318,12 @@ if (searchInput) {
 /* =========================================
    FILTERS
 ========================================= */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const btn = e.target.closest('.filter-btn');
   if (!btn) return;
   currentStatus = btn.dataset.status;
-  currentPage   = 1;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  currentPage = 1;
+  document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   loadVendors(currentPage, currentQuery, currentStatus);
 });
@@ -324,16 +348,22 @@ async function loadPayoutRequests() {
     }
 
     if (!payouts.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="admin-payout-empty">No pending payout requests</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="4" class="admin-payout-empty">No pending payout requests</td></tr>';
       return;
     }
 
-    tbody.innerHTML = payouts.map(p => {
-      const vendor = p.vendorId || {};
-      const storeName = vendor.storeName || '—';
-      const email = vendor.userId?.email || '—';
-      const date = new Date(p.requestedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      return `<tr data-payout-id="${p._id}">
+    tbody.innerHTML = payouts
+      .map((p) => {
+        const vendor = p.vendorId || {};
+        const storeName = vendor.storeName || '—';
+        const email = vendor.userId?.email || '—';
+        const date = new Date(p.requestedAt).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+        return `<tr data-payout-id="${p._id}">
   <td><strong>${storeName}</strong><br><small style="color:#6b7280">${email}</small></td>
   <td><strong>£${Number(p.amount).toFixed(2)}</strong></td>
   <td>${date}</td>
@@ -345,7 +375,8 @@ async function loadPayoutRequests() {
     </div>
   </td>
 </tr>`;
-    }).join('');
+      })
+      .join('');
   } catch (err) {
     console.error('Payout requests error:', err);
   }
@@ -362,10 +393,10 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
 
-  const id     = btn.dataset.id;
+  const id = btn.dataset.id;
   const action = btn.dataset.action;
-  const row    = btn.closest('tr');
-  const ref    = row?.querySelector('.payout-ref-input')?.value?.trim() || '';
+  const row = btn.closest('tr');
+  const ref = row?.querySelector('.payout-ref-input')?.value?.trim() || '';
 
   const label = action === 'paid' ? 'Mark this payout as paid?' : 'Reject this payout request?';
   if (!confirm(label)) return;
@@ -379,7 +410,11 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) { alert('Action failed'); btn.disabled = false; return; }
+    if (!res.ok) {
+      alert('Action failed');
+      btn.disabled = false;
+      return;
+    }
     loadPayoutRequests();
   } catch (err) {
     alert('Network error');
@@ -392,13 +427,31 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
 ========================================= */
 let lastVendors = [];
 
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   if (!e.target.closest('#vendors-export-csv')) return;
-  if (!lastVendors.length) { alert('No vendors loaded to export.'); return; }
+  if (!lastVendors.length) {
+    alert('No vendors loaded to export.');
+    return;
+  }
 
-  const header = ['Vendor', 'Short ID', 'Email', 'Status', 'Orders', 'Gross (£)', 'Refunds (£)', 'Commission (£)', 'Net to Vendor (£)', 'Created'];
-  const rows = lastVendors.map(v => {
-    const shortId = '...' + String(v._id || '').slice(-6).toUpperCase();
+  const header = [
+    'Vendor',
+    'Short ID',
+    'Email',
+    'Status',
+    'Orders',
+    'Gross (£)',
+    'Refunds (£)',
+    'Commission (£)',
+    'Net to Vendor (£)',
+    'Created',
+  ];
+  const rows = lastVendors.map((v) => {
+    const shortId =
+      '...' +
+      String(v._id || '')
+        .slice(-6)
+        .toUpperCase();
     const commission = ((v.grossRevenue || 0) * 0.08).toFixed(2);
     const created = v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-GB') : '';
     return [

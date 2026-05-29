@@ -47,11 +47,12 @@
 
 .checkout-section input {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   margin-top: 6px;
   border-radius: 6px;
   border: 1px solid #ccc;
-  font-size: 15px;
+  font-size: 1rem;
+  box-sizing: border-box;
 }
 
 .inline-fields {
@@ -155,15 +156,17 @@
 /* Button */
 .checkout-btn {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   background: #f18c28;
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 17px;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   margin-top: 20px;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 #checkout-total {
@@ -203,9 +206,32 @@
 @media (max-width: 768px) {
   .checkout-grid {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
 
   .checkout-right {
     position: static;
+    order: -1;
+  }
+
+  .checkout-container {
+    margin: 20px auto;
+  }
+
+  .checkout-container h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .checkout-left {
+    padding: 18px 16px;
+  }
+
+  .checkout-summary {
+    padding: 16px;
+  }
+
+  .checkout-exit {
+    margin-top: 24px;
   }
 }

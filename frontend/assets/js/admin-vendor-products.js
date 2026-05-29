@@ -20,7 +20,8 @@ function authFetch(url, opts = {}) {
   const params = new URLSearchParams(window.location.search);
   const vendorId = params.get('id');
   if (!vendorId) {
-    document.getElementById('vp-grid').innerHTML = '<div class="vp-loading">No vendor ID in URL.</div>';
+    document.getElementById('vp-grid').innerHTML =
+      '<div class="vp-loading">No vendor ID in URL.</div>';
     return;
   }
   loadProducts(vendorId);
@@ -45,8 +46,8 @@ async function loadProducts(vendorId) {
 }
 
 function filteredProducts() {
-  if (currentFilter === 'active')   return allProducts.filter(p => !p.archived);
-  if (currentFilter === 'archived') return allProducts.filter(p => p.archived);
+  if (currentFilter === 'active') return allProducts.filter((p) => !p.archived);
+  if (currentFilter === 'archived') return allProducts.filter((p) => p.archived);
   return allProducts;
 }
 
@@ -71,11 +72,12 @@ function renderInfoBar(v) {
   if (!v) return;
   const bar = document.getElementById('vp-info-bar');
   if (!bar) return;
-  const statusStyle = v.status === 'approved'
-    ? 'background:#dcfce7;color:#166534'
-    : v.status === 'suspended'
-      ? 'background:#fee2e2;color:#991b1b'
-      : 'background:#fef9c3;color:#854d0e';
+  const statusStyle =
+    v.status === 'approved'
+      ? 'background:#dcfce7;color:#166534'
+      : v.status === 'suspended'
+        ? 'background:#fee2e2;color:#991b1b'
+        : 'background:#fef9c3;color:#854d0e';
   bar.innerHTML = `
     <strong>${v.storeName}</strong>
     ${v.storeSlug ? `<span style="color:#9ca3af;font-size:11px">@${v.storeSlug}</span>` : ''}
@@ -105,18 +107,24 @@ function renderGrid(products) {
     return;
   }
 
-  grid.innerHTML = products.map(p => {
-    const img = (p.images && p.images[0])
-      ? `<img class="vp-card-img" src="${p.images[0]}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-      : '';
-    const placeholder = `<div class="vp-card-img-placeholder" ${img ? 'style="display:none"' : ''}>📦</div>`;
-    const price = p.price != null ? `£${Number(p.price).toFixed(2)}` : '—';
-    const stock = p.stock != null ? `${p.stock} in stock` : '';
-    const category = p.category || '';
-    const created = new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const archivedTag = p.archived ? '<span class="vp-archived-tag">archived</span>' : '';
+  grid.innerHTML = products
+    .map((p) => {
+      const img =
+        p.images && p.images[0]
+          ? `<img class="vp-card-img" src="${p.images[0]}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : '';
+      const placeholder = `<div class="vp-card-img-placeholder" ${img ? 'style="display:none"' : ''}>📦</div>`;
+      const price = p.price != null ? `£${Number(p.price).toFixed(2)}` : '—';
+      const stock = p.stock != null ? `${p.stock} in stock` : '';
+      const category = p.category || '';
+      const created = new Date(p.createdAt).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const archivedTag = p.archived ? '<span class="vp-archived-tag">archived</span>' : '';
 
-    return `<div class="vp-card">
+      return `<div class="vp-card">
       ${img}${placeholder}
       <div class="vp-card-body">
         <div class="vp-card-name">${p.name}${archivedTag}</div>
@@ -124,7 +132,8 @@ function renderGrid(products) {
         <div class="vp-card-meta">${[stock, category, created].filter(Boolean).join(' · ')}</div>
       </div>
     </div>`;
-  }).join('');
+    })
+    .join('');
 }
 
 function renderPagination(page, pages) {
@@ -137,7 +146,10 @@ function renderPagination(page, pages) {
   prev.textContent = '← Prev';
   prev.className = 'vp-pg-btn';
   prev.disabled = page <= 1;
-  prev.onclick = () => { renderPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  prev.onclick = () => {
+    renderPage(page - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   container.appendChild(prev);
 
   const info = document.createElement('span');
@@ -149,15 +161,18 @@ function renderPagination(page, pages) {
   next.textContent = 'Next →';
   next.className = 'vp-pg-btn';
   next.disabled = page >= pages;
-  next.onclick = () => { renderPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  next.onclick = () => {
+    renderPage(page + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   container.appendChild(next);
 }
 
 // Filter buttons
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const btn = e.target.closest('.vp-filter-btn');
   if (!btn) return;
-  document.querySelectorAll('.vp-filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.vp-filter-btn').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   currentFilter = btn.dataset.filter;
   renderPage(1);

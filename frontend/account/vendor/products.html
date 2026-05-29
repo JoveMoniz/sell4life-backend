@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -9,10 +9,11 @@
     <title>My Products | Sell4Life</title>
 
     <link rel="stylesheet" href="/assets/css/layout.css" />
-    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260523l" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style id="s4l-fouc">html{visibility:hidden}</style>
   </head>
 
-  <body>
+  <body class="s4l-loading">
     <div class="vendor-layout">
       <!-- Sidebar injected by layout.js -->
       <div id="vendor-sidebar"></div>
@@ -23,12 +24,60 @@
             ← Back to dashboard
           </a>
 
-          <h1 class="vendor-title">My Products</h1>
+          <div class="vp-page-header">
+            <h1 class="vendor-title">My Products</h1>
+            <div class="vp-header-actions">
+              <button type="button" class="btn-import-csv" id="btn-import-csv">&#8593; Import CSV</button>
+              <input type="file" accept=".csv" id="csv-file-input" class="csv-file-input-hidden" />
+              <a href="/account/vendor/add-product.html" class="btn-add-product-header">+ Add Product</a>
+            </div>
+          </div>
 
-          <div class="vendor-products-header">
-            <a href="/account/vendor/add-product.html" class="btn-add-product-header">
-              + Add Product
-            </a>
+          <div class="vp-bulk-bar" id="vp-bulk-bar" hidden>
+            <label class="vp-bulk-select-all">
+              <input type="checkbox" id="vp-select-all" />
+              <span id="vp-bulk-count">0 selected</span>
+            </label>
+            <div class="vp-bulk-actions">
+              <button type="button" class="vp-bulk-btn" id="btn-bulk-archive">Archive</button>
+              <button type="button" class="vp-bulk-btn" id="btn-bulk-unarchive" hidden>Restore</button>
+              <button type="button" class="vp-bulk-btn vp-bulk-btn-danger" id="btn-bulk-delete">Delete</button>
+            </div>
+            <button type="button" class="vp-bulk-clear" id="btn-bulk-clear" title="Clear selection">&#10005;</button>
+          </div>
+
+          <div class="vp-toolbar" id="vp-toolbar" hidden>
+            <input type="text" id="vp-search" class="vp-search" placeholder="Search products&hellip;" />
+            <div class="vp-filter-btns">
+              <button type="button" class="vp-filter-btn active" data-status="all">All</button>
+              <button type="button" class="vp-filter-btn" data-status="active">Active</button>
+              <button type="button" class="vp-filter-btn" data-status="draft">Draft</button>
+              <button type="button" class="vp-filter-btn" data-status="archived">Archived</button>
+            </div>
+            <select id="vp-sort" class="vp-sort">
+              <option value="newest">Newest</option>
+              <option value="name">Name A&ndash;Z</option>
+              <option value="price-asc">Price &uarr;</option>
+              <option value="price-desc">Price &darr;</option>
+              <option value="stock-asc">Stock &uarr;</option>
+            </select>
+            <div class="vp-view-toggle">
+              <button type="button" class="vp-view-btn active" data-view="grid" title="Grid view">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <rect x="0" y="0" width="7" height="7" rx="1"/>
+                  <rect x="9" y="0" width="7" height="7" rx="1"/>
+                  <rect x="0" y="9" width="7" height="7" rx="1"/>
+                  <rect x="9" y="9" width="7" height="7" rx="1"/>
+                </svg>
+              </button>
+              <button type="button" class="vp-view-btn" data-view="list" title="List view">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <rect x="0" y="1" width="16" height="3" rx="1"/>
+                  <rect x="0" y="7" width="16" height="3" rx="1"/>
+                  <rect x="0" y="13" width="16" height="3" rx="1"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div id="vendor-products" class="vendor-products-grid">
@@ -40,7 +89,7 @@
 
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/vendor-guard.js"></script>
-    <script src="/assets/js/layout.js?v=20260523j"></script>
+    <script src="/assets/js/layout.js?v=20260529"></script>
     <script src="/assets/js/vendor-products.js"></script>
   </body>
 </html>

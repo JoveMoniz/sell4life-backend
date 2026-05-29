@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Core pages -->
+  <url><loc>https://sell4life.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://sell4life.com/shop/</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://sell4life.com/stores/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <!-- Categories -->
+  <url><loc>https://sell4life.com/category/electronics.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sell4life.com/category/fashion.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sell4life.com/category/books.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sell4life.com/category/health-beauty.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sell4life.com/category/home-garden.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sell4life.com/category/toys.html</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+
+  <!-- Info pages -->
+  <url><loc>https://sell4life.com/about/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://sell4life.com/contact/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://sell4life.com/sell/</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://sell4life.com/help/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- Legal -->
+  <url><loc>https://sell4life.com/legal/terms.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://sell4life.com/legal/privacy.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://sell4life.com/legal/returns.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+
+</urlset>

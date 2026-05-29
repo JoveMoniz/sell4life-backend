@@ -26,14 +26,20 @@
     'pk_test_51T5d67A1Mw7MF8uC9jIxvbO2ryqXdag6Og5z6r8sAUPGsEMYM5Tn9ymJOpTBaGYvndAApYvVEig5KQjNJf2KXW2k00ZLHNXPaM';
 
   // --------------------------------------------------
-  // CSS cache-busting — re-version all stylesheets with
-  // current timestamp so browsers always fetch fresh CSS
+  // Inject layout.js with cache-busting on every load
+  // (CSS is NOT re-versioned here — doing so after the
+  //  page renders causes a flash of unstyled content)
   // --------------------------------------------------
   const _v = Date.now();
-  document.querySelectorAll('link[rel="stylesheet"]').forEach(function (link) {
-    const href = link.getAttribute('href');
-    if (href && href.startsWith('/')) {
-      link.href = href.split('?')[0] + '?v=' + _v;
-    }
-  });
+
+  const isAdminPage = location.pathname.includes('/account/admin/');
+  if (!isAdminPage) {
+    // Hide body until layout.js injects the header — prevents unstyled flash
+    document.body.classList.add('s4l-loading');
+
+    const _layout = document.createElement('script');
+    _layout.src = '/assets/js/layout.js?v=' + _v;
+    _layout.defer = true;
+    document.head.appendChild(_layout);
+  }
 })();

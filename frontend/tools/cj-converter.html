@@ -1,0 +1,48 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CJ Converter – Sell4Life</title>
+    <link rel="icon" type="image/png" href="/assets/images/hero/favicon.png" />
+    <link rel="stylesheet" href="/assets/css/style.css" />
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/quick-add.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style id="s4l-fouc">html{visibility:hidden}</style>
+  </head>
+  <body class="s4l-loading">
+    <main style="max-width:800px;margin:0 auto;padding:40px 20px">
+      <a href="/" style="color:#0b6b6a;font-size:0.9rem">← Back to Home</a>
+      <h1 style="margin:16px 0 4px">CJ Dropshipping → Sell4Life CSV</h1>
+      <p style="color:#6b7280;margin-bottom:24px">Paste your CJ product export below to convert it to a Sell4Life-compatible CSV.</p>
+
+      <div id="csv-drop-zone" class="tool-drop-zone">
+        <input type="file" id="csv-file-input" accept=".xlsx,.xls,.csv" style="display:none" />
+        <span class="tool-drop-icon">📦</span>
+        <span class="tool-drop-text">Drop CJ spreadsheet here or <u>click to browse</u></span>
+      </div>
+
+      <div id="csv-info-bar" class="csv-info-bar" style="display:none">
+        <span id="csv-file-name"></span>
+      </div>
+
+      <div id="csv-mapper" class="csv-mapper" style="display:none">
+        <h3 class="csv-section-label">Map Columns</h3>
+        <div id="csv-mapper-grid" class="csv-mapper-grid"></div>
+      </div>
+
+      <div id="csv-preview" class="csv-preview" style="display:none">
+        <h3 class="csv-section-label">Preview <span id="csv-row-count"></span></h3>
+        <div class="csv-preview-scroll">
+          <table id="csv-preview-table"></table>
+        </div>
+      </div>
+
+      <div id="csv-actions" class="csv-actions" style="display:none">
+        <button id="csv-download-btn" class="vp-btn vp-btn-primary">↓ Download Sell4Life CSV</button>
+      </div>
+    </main>
+    <script src="/assets/js/config-global.js"></script>
+  </body>
+</html>

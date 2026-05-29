@@ -1,145 +1,125 @@
 // =====================================================
-// SIGN IN (intent-based, upgraded with vendor check)
-// =====================================================
-
-console.log('user-signin.js loaded');
-
-// =====================================================
-// AUTO-REDIRECT IF ALREADY LOGGED IN (INTENT AWARE)
+// SIGN IN
 // =====================================================
 
 const existingToken = localStorage.getItem('s4l_token');
-const existingUser = localStorage.getItem('s4l_user');
+const existingUser  = localStorage.getItem('s4l_user');
 
+// ── Already logged in — redirect away ────────────────
 if (existingToken && existingUser) {
-  const intent = localStorage.getItem('s4l_intent');
+  const intent   = localStorage.getItem('s4l_intent');
+  const redirect = localStorage.getItem('postLoginRedirect');
 
-  // 🔥 ONLY go vendor flow if user intended it
   if (intent === 'sell') {
+    localStorage.removeItem('s4l_intent');
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/vendor/me`, {
-          headers: {
-            Authorization: `Bearer ${existingToken}`,
-          },
+        const res  = await fetch(`${window.API_BASE}/vendor/me`, {
+          headers: { Authorization: `Bearer ${existingToken}` },
         });
-
         const data = await res.json();
-
-        localStorage.removeItem('s4l_intent');
-
-        if (data.isVendor) {
-          window.location.href = '/account/vendor/dashboard.html';
+        if (data.isVendor && data.vendor) {
+          localStorage.setItem('s4l_isVendor', 'true');
+          localStorage.setItem('s4l_vendorStatus', data.vendor.status);
+          window.location.replace('/account/vendor/dashboard.html');
         } else {
-          window.location.href = '/account/vendor/create.html';
+          localStorage.setItem('s4l_isVendor', 'false');
+          window.location.replace('/account/vendor/create.html');
         }
       } catch {
-        const redirect = localStorage.getItem('postLoginRedirect');
         localStorage.removeItem('postLoginRedirect');
-
-        window.location.href = redirect || '/index.html';
+        window.location.replace(redirect || '/index.html');
       }
     })();
   } else {
-    // 🧠 USE SAVED REDIRECT OR DEFAULT
-    const redirect = localStorage.getItem('postLoginRedirect');
-
     localStorage.removeItem('postLoginRedirect');
-
-    window.location.href = redirect || '/index.html';
+    window.location.replace(redirect || '/index.html');
   }
 }
 
-// =====================================================
-// INITIALISE FORM
-// =====================================================
-
+// ── Form ─────────────────────────────────────────────
 const form = document.getElementById('signinForm');
-const msg = document.getElementById('msg');
+const msg  = document.getElementById('msg');
 
-if (!form || !msg) {
-  console.error('Signin DOM elements missing');
-} else {
+if (form && msg) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const email = document.getElementById('email').value.trim();
+    const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
+    const btn      = form.querySelector('button[type="submit"]');
 
-    msg.textContent = 'Checking credentials…';
-    msg.style.color = '#e5e7eb';
+    msg.textContent  = 'Checking credentials…';
+    msg.style.color  = '#e5e7eb';
+    btn.disabled     = true;
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
+      const res  = await fetch(`${window.API_BASE}/auth/login`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body:    JSON.stringify({ email, password }),
       });
 
-      const text = await res.text();
-
       let data;
-      try {
-        data = JSON.parse(text);
-        console.log('STATUS:', res.status);
-        console.log('RESPONSE:', data);
-      } catch {
+      try { data = await res.json(); }
+      catch {
         msg.textContent = 'Invalid server response';
-        msg.style.color = 'red';
+        msg.style.color = '#f87171';
+        btn.disabled = false;
         return;
       }
 
       if (!res.ok || !data.token || !data.user) {
-        msg.textContent = data.msg || 'Login failed';
-        msg.style.color = 'red';
+        msg.textContent = data.msg || data.error || 'Login failed';
+        msg.style.color = '#f87171';
+        btn.disabled = false;
         return;
       }
 
-      // STORE AUTH
+      // Store auth
       localStorage.setItem('s4l_token', data.token);
       localStorage.setItem('s4l_user', JSON.stringify(data.user));
 
-      msg.textContent = 'Login successful';
-      msg.style.color = 'lightgreen';
+      msg.textContent = 'Login successful…';
+      msg.style.color = '#86efac';
 
-      // =====================================================
-      // POST-LOGIN REDIRECT WITH VENDOR CHECK
-      // =====================================================
+      // Check vendor status and cache it so layout.js sidebar guard passes
+      try {
+        const vRes  = await fetch(`${window.API_BASE}/vendor/me`, {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        const vData = await vRes.json();
+        if (vData.isVendor && vData.vendor) {
+          localStorage.setItem('s4l_isVendor', 'true');
+          localStorage.setItem('s4l_vendorStatus', vData.vendor.status);
+        } else {
+          localStorage.setItem('s4l_isVendor', 'false');
+        }
+      } catch {
+        // Non-critical — vendor pages will re-check via vendor-guard.js
+      }
 
-      const intent = localStorage.getItem('s4l_intent');
+      // Determine redirect
+      const intent   = localStorage.getItem('s4l_intent');
+      const isVendor = localStorage.getItem('s4l_isVendor') === 'true';
       localStorage.removeItem('s4l_intent');
 
       let redirect = localStorage.getItem('postLoginRedirect');
-
-      if (intent === 'sell') {
-        try {
-          const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
-            headers: {
-              Authorization: `Bearer ${data.token}`,
-            },
-          });
-
-          const vendorData = await vendorRes.json();
-
-          if (vendorData.isVendor) {
-            redirect = '/account/vendor/dashboard.html';
-          } else {
-            redirect = '/account/vendor/create.html';
-          }
-        } catch {
-          redirect = '/index.html';
-        }
-      } else {
-        // 🧠 USE SAVED REDIRECT OR DEFAULT
-        redirect = redirect || '/index.html';
-      }
       localStorage.removeItem('postLoginRedirect');
 
+      if (intent === 'sell') {
+        redirect = isVendor ? '/account/vendor/dashboard.html' : '/account/vendor/create.html';
+      } else {
+        redirect = redirect || '/index.html';
+      }
+
       window.location.replace(redirect);
+
     } catch (err) {
       console.error('LOGIN ERROR:', err);
-      msg.textContent = 'Server error';
-      msg.style.color = 'red';
+      msg.textContent = 'Server error — please try again';
+      msg.style.color = '#f87171';
+      btn.disabled = false;
     }
   });
 }

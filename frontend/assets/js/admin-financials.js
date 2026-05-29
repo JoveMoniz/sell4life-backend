@@ -43,7 +43,8 @@ async function loadFinancials(period = 'all') {
 
     renderCards(s);
     renderVendorTable(lastVendors);
-    if (countEl) countEl.textContent = `${lastVendors.length} vendor${lastVendors.length !== 1 ? 's' : ''}`;
+    if (countEl)
+      countEl.textContent = `${lastVendors.length} vendor${lastVendors.length !== 1 ? 's' : ''}`;
   } catch (err) {
     console.error('Financials load error:', err);
     if (cardsEl) cardsEl.innerHTML = '<div class="fin-loading">Failed to load data</div>';
@@ -112,17 +113,19 @@ function renderVendorTable(vendors) {
   if (!tbody) return;
 
   if (!vendors.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="fin-loading">No vendor data for this period</td></tr>';
+    tbody.innerHTML =
+      '<tr><td colspan="8" class="fin-loading">No vendor data for this period</td></tr>';
     return;
   }
 
-  tbody.innerHTML = vendors.map(v => {
-    const statusCls = v.status === 'approved' ? 'approved'
-      : v.status === 'suspended' ? 'suspended' : 'pending';
-    const vatBadge = v.vatRegistered
-      ? '<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:8px;margin-left:4px">VAT</span>'
-      : '';
-    return `<tr>
+  tbody.innerHTML = vendors
+    .map((v) => {
+      const statusCls =
+        v.status === 'approved' ? 'approved' : v.status === 'suspended' ? 'suspended' : 'pending';
+      const vatBadge = v.vatRegistered
+        ? '<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:8px;margin-left:4px">VAT</span>'
+        : '';
+      return `<tr>
       <td>
         <strong>${v.storeName}</strong>${vatBadge}
         ${v.storeSlug ? `<div style="font-size:11px;color:#9ca3af">@${v.storeSlug}</div>` : ''}
@@ -135,16 +138,17 @@ function renderVendorTable(vendors) {
       <td class="fin-num">${fmt(v.netToVendor)}</td>
       <td class="fin-num fin-commission">${fmt(v.commission)}</td>
     </tr>`;
-  }).join('');
+    })
+    .join('');
 }
 
 /* ======================================================
    PERIOD FILTER
 ====================================================== */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const btn = e.target.closest('.fin-period-btn');
   if (!btn) return;
-  document.querySelectorAll('.fin-period-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.fin-period-btn').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   currentPeriod = btn.dataset.period;
   loadFinancials(currentPeriod);
@@ -153,22 +157,37 @@ document.addEventListener('click', e => {
 /* ======================================================
    CSV EXPORT
 ====================================================== */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   if (!e.target.closest('#btn-export-csv')) return;
-  if (!lastVendors.length) { alert('No data to export.'); return; }
+  if (!lastVendors.length) {
+    alert('No data to export.');
+    return;
+  }
 
-  const header = ['Vendor', 'Email', 'Status', 'VAT', 'Orders', 'Gross (£)', 'Refunds (£)', 'Net to Vendor (£)', 'Commission (£)'];
-  const rows = lastVendors.map(v => [
-    `"${v.storeName}"`,
-    v.email,
-    v.status,
-    v.vatRegistered ? 'Yes' : 'No',
-    v.orderCount,
-    Number(v.gross).toFixed(2),
-    Number(v.refunds).toFixed(2),
-    Number(v.netToVendor).toFixed(2),
-    Number(v.commission).toFixed(2),
-  ].join(','));
+  const header = [
+    'Vendor',
+    'Email',
+    'Status',
+    'VAT',
+    'Orders',
+    'Gross (£)',
+    'Refunds (£)',
+    'Net to Vendor (£)',
+    'Commission (£)',
+  ];
+  const rows = lastVendors.map((v) =>
+    [
+      `"${v.storeName}"`,
+      v.email,
+      v.status,
+      v.vatRegistered ? 'Yes' : 'No',
+      v.orderCount,
+      Number(v.gross).toFixed(2),
+      Number(v.refunds).toFixed(2),
+      Number(v.netToVendor).toFixed(2),
+      Number(v.commission).toFixed(2),
+    ].join(',')
+  );
 
   const csv = [header.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

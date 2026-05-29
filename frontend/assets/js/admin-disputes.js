@@ -12,12 +12,12 @@ function authFetch(url, opts = {}) {
 }
 
 const STATUS_LABELS = {
-  needs_response:  'Needs Response',
-  under_review:    'Under Review',
-  won:             'Won',
-  lost:            'Lost',
+  needs_response: 'Needs Response',
+  under_review: 'Under Review',
+  won: 'Won',
+  lost: 'Lost',
   charge_refunded: 'Charge Refunded',
-  warning_closed:  'Closed',
+  warning_closed: 'Closed',
 };
 
 (async function load() {
@@ -35,10 +35,10 @@ const STATUS_LABELS = {
       return;
     }
 
-    body.innerHTML = disputes.map(d => renderCard(d)).join('');
+    body.innerHTML = disputes.map((d) => renderCard(d)).join('');
 
     // Toggle expand
-    body.addEventListener('click', e => {
+    body.addEventListener('click', (e) => {
       const header = e.target.closest('.dp-card-header');
       if (!header) return;
       const cardBody = header.nextElementSibling;
@@ -48,7 +48,7 @@ const STATUS_LABELS = {
     });
 
     // Form submissions
-    body.addEventListener('click', async e => {
+    body.addEventListener('click', async (e) => {
       const btn = e.target.closest('.dp-btn-save, .dp-btn-submit');
       if (!btn) return;
       const card = btn.closest('.dp-card');
@@ -67,7 +67,11 @@ function renderCard(d) {
   const dueStr = d.evidenceDueBy
     ? `Due ${new Date(d.evidenceDueBy).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
     : '';
-  const createdStr = new Date(d.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const createdStr = new Date(d.createdAt).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
   const reason = (d.reason || '').replace(/_/g, ' ');
 
   const canRespond = ['needs_response', 'under_review'].includes(d.status);
@@ -86,7 +90,9 @@ function renderCard(d) {
       <div class="dp-reason">
         <strong>Dispute Reason</strong>${esc(reason) || '—'}
       </div>
-      ${canRespond ? `
+      ${
+        canRespond
+          ? `
       <div class="dp-field">
         <label>Product / Service Description</label>
         <textarea name="product_description" placeholder="Describe the product or service delivered…"></textarea>
@@ -107,7 +113,9 @@ function renderCard(d) {
         <button type="button" class="dp-btn-save">Save Draft</button>
         <button type="button" class="dp-btn-submit">Submit to Stripe</button>
         <span class="dp-msg"></span>
-      </div>` : `<p style="font-size:13px;color:#6b7280;margin:0">This dispute is <strong>${esc(statusLabel)}</strong> — no further evidence can be submitted.</p>`}
+      </div>`
+          : `<p style="font-size:13px;color:#6b7280;margin:0">This dispute is <strong>${esc(statusLabel)}</strong> — no further evidence can be submitted.</p>`
+      }
     </div>
   </div>`;
 }
@@ -115,25 +123,36 @@ function renderCard(d) {
 async function submitEvidence(card, disputeId, shouldSubmit) {
   const msgEl = card.querySelector('.dp-msg');
   const btns = card.querySelectorAll('.dp-btn-save, .dp-btn-submit');
-  btns.forEach(b => { b.disabled = true; });
-  if (msgEl) { msgEl.textContent = 'Saving…'; msgEl.className = 'dp-msg'; }
+  btns.forEach((b) => {
+    b.disabled = true;
+  });
+  if (msgEl) {
+    msgEl.textContent = 'Saving…';
+    msgEl.className = 'dp-msg';
+  }
 
   const body = {
-    product_description:    card.querySelector('[name="product_description"]')?.value || '',
+    product_description: card.querySelector('[name="product_description"]')?.value || '',
     customer_communication: card.querySelector('[name="customer_communication"]')?.value || '',
-    uncategorized_text:     card.querySelector('[name="uncategorized_text"]')?.value || '',
-    customer_name:          card.querySelector('[name="customer_name"]')?.value || '',
+    uncategorized_text: card.querySelector('[name="uncategorized_text"]')?.value || '',
+    customer_name: card.querySelector('[name="customer_name"]')?.value || '',
     submit: shouldSubmit,
   };
 
   try {
-    const res = await authFetch(`${API}/admin/vendors/disputes/${encodeURIComponent(disputeId)}/respond`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+    const res = await authFetch(
+      `${API}/admin/vendors/disputes/${encodeURIComponent(disputeId)}/respond`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    );
     const json = await res.json();
     if (!res.ok) {
-      if (msgEl) { msgEl.textContent = json.error || 'Error.'; msgEl.className = 'dp-msg error'; }
+      if (msgEl) {
+        msgEl.textContent = json.error || 'Error.';
+        msgEl.className = 'dp-msg error';
+      }
     } else {
       if (msgEl) {
         msgEl.textContent = shouldSubmit ? 'Submitted to Stripe.' : 'Draft saved.';
@@ -141,12 +160,21 @@ async function submitEvidence(card, disputeId, shouldSubmit) {
       }
     }
   } catch {
-    if (msgEl) { msgEl.textContent = 'Network error.'; msgEl.className = 'dp-msg error'; }
+    if (msgEl) {
+      msgEl.textContent = 'Network error.';
+      msgEl.className = 'dp-msg error';
+    }
   } finally {
-    btns.forEach(b => { b.disabled = false; });
+    btns.forEach((b) => {
+      b.disabled = false;
+    });
   }
 }
 
 function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

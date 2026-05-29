@@ -1,0 +1,270 @@
+/* ============================================================
+   QUICK-ADD POPUP — sell4life
+   ============================================================ */
+
+/* ── Backdrop + container ─────────────────────────────── */
+.qa-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.qa-modal.open {
+  visibility: visible;
+  opacity: 1;
+}
+
+.qa-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ── Box ─────────────────────────────────────────────── */
+.qa-box {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  width: 320px;
+  max-width: 92vw;
+  padding: 22px 20px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  transform: scale(0.93) translateY(10px);
+  transition: transform 0.22s cubic-bezier(.34,1.4,.64,1);
+}
+
+.qa-modal.open .qa-box {
+  transform: scale(1) translateY(0);
+}
+
+/* ── Close ───────────────────────────────────────────── */
+.qa-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+.qa-close:hover { color: #111; }
+
+/* ── Header ──────────────────────────────────────────── */
+.qa-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 14px;
+}
+
+.qa-img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #f9f9f9;
+}
+
+.qa-name {
+  font-weight: 600;
+  color: #111;
+  font-size: 13.5px;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.qa-price {
+  color: #ff8a2a;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+/* ── Variant buttons ─────────────────────────────────── */
+.qa-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  min-height: 4px;
+}
+
+.qa-v {
+  padding: 6px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.qa-v:hover:not(:disabled) {
+  border-color: #0b6b6a;
+  color: #0b6b6a;
+}
+
+.qa-v.qa-v-sel {
+  border-color: #0b6b6a;
+  background: #0b6b6a;
+  color: #fff;
+}
+
+.qa-v.qa-v-out {
+  opacity: 0.38;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+/* ── Confirm button ──────────────────────────────────── */
+.qa-confirm {
+  width: 100%;
+  padding: 13px;
+  background: #0b6b6a;
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.qa-confirm:hover:not(:disabled) { background: #095f5e; }
+
+.qa-confirm:disabled {
+  background: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* ── Card wrapper + footer ───────────────────────────── */
+.sp-card-wrap,
+.cp-card-wrap {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e6eeee;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.sp-card-wrap:hover,
+.cp-card-wrap:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.09);
+}
+
+/* Remove double border from inner card */
+.sp-card-wrap .sp-card,
+.cp-card-wrap .sp-card {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Price + basket row */
+.sp-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 9px;
+  gap: 6px;
+}
+
+/* Basket icon button */
+.sp-quick-add-btn,
+.cp-quick-add-btn {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #f0faf9;
+  border: 0.5px solid rgba(11, 107, 106, 0.55);
+  color: #0b6b6a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  padding: 0 0 5px 0;
+  overflow: visible;
+  position: relative;   /* anchor CLR overlay */
+  touch-action: manipulation; /* removes 300 ms tap delay on mobile */
+}
+
+.sp-quick-add-btn:hover:not(.has-qty),
+.cp-quick-add-btn:hover:not(.has-qty) {
+  border-color: #0b6b6a;
+  background: #e0f5f5;
+}
+
+/* ── CLR overlay (shows on hover when item is in cart) ── */
+.sp-qa-clr,
+.cp-qa-clr {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #c0392b;
+  border-radius: 50%;
+  background: rgba(254, 242, 242, 0.96);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* CLR overlay only on real mouse/trackpad — never on touch, stylus, or just after clicking */
+@media (hover: hover) and (pointer: fine) {
+  .sp-quick-add-btn.has-qty:not(.just-added):hover .sp-qa-clr,
+  .cp-quick-add-btn.has-qty:not(.just-added):hover .cp-qa-clr {
+    display: flex;
+  }
+
+  /* Hide SVG while CLR is showing */
+  .sp-quick-add-btn.has-qty:not(.just-added):hover svg,
+  .cp-quick-add-btn.has-qty:not(.just-added):hover svg {
+    visibility: hidden;
+  }
+}
+
+/* ── Clear cart button (inside popup) ───────────────────── */
+.qa-clear-cart {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  background: none;
+  border: none;
+  color: #bbb;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.qa-clear-cart:hover { color: #c0392b; }
+
+/* ── In-cart state: solid teal bag body, no other changes ─ */
+.sp-quick-add-btn.has-qty,
+.cp-quick-add-btn.has-qty {
+  border: 0.5px solid #0b6b6a;
+}
+/* SVG path fill handled entirely via JS inline styles */

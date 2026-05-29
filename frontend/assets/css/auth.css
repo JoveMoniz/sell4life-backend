@@ -185,6 +185,26 @@ button:active {
   text-decoration: underline;
 }
 
+/* Forgot password link */
+.forgot-link {
+  display: block;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+.forgot-link:hover { color: #fff; text-decoration: underline; }
+
+/* Auth hint text (above form) */
+.auth-hint {
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0 0 20px;
+}
+
 /* =====================================================
    MOBILE TWEAKS
 ===================================================== */

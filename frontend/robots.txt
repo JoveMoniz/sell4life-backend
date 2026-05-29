@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Disallow: /account/
+Disallow: /cart/
+Disallow: /thankyou/
+
+Sitemap: https://sell4life.com/sitemap.xml

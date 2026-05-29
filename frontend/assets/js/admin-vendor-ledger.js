@@ -4,9 +4,9 @@
 
 const API = window.API_BASE;
 let currentPeriod = 'all';
-let currentType   = 'all';
-let lastData      = null;
-let vendorId      = null;
+let currentType = 'all';
+let lastData = null;
+let vendorId = null;
 
 function authFetch(url, opts = {}) {
   const token = localStorage.getItem('s4l_token');
@@ -37,11 +37,11 @@ function fmt(n) {
    LOAD
 ====================================================== */
 async function loadLedger() {
-  const tbody   = document.getElementById('vl-table-body');
+  const tbody = document.getElementById('vl-table-body');
   const cardsEl = document.getElementById('vl-cards');
 
   if (cardsEl) cardsEl.innerHTML = '<div class="vl-loading">Loading…</div>';
-  if (tbody)   tbody.innerHTML   = '<tr><td colspan="8" class="vl-loading">Loading…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="vl-loading">Loading…</td></tr>';
 
   let url = `${API}/admin/vendors/${vendorId}/transactions?type=${currentType}`;
   if (currentPeriod !== 'all') url += `&period=${currentPeriod}`;
@@ -60,7 +60,8 @@ async function loadLedger() {
     renderCount(data.showing, data.totalOrders, data.truncated);
   } catch (err) {
     console.error('Ledger load error:', err);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="vl-loading">Failed to load data.</td></tr>';
+    if (tbody)
+      tbody.innerHTML = '<tr><td colspan="8" class="vl-loading">Failed to load data.</td></tr>';
   }
 }
 
@@ -72,9 +73,12 @@ function renderInfoBar(v) {
   const bar = document.getElementById('vl-info-bar');
   if (!bar) return;
 
-  const statusCls = v.status === 'approved' ? 'color:#166534;background:#dcfce7'
-    : v.status === 'suspended' ? 'color:#991b1b;background:#fee2e2'
-    : 'color:#854d0e;background:#fef9c3';
+  const statusCls =
+    v.status === 'approved'
+      ? 'color:#166534;background:#dcfce7'
+      : v.status === 'suspended'
+        ? 'color:#991b1b;background:#fee2e2'
+        : 'color:#854d0e;background:#fef9c3';
 
   bar.innerHTML = `
     <strong>${v.storeName}</strong>
@@ -96,13 +100,14 @@ function renderCards(s, v) {
   const el = document.getElementById('vl-cards');
   if (!el || !s) return;
 
-  const vatCard = (v && v.vatRegistered && s.totalVat)
-    ? `<div class="vl-card">
+  const vatCard =
+    v && v.vatRegistered && s.totalVat
+      ? `<div class="vl-card">
         <div class="vl-card-label">VAT Collected</div>
         <div class="vl-card-value">${fmt(s.totalVat)}</div>
         <div class="vl-card-sub">incl. in gross</div>
        </div>`
-    : '';
+      : '';
 
   el.innerHTML = `
     <div class="vl-card">
@@ -142,42 +147,58 @@ function renderTable(transactions, summary) {
   if (!tbody) return;
 
   if (!transactions || !transactions.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="vl-loading">No transactions for this period.</td></tr>';
+    tbody.innerHTML =
+      '<tr><td colspan="8" class="vl-loading">No transactions for this period.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = transactions.map(t => {
-    const date = new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const badgeType = t.type === 'sale' ? 'sale'
-      : t.type === 'cancelled' ? 'cancelled'
-      : t.type === 'returned'  ? 'returned'
-      : t.type === 'return_pending' ? 'return_pending'
-      : t.type === 'chargeback' ? 'chargeback'
-      : t.type;
+  tbody.innerHTML = transactions
+    .map((t) => {
+      const date = new Date(t.date).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const badgeType =
+        t.type === 'sale'
+          ? 'sale'
+          : t.type === 'cancelled'
+            ? 'cancelled'
+            : t.type === 'returned'
+              ? 'returned'
+              : t.type === 'return_pending'
+                ? 'return_pending'
+                : t.type === 'chargeback'
+                  ? 'chargeback'
+                  : t.type;
 
-    const amountFormatted = t.pending
-      ? `<span class="vl-amount-pending">${fmt(t.amount)} (pending)</span>`
-      : t.amount >= 0
-        ? `<span class="vl-amount-pos">${fmt(t.amount)}</span>`
-        : `<span class="vl-amount-neg">${fmt(t.amount)}</span>`;
+      const amountFormatted = t.pending
+        ? `<span class="vl-amount-pending">${fmt(t.amount)} (pending)</span>`
+        : t.amount >= 0
+          ? `<span class="vl-amount-pos">${fmt(t.amount)}</span>`
+          : `<span class="vl-amount-neg">${fmt(t.amount)}</span>`;
 
-    const commission = t.type === 'sale' && t.commission != null
-      ? `<span class="vl-amount-neg">−${fmt(t.commission)}</span>`
-      : '—';
+      const commission =
+        t.type === 'sale' && t.commission != null
+          ? `<span class="vl-amount-neg">−${fmt(t.commission)}</span>`
+          : '—';
 
-    const netToVendor = t.type === 'sale' && t.commission != null
-      ? (() => {
-          const n = (t.amount || 0) - (t.commission || 0);
-          return n >= 0
-            ? `<span class="vl-amount-pos">${fmt(n)}</span>`
-            : `<span class="vl-amount-neg">${fmt(n)}</span>`;
-        })()
-      : '—';
+      const netToVendor =
+        t.type === 'sale' && t.commission != null
+          ? (() => {
+              const n = (t.amount || 0) - (t.commission || 0);
+              return n >= 0
+                ? `<span class="vl-amount-pos">${fmt(n)}</span>`
+                : `<span class="vl-amount-neg">${fmt(n)}</span>`;
+            })()
+          : '—';
 
-    const desc = t.description || '—';
-    const itemNote = t.itemName ? `<div style="font-size:10px;color:#9ca3af">${t.itemName}${t.qty ? ` ×${t.qty}` : ''}</div>` : '';
+      const desc = t.description || '—';
+      const itemNote = t.itemName
+        ? `<div style="font-size:10px;color:#9ca3af">${t.itemName}${t.qty ? ` ×${t.qty}` : ''}</div>`
+        : '';
 
-    return `<tr>
+      return `<tr>
       <td style="white-space:nowrap">${date}</td>
       <td><span class="vl-order-id">${t.displayId || '—'}</span></td>
       <td><span class="vl-buyer">${t.buyerEmail || '—'}</span></td>
@@ -187,7 +208,8 @@ function renderTable(transactions, summary) {
       <td class="vl-num">${commission}</td>
       <td class="vl-num">${netToVendor}</td>
     </tr>`;
-  }).join('');
+    })
+    .join('');
 }
 
 /* ======================================================
@@ -195,7 +217,8 @@ function renderTable(transactions, summary) {
 ====================================================== */
 function renderCount(showing, total, truncated) {
   const countEl = document.getElementById('vl-count');
-  if (countEl) countEl.textContent = `Showing ${showing} of ${total} order${total !== 1 ? 's' : ''}`;
+  if (countEl)
+    countEl.textContent = `Showing ${showing} of ${total} order${total !== 1 ? 's' : ''}`;
 
   const truncEl = document.getElementById('vl-truncated');
   if (truncEl) {
@@ -211,10 +234,12 @@ function renderCount(showing, total, truncated) {
 /* ======================================================
    PERIOD FILTER
 ====================================================== */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const btn = e.target.closest('.vl-filter-btn[data-period]');
   if (!btn) return;
-  document.querySelectorAll('.vl-filter-btn[data-period]').forEach(b => b.classList.remove('active'));
+  document
+    .querySelectorAll('.vl-filter-btn[data-period]')
+    .forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   currentPeriod = btn.dataset.period;
   loadLedger();
@@ -223,10 +248,12 @@ document.addEventListener('click', e => {
 /* ======================================================
    TYPE FILTER
 ====================================================== */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const btn = e.target.closest('.vl-filter-btn[data-type]');
   if (!btn) return;
-  document.querySelectorAll('.vl-filter-btn[data-type]').forEach(b => b.classList.remove('active'));
+  document
+    .querySelectorAll('.vl-filter-btn[data-type]')
+    .forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   currentType = btn.dataset.type;
   loadLedger();
@@ -235,7 +262,7 @@ document.addEventListener('click', e => {
 /* ======================================================
    CSV EXPORT
 ====================================================== */
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   if (!e.target.closest('#vl-export-csv')) return;
   if (!lastData || !lastData.transactions || !lastData.transactions.length) {
     alert('No data to export.');
@@ -243,12 +270,24 @@ document.addEventListener('click', e => {
   }
 
   const v = lastData.vendor || {};
-  const header = ['Date', 'Order ID', 'Buyer Email', 'Type', 'Description', 'Item', 'Qty', 'Amount (£)', 'Commission (£)', 'Net to Vendor (£)'];
-  const rows = lastData.transactions.map(t => {
+  const header = [
+    'Date',
+    'Order ID',
+    'Buyer Email',
+    'Type',
+    'Description',
+    'Item',
+    'Qty',
+    'Amount (£)',
+    'Commission (£)',
+    'Net to Vendor (£)',
+  ];
+  const rows = lastData.transactions.map((t) => {
     const date = new Date(t.date).toLocaleDateString('en-GB');
-    const net  = t.type === 'sale' && t.commission != null
-      ? Number(((t.amount || 0) - (t.commission || 0)).toFixed(2))
-      : '';
+    const net =
+      t.type === 'sale' && t.commission != null
+        ? Number(((t.amount || 0) - (t.commission || 0)).toFixed(2))
+        : '';
     return [
       date,
       t.displayId || '',

@@ -66,13 +66,34 @@
   // ======================================================
 
   function productCardHtml(p) {
+    const id = getProductId(p);
+
+    // Store for quick-add modal lookup
+    window._qaProducts = window._qaProducts || {};
+    window._qaProducts[id] = p;
+
+    const basketBtn = p.comingSoon ? '' : `
+      <button class="cp-quick-add-btn" data-id="${id}" title="Add to basket">
+        <svg width="21" height="24" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 13C7 5 17 5 17 13"/>
+          <path d="M1 12H23V23Q23 27 19 27H5Q1 27 1 23V12Z"/>
+        </svg>
+        <span class="cp-qa-clr" title="Remove from basket">CLR</span>
+      </button>`;
+
     return `
-      <div class="product-card">
-        <a href="/product/product.html?id=${encodeURIComponent(getProductId(p))}">
-          <img src="${resolveImage(p)}" alt="${p.name}">
+      <div class="cp-card-wrap product-card${p.comingSoon ? ' card-coming-soon' : ''}">
+        <a href="/product/product.html?id=${encodeURIComponent(id)}">
+          <div style="position:relative">
+            <img src="${resolveImage(p)}" alt="${p.name}">
+            ${p.comingSoon ? '<div class="sp-coming-soon-badge">🕐 Coming Soon</div>' : ''}
+          </div>
           <h3>${p.name}</h3>
-          <p class="product-price">${makePrice(p)}</p>
         </a>
+        <div class="sp-card-footer">
+          <p class="product-price" style="margin:0">${makePrice(p)}</p>
+          ${basketBtn}
+        </div>
       </div>
     `;
   }
