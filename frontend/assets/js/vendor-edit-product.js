@@ -1013,9 +1013,13 @@ function addVariantRow(data) {
     </td>
     <td class="ao-img-cell">
       <div class="ao-img-wrap">
-        <img class="ao-img-preview vr-img-preview" src="${imgSrc}" alt="" style="${imgSrc ? '' : 'display:none'}" />
+        <div class="vr-thumb-wrap${imgSrc ? ' has-img' : ''}">
+          <img class="vr-img-preview" src="${imgSrc}" alt="" />
+          <div class="vr-thumb-overlay">
+            <button type="button" class="vr-img-clear">CLR</button>
+          </div>
+        </div>
         <input type="text" class="vb-input ao-img-url vr-img-url" name="vr-image" value="${imgSrc}" placeholder="Paste image URL…" />
-        <button type="button" class="vr-img-clear" title="Clear image" style="${imgSrc ? '' : 'display:none'}">&#x2715; Clear image</button>
       </div>
     </td>
     <td><input type="number" class="vb-input vb-input-sm" name="vr-price" step="0.01" min="0" value="${data.price != null ? data.price : ''}" placeholder="0.00" /></td>
@@ -1268,14 +1272,22 @@ function bindVariants() {
     if (e.target.classList.contains('vb-remove-btn')) {
       e.target.closest('tr').remove();
     }
-    // Clear just the thumbnail image without deleting the whole variant row
+    // Clear just the thumbnail — confirm before wiping
     if (e.target.classList.contains('vr-img-clear')) {
       const td   = e.target.closest('td');
+      const wrap = td.querySelector('.vr-thumb-wrap');
       const img  = td.querySelector('.vr-img-preview');
       const url  = td.querySelector('[name="vr-image"]');
-      if (img)  { img.src = ''; img.style.display = 'none'; }
-      if (url)  { url.value = ''; }
-      e.target.style.display = 'none';
+      const doIt = async () => {
+        const ok = window.confirmAction
+          ? await window.confirmAction('Clear this variant image? The colour swatch will remain.')
+          : confirm('Clear this variant image?');
+        if (!ok) return;
+        if (img)  img.src = '';
+        if (url)  url.value = '';
+        if (wrap) wrap.classList.remove('has-img');
+      };
+      doIt();
     }
   });
   variantRows?.addEventListener('input', (e) => {
@@ -1286,9 +1298,9 @@ function bindVariants() {
       const url     = e.target.value.trim();
       const td      = e.target.closest('td');
       const preview = td.querySelector('.vr-img-preview');
-      const clrBtn  = td.querySelector('.vr-img-clear');
-      if (preview) { preview.src = url; preview.style.display = url ? '' : 'none'; }
-      if (clrBtn)  { clrBtn.style.display = url ? '' : 'none'; }
+      const wrap    = td.querySelector('.vr-thumb-wrap');
+      if (preview) preview.src = url;
+      if (wrap)    wrap.classList.toggle('has-img', !!url);
       if (url) sampleDominantColor(url, (hex) => {
         const picker = e.target.closest('tr')?.querySelector('[name="vr-color"]');
         if (picker) { picker.value = hex; picker.dataset.userSet = 'true'; }

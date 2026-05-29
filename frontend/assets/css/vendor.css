@@ -4251,22 +4251,59 @@ Vendor Products
   background: #f9fafb;
 }
 
-.vr-img-clear {
-  margin-top: 3px;
-  padding: 2px 8px;
-  font-size: 0.72rem;
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-  border-radius: 4px;
-  cursor: pointer;
+/* Variant thumbnail hover-to-clear */
+.vr-thumb-wrap {
+  display: none;
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.vr-thumb-wrap.has-img {
+  display: block;
+}
+
+.vr-thumb-wrap img {
   width: 100%;
-  text-align: center;
-  transition: background 0.12s;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vr-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.vr-thumb-wrap:hover .vr-thumb-overlay {
+  opacity: 1;
+}
+
+.vr-img-clear {
+  background: rgba(255, 255, 255, 0.92);
+  color: #b91c1c;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
 }
 
 .vr-img-clear:hover {
-  background: #fee2e2;
+  background: #fff;
 }
 
 .ao-img-url {
