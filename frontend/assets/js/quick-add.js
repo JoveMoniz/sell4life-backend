@@ -274,6 +274,28 @@ window.__quickAddLoaded = true;
   // ── Global open hook (called by card buttons) ─────────────
   window.openQuickAdd = open;
 
+  // ── Disable basket buttons for vendor's own products ───────
+  // Called after products render OR after vendorId becomes known.
+  window.s4l_markOwnListings = function () {
+    const myVid = localStorage.getItem('s4l_vendorId');
+    if (!myVid || !window._qaProducts) return;
+    document.querySelectorAll(
+      '.sp-quick-add-btn[data-id], .cp-quick-add-btn[data-id]'
+    ).forEach((btn) => {
+      const p   = window._qaProducts[btn.dataset.id];
+      if (!p) return;
+      const pvid = typeof p.vendor === 'object'
+        ? (p.vendor?._id || p.vendor?.id)
+        : p.vendor;
+      if (pvid && String(pvid) === myVid) {
+        btn.disabled = true;
+        btn.style.opacity  = '0.35';
+        btn.style.cursor   = 'not-allowed';
+        btn.title = 'Your listing';
+      }
+    });
+  };
+
   // ── Delegate clicks from card buttons ────────────────────
   document.addEventListener('click', (e) => {
 

@@ -159,6 +159,7 @@ function renderCard(p) {
   // Store for quick-add modal lookup
   window._qaProducts = window._qaProducts || {};
   window._qaProducts[id] = p;
+  window.s4l_markOwnListings?.();
 
   const compareRaw = p.comparePrice ?? p.compare_price ?? null;
   const compareEl  = compareRaw && Number(compareRaw) > Number(p.price)

@@ -71,6 +71,7 @@
     // Store for quick-add modal lookup
     window._qaProducts = window._qaProducts || {};
     window._qaProducts[id] = p;
+    window.s4l_markOwnListings?.();
 
     const basketBtn = p.comingSoon ? '' : `
       <button class="cp-quick-add-btn" data-id="${id}" title="Add to basket">

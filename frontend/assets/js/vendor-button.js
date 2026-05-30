@@ -107,7 +107,10 @@ async function initVendorButtons() {
 
       localStorage.setItem('s4l_isVendor', 'true');
       localStorage.setItem('s4l_vendorStatus', status);
-      if (vid) localStorage.setItem('s4l_vendorId', String(vid));
+      if (vid) {
+        localStorage.setItem('s4l_vendorId', String(vid));
+        window.s4l_markOwnListings?.();   // grey out own listings already on page
+      }
 
       buttons.forEach((btn) => {
         btn.dataset.isVendor = 'true';
