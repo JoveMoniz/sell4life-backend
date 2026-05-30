@@ -84,9 +84,9 @@
       font-size: 12px; font-weight: 800; color: #0b6b6a;
       line-height: 1; font-family: inherit;
     }
-    .s4l-basket-circle.s4l-has               { border-color: #0b6b6a; }
+    .s4l-basket-circle.s4l-has               { border-color: #0b6b6a; background: #0b6b6a; }
     .s4l-basket-circle.s4l-has svg           { opacity: 0; }
-    .s4l-basket-circle.s4l-has .s4l-basket-n { display: flex; }
+    .s4l-basket-circle.s4l-has .s4l-basket-n { display: flex; color: #fff; }
     /* ── Pill inner boxes (visual only) ─────────────── */
     /* vendor: square, teal */
     .s4l-pill-vendor .s4l-pill-inner {
