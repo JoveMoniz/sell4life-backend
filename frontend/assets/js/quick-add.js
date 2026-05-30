@@ -283,11 +283,13 @@ window.__quickAddLoaded = true;
     document.querySelectorAll(
       '.sp-quick-add-btn[data-id], .cp-quick-add-btn[data-id]'
     ).forEach((btn) => {
-      if (btn.dataset.marked) return;          // already processed
+      // Skip already-disabled buttons (OOS etc.) but re-check for own-vendor
+      if (btn.dataset.oos) return;
+
       const p = window._qaProducts[btn.dataset.id];
       if (!p) return;
 
-      // Own vendor listing
+      // Own vendor listing — check every time (vendorId may arrive late)
       if (myVid) {
         const pvid = typeof p.vendor === 'object'
           ? (p.vendor?._id || p.vendor?.id)
@@ -297,12 +299,11 @@ window.__quickAddLoaded = true;
           btn.style.opacity = '0.35';
           btn.style.cursor  = 'not-allowed';
           btn.title = 'Your listing';
-          btn.dataset.marked = '1';
           return;
         }
       }
 
-      // Out of stock (product-level, no variants)
+      // Out of stock (product-level, no variants) — permanent, mark to skip next time
       const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
       const stockNum    = p.stock !== undefined && p.stock !== null ? Number(p.stock) : null;
       if (!hasVariants && stockNum !== null && stockNum <= 0) {
@@ -310,10 +311,29 @@ window.__quickAddLoaded = true;
         btn.style.opacity = '0.35';
         btn.style.cursor  = 'not-allowed';
         btn.title = 'Out of stock';
-        btn.dataset.marked = '1';
+        btn.dataset.oos = '1';   // permanent — no need to re-check
       }
     });
   };
+
+  // ── Lazy-fetch vendorId for vendors whose ID wasn't cached at login ─
+  (async function ensureVendorId() {
+    const token    = localStorage.getItem('s4l_token');
+    const isVendor = localStorage.getItem('s4l_isVendor') === 'true';
+    const hasId    = localStorage.getItem('s4l_vendorId');
+    if (!token || !isVendor || hasId) return;
+    try {
+      const r = await fetch(`${window.API_BASE}/vendor/me`,
+        { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return;
+      const d   = await r.json();
+      const vid = d.vendor?._id || d.vendor?.id;
+      if (vid) {
+        localStorage.setItem('s4l_vendorId', String(vid));
+        window.s4l_markOwnListings();   // now mark own listings
+      }
+    } catch {}
+  })();
 
   // ── Delegate clicks from card buttons ────────────────────
   document.addEventListener('click', (e) => {
