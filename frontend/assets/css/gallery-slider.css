@@ -300,8 +300,10 @@
     max-width: 56px;
     z-index: 20;
     background: transparent;
-    border: none;
-    color: rgba(0, 0, 0, 0.4);
+    border-top: none;
+    border-bottom: none;
+    border: 0.6px solid rgba(11, 107, 105, 0.28);
+    color: rgba(0, 0, 0, 0.65);
     font-size: 34px;
     display: flex;
     align-items: center;
@@ -309,11 +311,11 @@
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
-    transition: color 0.2s;
+    transition: color 0.2s, background 0.2s;
   }
 
-  #main-prev { left: 0; }
-  #main-next { right: 0; }
+  #main-prev { left: 0; border-left: none; }
+  #main-next { right: 0; border-right: none; }
 
   #main-prev:active,
   #main-next:active { transform: scale(0.92); }
