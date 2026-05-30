@@ -210,7 +210,17 @@ async function loadOrderDetails() {
         <h4>Order activity</h4>
         <ul class="order-history-list">
           ${Array.isArray(order.statusHistory)
-            ? order.statusHistory.slice().reverse().map(h => `
+            ? order.statusHistory.slice()
+                .sort((a, b) => {
+                  const diff = new Date(b.date) - new Date(a.date);
+                  if (diff !== 0) return diff;
+                  // Same timestamp: cancel before refund (logical order)
+                  const rank = { Cancelled: 0, Refunded: 1, Refund: 2 };
+                  const ra = Object.keys(rank).find(k => String(a.status).includes(k));
+                  const rb = Object.keys(rank).find(k => String(b.status).includes(k));
+                  return (rank[ra] ?? 99) - (rank[rb] ?? 99);
+                })
+                .map(h => `
                 <li>
                   <span class="history-label">${formatHistoryStatus(h.status)}</span>
                   <span class="history-date">${new Date(h.date).toLocaleString()}</span>

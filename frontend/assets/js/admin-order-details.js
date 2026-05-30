@@ -251,12 +251,21 @@ function renderStatusHistory(order) {
     label.textContent = 'Order Activity';
     wrap.appendChild(label);
 
-    globalHistory.forEach(h => {
-      const row = document.createElement('div');
-      row.style.cssText = 'font-size:0.82rem;color:#374151;margin-bottom:3px';
-      row.innerHTML = `<span style="color:#9ca3af">${new Date(h.date).toLocaleString()}</span> — ${h.status}`;
-      wrap.appendChild(row);
-    });
+    globalHistory.slice()
+      .sort((a, b) => {
+        const diff = new Date(b.date) - new Date(a.date);
+        if (diff !== 0) return diff;
+        const rank = { Cancelled: 0, Refunded: 1, Refund: 2 };
+        const ra = Object.keys(rank).find(k => String(a.status).includes(k));
+        const rb = Object.keys(rank).find(k => String(b.status).includes(k));
+        return (rank[ra] ?? 99) - (rank[rb] ?? 99);
+      })
+      .forEach(h => {
+        const row = document.createElement('div');
+        row.style.cssText = 'font-size:0.82rem;color:#374151;margin-bottom:3px';
+        row.innerHTML = `<span style="color:#9ca3af">${new Date(h.date).toLocaleString()}</span> — ${h.status}`;
+        wrap.appendChild(row);
+      });
 
     historyList.appendChild(wrap);
   }
