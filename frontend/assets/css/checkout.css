@@ -108,10 +108,32 @@
   flex-direction: column;
 }
 
+.checkout-title-wrap {
+  max-width: 220px;
+  overflow: hidden;
+}
+
 .checkout-title {
   font-size: 15px;
   font-weight: 600;
   color: #094949;
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.checkout-title.scrollable {
+  animation: title-scroll 28s linear 1s infinite;
+}
+
+@keyframes title-scroll {
+  0%   { transform: translateX(0);                              opacity: 1; }
+  8%   { transform: translateX(0);                              opacity: 1; }
+  72%  { transform: translateX(min(0px, calc(-100% + 220px)));  opacity: 1; }
+  81%  { transform: translateX(min(0px, calc(-100% + 220px)));  opacity: 0; }
+  82%  { transform: translateX(0);                              opacity: 0; }
+  92%  { transform: translateX(0);                              opacity: 1; }
+  100% { transform: translateX(0);                              opacity: 1; }
 }
 
 .checkout-qty {

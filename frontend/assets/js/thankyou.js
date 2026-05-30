@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           return `
             <div class="ty-item">
               <div class="ty-item-left">
-                <span>${item.name}</span>
+                <div class="ty-name-wrap"><span>${item.name}</span></div>
                 <span class="ty-item-qty">×${qty}</span>
               </div>
               <span class="ty-item-subtotal">
@@ -242,6 +242,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderOrder(order);
     cleanupCart(order);
     showCard();
+
+    // Scroll long product names — same pattern as cart.js
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.ty-name-wrap').forEach((wrap) => {
+        const span = wrap.querySelector('span');
+        if (span && span.scrollWidth > wrap.offsetWidth + 2) {
+          span.classList.add('scrollable');
+        }
+      });
+    });
 
     console.log('✅ Thankyou complete');
   } catch (err) {

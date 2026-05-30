@@ -133,6 +133,34 @@
   display: flex;
   gap: 8px;
   align-items: baseline;
+  min-width: 0;
+  flex: 1;
+}
+
+.ty-name-wrap {
+  max-width: 260px;
+  overflow: hidden;
+  flex-shrink: 1;
+}
+
+.ty-name-wrap span {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.ty-name-wrap span.scrollable {
+  animation: ty-name-scroll 28s linear 1s infinite;
+}
+
+@keyframes ty-name-scroll {
+  0%   { transform: translateX(0);                              opacity: 1; }
+  8%   { transform: translateX(0);                              opacity: 1; }
+  72%  { transform: translateX(min(0px, calc(-100% + 260px)));  opacity: 1; }
+  81%  { transform: translateX(min(0px, calc(-100% + 260px)));  opacity: 0; }
+  82%  { transform: translateX(0);                              opacity: 0; }
+  92%  { transform: translateX(0);                              opacity: 1; }
+  100% { transform: translateX(0);                              opacity: 1; }
 }
 
 .ty-item-qty {

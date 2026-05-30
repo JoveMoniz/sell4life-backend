@@ -111,7 +111,9 @@ function renderItems() {
         />
 
         <div class="checkout-details">
-          <span class="checkout-title">${item.name}</span>
+          <div class="checkout-title-wrap">
+            <span class="checkout-title">${item.name}</span>
+          </div>
           <span class="checkout-qty">Quantity: ${qty}</span>
         </div>
 
@@ -125,6 +127,16 @@ function renderItems() {
   subtotalEl.textContent = `£${subtotal.toFixed(2)}`;
   shippingEl.textContent = '£0.00';
   totalEl.textContent = `£${subtotal.toFixed(2)}`;
+
+  // Scroll long titles — same pattern as cart.js
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.checkout-title-wrap').forEach((wrap) => {
+      const span = wrap.querySelector('.checkout-title');
+      if (span && span.scrollWidth > wrap.offsetWidth + 2) {
+        span.classList.add('scrollable');
+      }
+    });
+  });
 
   return { subtotal };
 }
