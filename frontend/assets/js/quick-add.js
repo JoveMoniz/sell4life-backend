@@ -274,24 +274,43 @@ window.__quickAddLoaded = true;
   // ── Global open hook (called by card buttons) ─────────────
   window.openQuickAdd = open;
 
-  // ── Disable basket buttons for vendor's own products ───────
+  // ── Disable basket buttons for own products + out-of-stock ─
   // Called after products render OR after vendorId becomes known.
   window.s4l_markOwnListings = function () {
     const myVid = localStorage.getItem('s4l_vendorId');
-    if (!myVid || !window._qaProducts) return;
+    if (!window._qaProducts) return;
+
     document.querySelectorAll(
       '.sp-quick-add-btn[data-id], .cp-quick-add-btn[data-id]'
     ).forEach((btn) => {
-      const p   = window._qaProducts[btn.dataset.id];
+      if (btn.dataset.marked) return;          // already processed
+      const p = window._qaProducts[btn.dataset.id];
       if (!p) return;
-      const pvid = typeof p.vendor === 'object'
-        ? (p.vendor?._id || p.vendor?.id)
-        : p.vendor;
-      if (pvid && String(pvid) === myVid) {
+
+      // Own vendor listing
+      if (myVid) {
+        const pvid = typeof p.vendor === 'object'
+          ? (p.vendor?._id || p.vendor?.id)
+          : p.vendor;
+        if (pvid && String(pvid) === myVid) {
+          btn.disabled = true;
+          btn.style.opacity = '0.35';
+          btn.style.cursor  = 'not-allowed';
+          btn.title = 'Your listing';
+          btn.dataset.marked = '1';
+          return;
+        }
+      }
+
+      // Out of stock (product-level, no variants)
+      const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+      const stockNum    = p.stock !== undefined && p.stock !== null ? Number(p.stock) : null;
+      if (!hasVariants && stockNum !== null && stockNum <= 0) {
         btn.disabled = true;
-        btn.style.opacity  = '0.35';
-        btn.style.cursor   = 'not-allowed';
-        btn.title = 'Your listing';
+        btn.style.opacity = '0.35';
+        btn.style.cursor  = 'not-allowed';
+        btn.title = 'Out of stock';
+        btn.dataset.marked = '1';
       }
     });
   };
@@ -337,12 +356,17 @@ window.__quickAddLoaded = true;
     const product = (window._qaProducts || {})[btn.dataset.id];
     if (!product) return;
 
-    // Block vendor from adding their own product
+    // Block vendor's own products
     const _myVid = localStorage.getItem('s4l_vendorId');
     const _pvid  = typeof product.vendor === 'object'
       ? (product.vendor?._id || product.vendor?.id)
       : product.vendor;
     if (_myVid && _pvid && _myVid === String(_pvid)) return;
+
+    // Block out-of-stock products (no variants)
+    const _hasVar = Array.isArray(product.variants) && product.variants.length > 0;
+    const _stock  = product.stock !== undefined && product.stock !== null ? Number(product.stock) : null;
+    if (!_hasVar && _stock !== null && _stock <= 0) return;
 
     if (product.variants && product.variants.length > 0) {
       open(product);            // open() filters blank rows; falls to directAddToCart if none real
