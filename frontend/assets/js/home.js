@@ -168,7 +168,6 @@ async function loadFeaturedProducts() {
       : '/assets/images/products/sell4life-placeholder.png';
 
     window._qaProducts[id] = p;
-    window.s4l_markOwnListings?.();
 
     const basketBtn = p.comingSoon ? '' : `
       <button class="sp-quick-add-btn" data-id="${id}" title="Add to basket">
@@ -197,6 +196,7 @@ async function loadFeaturedProducts() {
         </div>
       </div>`;
   }).join('');
+  window.s4l_markOwnListings?.();
 }
 
 // ── Init ───────────────────────────────────────────────────

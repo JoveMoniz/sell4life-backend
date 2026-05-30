@@ -159,7 +159,6 @@ function renderCard(p) {
   // Store for quick-add modal lookup
   window._qaProducts = window._qaProducts || {};
   window._qaProducts[id] = p;
-  window.s4l_markOwnListings?.();
 
   const compareRaw = p.comparePrice ?? p.compare_price ?? null;
   const compareEl  = compareRaw && Number(compareRaw) > Number(p.price)
@@ -262,6 +261,7 @@ function renderBrowseMode() {
   browse.innerHTML = html;
   browse.style.display = 'block';
   grid.style.display = 'none';
+  window.s4l_markOwnListings?.();
 
   // Arrow click handlers
   browse.querySelectorAll('.shop-row').forEach(row => {
@@ -317,6 +317,7 @@ function renderProducts(list) {
          <strong>No products found</strong>
          Try a different category or clear the filter.
        </div>`;
+  window.s4l_markOwnListings?.();
 }
 
 // ── Load ───────────────────────────────────────────────────

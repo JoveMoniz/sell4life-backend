@@ -71,7 +71,6 @@
     // Store for quick-add modal lookup
     window._qaProducts = window._qaProducts || {};
     window._qaProducts[id] = p;
-    window.s4l_markOwnListings?.();
 
     const basketBtn = p.comingSoon ? '' : `
       <button class="cp-quick-add-btn" data-id="${id}" title="Add to basket">
@@ -183,6 +182,7 @@
     featuredWrap.innerHTML = featured.length
       ? featured.map(featuredCardHtml).join('')
       : `<p class="empty-note">No featured products yet.</p>`;
+    window.s4l_markOwnListings?.();
   }
 
   // ======================================================
@@ -219,6 +219,7 @@
     productsWrap.innerHTML = catProducts.length
       ? catProducts.map(productCardHtml).join('')
       : `<p class="empty-note">No products found in this category yet.</p>`;
+    window.s4l_markOwnListings?.();
   }
 
   // ======================================================
