@@ -4,7 +4,8 @@ body {
   margin: 0;
 }
 
-.m-price-line {
+/* Higher specificity than .cart-row > div so it isn't overridden */
+.cart-row > .m-price-line {
   display: none;
 }
 
@@ -75,11 +76,15 @@ body {
   width: 100%;
   display: flex;
   align-items: center;
-  min-height: 48px;
+  height: 72px;        /* fixed height — all cells in the same row stay equal */
+  min-height: 72px;
+  max-height: 72px;
   padding: 0 10px;
   margin: 0;
   justify-content: end;
   border-bottom: 1px solid #dceaea;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* ============================
@@ -485,7 +490,7 @@ body {
     display: none !important;
   }
 
-  .m-price-line {
+  .cart-row > .m-price-line {
     display: flex;
     justify-content: space-between;
     padding: 10px 14px;
