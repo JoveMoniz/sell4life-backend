@@ -132,19 +132,19 @@
 
 @media (max-width: 1400px) {
 
-  /* Stack: slider on top, thumbnails below */
+  /* Stack: slider on top, thumbnails below — all at full viewport width */
   .custom-gallery.side-layout {
     flex-direction: column;
-    align-items: stretch;
+    align-items: stretch;   /* stretch, never center — keeps full width */
     gap: 0;
+    width: 100%;
   }
 
   .main-image-wrapper {
     order: 1;
     width: 100%;
     max-width: 100%;
-    /* MUST stay relative so absolute buttons stay anchored here */
-    position: relative;
+    position: relative;     /* buttons anchor here — NEVER set to static */
   }
 
   .thumbnail-gallery {
