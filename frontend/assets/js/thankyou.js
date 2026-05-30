@@ -243,15 +243,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     cleanupCart(order);
     showCard();
 
-    // Scroll long product names — same pattern as cart.js
-    requestAnimationFrame(() => {
-      document.querySelectorAll('.ty-name-wrap').forEach((wrap) => {
-        const span = wrap.querySelector('span');
-        if (span && span.scrollWidth > wrap.offsetWidth + 2) {
-          span.classList.add('scrollable');
-        }
-      });
-    });
 
     console.log('✅ Thankyou complete');
   } catch (err) {
