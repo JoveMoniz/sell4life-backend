@@ -7,6 +7,7 @@ const path = location.pathname.toLowerCase();
 const noLayoutPages = [
   '/cart.html',
   '/checkout.html',
+  '/thankyou/thankyou.html',
   '/account/orders.html',
   '/account/orders-details.html',
   '/account/signin.html',
