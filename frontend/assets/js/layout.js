@@ -288,6 +288,7 @@ function injectMobileBar() {
     { href: '/account/vendor/add-product.html', label: 'Add Product' },
     { href: '/account/vendor/orders.html', label: 'Orders' },
     { href: '/account/vendor/transactions.html', label: 'Transactions' },
+    { href: '/account/vendor/tools.html', label: 'Tools' },
     { href: '/account/signin.html', label: 'Logout', cls: 'vendor-logout' },
   ];
 

@@ -423,9 +423,9 @@ function updateMapPreview(key) {
 /* ── Render preview table ────────────────────────── */
 
 function renderPreview() {
-  const wrap  = document.getElementById('csv-preview-wrap');
+  const wrap  = document.getElementById('csv-preview');
   const table = document.getElementById('csv-preview-table');
-  const label = document.getElementById('csv-preview-label');
+  const label = document.getElementById('csv-row-count');
   if (!wrap || !table) return;
 
   const mapped = S4L_FIELDS.filter(f => _mapping[f.key]);
@@ -442,7 +442,7 @@ function renderPreview() {
   ).join('')}</tbody>`;
 
   table.innerHTML = thead + tbody;
-  if (label) label.textContent = `(first ${preview.length} of ${_rows.length} rows)`;
+  if (label) label.textContent = `first ${preview.length} of ${_rows.length} rows`;
   wrap.style.display = '';
 }
 
@@ -497,7 +497,7 @@ function resetCsv() {
   document.getElementById('csv-info-bar').style.display    = 'none';
   document.getElementById('csv-mapper').style.display      = 'none';
   document.getElementById('csv-price-calc').style.display  = 'none';
-  document.getElementById('csv-preview-wrap').style.display = 'none';
+  document.getElementById('csv-preview').style.display     = 'none';
   document.getElementById('csv-actions').style.display     = 'none';
   document.getElementById('csv-mapper-grid').innerHTML     = '';
   document.getElementById('csv-preview-table').innerHTML   = '';
