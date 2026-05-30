@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logo Preview | Sell4Life</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f0f4f4; font-family: Roboto, sans-serif; padding: 40px 20px; }
+
+    h1 { text-align: center; color: #0b6b6a; margin-bottom: 8px; font-size: 1.3rem; }
+    p  { text-align: center; color: #555; margin-bottom: 40px; font-size: 0.9rem; }
+
+    .preview-section {
+      max-width: 900px;
+      margin: 0 auto 48px;
+    }
+
+    .preview-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0b6b6a;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .preview-desc {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    /* Simulate the desktop header */
+    .header-sim {
+      background: #0b6b6a;
+      padding: 0 32px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    /* Simulate the mobile header */
+    .mobile-sim {
+      background: #0b6b6a;
+      padding: 0 16px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      margin-top: 12px;
+      max-width: 390px;
+    }
+
+    /* Fake nav items */
+    .fake-nav { display: flex; gap: 24px; }
+    .fake-nav span { color: rgba(255,255,255,0.75); font-size: 0.9rem; }
+    .fake-icons { display: flex; gap: 16px; align-items: center; }
+    .fake-icon  { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.4); }
+    .fake-btn   { background: rgba(255,255,255,0.15); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; cursor: default; }
+    .fake-hamburger { width: 22px; height: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+    .fake-hamburger span { height: 2px; background: rgba(255,255,255,0.8); border-radius: 2px; }
+    .sim-label { font-size: 0.7rem; color: #888; margin-top: 6px; margin-bottom: 20px; }
+
+    /* ── LOGO A: Price Tag Icon + Wordmark ── */
+    .logo-a svg, .logo-b svg { display: block; }
+
+    /* Divider */
+    hr { border: none; border-top: 2px solid #d8e4e3; margin: 32px 0; }
+  </style>
+</head>
+<body>
+
+  <h1>Sell4Life Logo Options</h1>
+  <p>Both previewed on the real header background colour at desktop and mobile sizes.</p>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- OPTION A — Price Tag Icon + Wordmark               -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="preview-section">
+    <div class="preview-label">Option A — Price Tag Icon + Wordmark</div>
+    <div class="preview-desc">
+      A clean price tag shape (a nod to buying &amp; selling) with a punched hole, next to a bold white wordmark.
+      The "4" stays orange as the accent. Works as icon-only on small sizes.
+    </div>
+
+    <!-- Desktop -->
+    <div class="header-sim">
+      <!-- LOGO A -->
+      <svg width="168" height="42" viewBox="0 0 168 42" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <!-- Tag body: pentagon pointing right -->
+        <polygon points="2,2 2,40 22,40 38,21 22,2" fill="#f18c28" />
+        <!-- Hole in tag -->
+        <circle cx="10" cy="21" r="4" fill="#0b6b6a" />
+        <!-- Wordmark -->
+        <text x="48" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#ffffff" letter-spacing="-0.5">Sell</text>
+        <text x="100" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#f18c28" letter-spacing="-0.5">4</text>
+        <text x="116" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#ffffff" letter-spacing="-0.5">Life</text>
+      </svg>
+
+      <div class="fake-nav">
+        <span>Buy</span><span>Sell</span><span>Stores</span>
+      </div>
+      <div class="fake-icons">
+        <div class="fake-icon"></div>
+        <div class="fake-btn">Jovelino ▾</div>
+      </div>
+    </div>
+    <div class="sim-label">↑ Desktop header</div>
+
+    <!-- Mobile -->
+    <div class="mobile-sim">
+      <svg width="116" height="32" viewBox="0 0 168 42" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <polygon points="2,2 2,40 22,40 38,21 22,2" fill="#f18c28" />
+        <circle cx="10" cy="21" r="4" fill="#0b6b6a" />
+        <text x="48" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#ffffff" letter-spacing="-0.5">Sell</text>
+        <text x="100" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#f18c28" letter-spacing="-0.5">4</text>
+        <text x="116" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="900" fill="#ffffff" letter-spacing="-0.5">Life</text>
+      </svg>
+      <div class="fake-hamburger"><span></span><span></span><span></span></div>
+    </div>
+    <div class="sim-label">↑ Mobile header</div>
+  </div>
+
+  <hr />
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- OPTION B — Dollar Circle + Clean Wordmark          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="preview-section">
+    <div class="preview-label">Option B — Dollar Circle + Clean Wordmark</div>
+    <div class="preview-desc">
+      An orange circle with a bold white "$" — familiar, instant recognition as a money/marketplace brand.
+      Wordmark uses tighter tracking for a more premium feel.
+    </div>
+
+    <!-- Desktop -->
+    <div class="header-sim">
+      <!-- LOGO B -->
+      <svg width="172" height="42" viewBox="0 0 172 42" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <!-- Circle icon -->
+        <circle cx="21" cy="21" r="19" fill="#f18c28" />
+        <text x="21" y="27.5" font-family="Roboto,Arial,sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle">$</text>
+        <!-- Wordmark -->
+        <text x="50" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="700" fill="#ffffff" letter-spacing="-0.8">
+          <tspan>Sell</tspan><tspan fill="#f18c28">4</tspan><tspan>Life</tspan>
+        </text>
+      </svg>
+
+      <div class="fake-nav">
+        <span>Buy</span><span>Sell</span><span>Stores</span>
+      </div>
+      <div class="fake-icons">
+        <div class="fake-icon"></div>
+        <div class="fake-btn">Jovelino ▾</div>
+      </div>
+    </div>
+    <div class="sim-label">↑ Desktop header</div>
+
+    <!-- Mobile -->
+    <div class="mobile-sim">
+      <svg width="118" height="32" viewBox="0 0 172 42" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <circle cx="21" cy="21" r="19" fill="#f18c28" />
+        <text x="21" y="27.5" font-family="Roboto,Arial,sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle">$</text>
+        <text x="50" y="30" font-family="Roboto,Arial,sans-serif" font-size="24" font-weight="700" fill="#ffffff" letter-spacing="-0.8">
+          <tspan>Sell</tspan><tspan fill="#f18c28">4</tspan><tspan>Life</tspan>
+        </text>
+      </svg>
+      <div class="fake-hamburger"><span></span><span></span><span></span></div>
+    </div>
+    <div class="sim-label">↑ Mobile header</div>
+  </div>
+
+  <hr />
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- CURRENT — for comparison                           -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="preview-section">
+    <div class="preview-label" style="color:#888">Current (text spans) — for comparison</div>
+    <div class="header-sim">
+      <a href="#" style="text-decoration:none; font-family:Roboto,sans-serif; font-size:1.3rem; font-weight:700;">
+        <span style="color:#f18c28">$</span><span style="color:#fff">ell</span><span style="color:#f18c28">4</span><span style="color:#fff">Life</span>
+      </a>
+      <div class="fake-nav"><span>Buy</span><span>Sell</span><span>Stores</span></div>
+      <div class="fake-icons"><div class="fake-icon"></div><div class="fake-btn">Jovelino ▾</div></div>
+    </div>
+  </div>
+
+</body>
+</html>
