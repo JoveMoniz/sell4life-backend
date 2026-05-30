@@ -49,6 +49,11 @@
       </div>
     </div>
 
+    <script>
+      // Remove FOUC guard immediately — no layout.js on this standalone page
+      document.getElementById('s4l-fouc')?.remove();
+      document.body.classList.remove('s4l-loading');
+    </script>
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/thankyou.js"></script>
   </body>
