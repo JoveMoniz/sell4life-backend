@@ -126,17 +126,29 @@
 }
 
 /* =========================================================
-   RESPONSIVE
+   RESPONSIVE  — everything ≤ 1400px (tablet + mobile, all orientations)
+   Desktop (> 1400px) is untouched above.
 ========================================================= */
 
-/* Tablet / mobile: stack layout, horizontal thumbnails */
 @media (max-width: 1400px) {
+
+  /* Stack: slider on top, thumbnails below */
   .custom-gallery.side-layout {
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .main-image-wrapper {
+    order: 1;
+    width: 100%;
+    max-width: 100%;
+    /* MUST stay relative so absolute buttons stay anchored here */
+    position: relative;
   }
 
   .thumbnail-gallery {
+    order: 2;
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
@@ -144,7 +156,9 @@
     width: 100%;
     justify-content: center;
     padding: 8px 0;
+    scrollbar-width: none;
   }
+  .thumbnail-gallery::-webkit-scrollbar { display: none; }
 
   .thumb-img {
     width: 60px;
@@ -152,133 +166,94 @@
     flex: 0 0 auto;
   }
 
-  /* Make main slider full width */
+  /* Slider: full width, clips any overflow, fixed height cap */
   .slider-wrapper {
-    max-width: 100%;
+    position: relative;
     width: 100%;
+    max-width: 100%;
+    max-height: 62vh;
     border-radius: 0;
-  }
-}
-
-/* MOBILE PORTRAIT — full bleed slider */
-/* FORCE full-height center on mobile portrait */
-@media (max-width: 600px) and (orientation: portrait) {
-  .main-image-wrapper {
-    position: static !important;
-  }
-
-  .slider-wrapper {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: 65vh !important;
-    padding: 0 !important;
-    overflow: hidden !important;
+    overflow: hidden;
+    background: #f9f9f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .slider-track {
-    display: flex !important;
-    width: 100% !important;
+    display: flex;
+    width: 100%;
+    transition: transform 0.3s ease;
   }
 
+  /* Images never overflow — contain inside the fixed-height wrapper */
   .slide-img {
-    flex: 0 0 100% !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: 65vh !important;
-
-    object-fit: contain !important;
-    object-position: center center !important;
-
-    display: block !important;
-    background: #fff !important;
-  }
-
-  #main-prev,
-  #main-next {
-    position: absolute !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    width: 60px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 20 !important;
-  }
-
-  #main-prev {
-    left: 0 !important;
-  }
-
-  #main-next {
-    right: 0 !important;
-  }
-
-  .thumbnail-gallery {
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-
-    flex-wrap: nowrap !important;
-
-    justify-content: flex-start !important;
-
-    width: 100% !important;
-  }
-}
-/* MOBILE LANDSCAPE — image must be fully visible */
-@media (max-height: 600px) and (orientation: landscape) {
-  .slider-wrapper,
-  .main-image-wrapper,
-  .product-gallery {
+    flex: 0 0 100%;
     width: 100%;
     max-width: 100%;
+    max-height: 62vh;
+    object-fit: contain;
+    object-position: center center;
+    display: block;
+    background: #f9f9f9;
   }
 
-  /* Image fits inside, no cropping */
-  .slider-track img {
-    width: 100%;
-    height: 280px;
-    object-fit: contain; /* <-- no cut image */
-    background: #fff;
-  }
-
-  .thumb-img {
-    width: 40px;
-    height: 40px;
-  }
-
-  .thumbnail-gallery {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-  }
-}
-
-/* Full-width gallery on tablets + mobiles, including iPad Pro */
-@media (max-width: 1400px) {
-  .main-image-wrapper {
-    order: 1;
-  }
-  .thumbnail-gallery {
-    order: 2;
-  }
-
-  /* Arrows still on edges */
+  /* ── Buttons: always at left / right edge of the slider, on top ── */
   #main-prev,
   #main-next {
     position: absolute;
     top: 0;
     bottom: 0;
-    font-size: 30px;
-    opacity: 0.9;
-    z-index: 10;
+    width: 56px;
+    max-width: 56px;
+    z-index: 20;
+    background: transparent;
+    border: none;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: color 0.2s;
   }
 
-  #main-prev {
-    left: 0;
+  #main-prev { left: 0; }
+  #main-next { right: 0; }
+
+  #main-prev:active,
+  #main-next:active { transform: scale(0.92); }
+}
+
+/* ── Mobile portrait: taller image area ──────────────── */
+@media (max-width: 600px) and (orientation: portrait) {
+  .slider-wrapper,
+  .slide-img {
+    max-height: 65vh;
   }
+
+  #main-prev,
   #main-next {
-    right: 0;
+    width: 52px;
+    font-size: 30px;
+  }
+
+  .thumbnail-gallery {
+    justify-content: flex-start;
+  }
+}
+
+/* ── Mobile landscape: short screen, use most of height ─ */
+@media (max-height: 520px) and (orientation: landscape) {
+  .slider-wrapper,
+  .slide-img {
+    max-height: 84vh;
+  }
+
+  .thumb-img {
+    width: 40px;
+    height: 40px;
   }
 }
