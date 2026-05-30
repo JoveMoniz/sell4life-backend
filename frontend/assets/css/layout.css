@@ -96,16 +96,19 @@ footer p {
   background: #378188;
   color: #fff;
   text-align: center;
-  padding: 15px 0;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.3s ease;
 }
 
+/* Make the entire bar clickable — link fills 100% of the strip */
 .back-to-top {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  padding: 15px 0;
   color: #fff;
   text-decoration: none;
   font-size: 14px;
@@ -113,6 +116,7 @@ footer p {
   letter-spacing: 0.4px;
   opacity: 0.85;
   transition: opacity 0.2s;
+  box-sizing: border-box;
 }
 .back-to-top:hover {
   opacity: 1;
