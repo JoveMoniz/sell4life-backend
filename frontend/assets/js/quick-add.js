@@ -71,14 +71,37 @@ window.__quickAddLoaded = true;
   let _sourceBtn = null;   // the card button that triggered the popup
 
   // ── Helpers ───────────────────────────────────────────────
-  // A variant is "real" only if it has a visible label (non-empty colour or attributes)
+  // Human-readable label from attributes (preferred) or fall back to color hex
   function variantLabel(v) {
-    if (v.color && v.color.trim()) return v.color.trim();
     if (v.attributes && typeof v.attributes === 'object') {
       const vals = Object.values(v.attributes).map(x => String(x || '').trim()).filter(Boolean);
       if (vals.length) return vals.join(' / ');
     }
+    if (v.color && v.color.trim()) return v.color.trim();
     return '';
+  }
+
+  // Build the HTML for one variant button — swatch, thumbnail, or plain text
+  function variantBtn(v, i) {
+    const label   = variantLabel(v);
+    const soldOut = v.stock !== undefined && Number(v.stock) <= 0;
+    const base    = `qa-v${soldOut ? ' qa-v-out' : ''}`;
+    const dis     = soldOut ? ' disabled' : '';
+    const tip     = label ? ` title="${label}"` : '';
+
+    if (v.displayMode === 'image' && v.image) {
+      return `<button class="${base} qa-v-img" data-vi="${i}"${dis}${tip}>
+        <img src="${v.image}" alt="${label}" />
+      </button>`;
+    }
+    const hex = v.color && v.color.trim();
+    if (hex && hex !== '#ffffff' && hex !== '#fff') {
+      return `<button class="${base} qa-v-swatch" data-vi="${i}"${dis}${tip}>
+        <span class="qa-swatch-dot" style="background:${hex}"></span>
+        <span class="qa-swatch-lbl">${label}</span>
+      </button>`;
+    }
+    return `<button class="${base}" data-vi="${i}"${dis}>${label}</button>`;
   }
 
   // ── Open ──────────────────────────────────────────────────
@@ -87,8 +110,8 @@ window.__quickAddLoaded = true;
     _product = product;
     _variant = null;
 
-    // Filter to variants that actually have something to show
-    const realVariants = (product.variants || []).filter(v => variantLabel(v));
+    // Keep variants that have a label, a colour, or an image
+    const realVariants = (product.variants || []).filter(v => variantLabel(v) || v.image);
 
     // No real options → skip the popup entirely, add directly
     if (!realVariants.length) {
@@ -107,11 +130,7 @@ window.__quickAddLoaded = true;
     const confirmBtn = modal.querySelector('.qa-confirm');
     const variantsEl = modal.querySelector('.qa-variants');
 
-    variantsEl.innerHTML = realVariants.map((v, i) => {
-      const label   = variantLabel(v);
-      const soldOut = v.stock !== undefined && Number(v.stock) <= 0;
-      return `<button class="qa-v${soldOut ? ' qa-v-out' : ''}" data-vi="${i}"${soldOut ? ' disabled' : ''}>${label}</button>`;
-    }).join('');
+    variantsEl.innerHTML = realVariants.map((v, i) => variantBtn(v, i)).join('');
 
     // Store only the real variants so addToCart picks the right one
     _product = { ...product, variants: realVariants };
