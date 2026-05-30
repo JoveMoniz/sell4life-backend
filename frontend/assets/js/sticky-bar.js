@@ -84,9 +84,11 @@
       font-size: 12px; font-weight: 800; color: #0b6b6a;
       line-height: 1; font-family: inherit;
     }
-    .s4l-basket-circle.s4l-has               { border-color: #0b6b6a; background: #0b6b6a; }
-    .s4l-basket-circle.s4l-has svg           { opacity: 0; }
-    .s4l-basket-circle.s4l-has .s4l-basket-n { display: flex; color: #fff; }
+    .s4l-basket-circle.s4l-has                           { border-color: #0b6b6a; }
+    /* Fill only the basket body path (last path = body), leave handle as stroke */
+    .s4l-basket-circle.s4l-has svg path:last-child       { fill: #0b6b6a; stroke: #0b6b6a; }
+    .s4l-basket-circle.s4l-has svg                       { opacity: 1; }
+    .s4l-basket-circle.s4l-has .s4l-basket-n             { display: flex; color: #fff; font-size: 10px; font-weight: 900; }
     /* ── Pill inner boxes (visual only) ─────────────── */
     /* vendor: square, teal */
     .s4l-pill-vendor .s4l-pill-inner {
