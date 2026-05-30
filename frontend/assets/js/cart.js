@@ -51,6 +51,21 @@ const toast = (msg) => window.showToast && window.showToast(msg);
         }
       });
 
+      // Safety net: silently remove any of the vendor's own products
+      const _myVid = localStorage.getItem('s4l_vendorId');
+      if (_myVid) {
+        const before = cart.length;
+        cart = cart.filter((item) => {
+          const vid = typeof item.vendor === 'object'
+            ? (item.vendor?._id || item.vendor?.id)
+            : item.vendor;
+          return !vid || String(vid) !== _myVid;
+        });
+        if (cart.length < before) {
+          toast('Your own listing was removed from the basket');
+        }
+      }
+
       saveCart();
     } catch (err) {
       console.error('Cart sync failed:', err);

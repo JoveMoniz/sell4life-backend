@@ -386,6 +386,29 @@ console.log('product.js loaded');
     if (buyBtn) { buyBtn.disabled = true; buyBtn.textContent = 'Out of stock'; }
   }
 
+  // ── Prevent vendor from purchasing their own product ──────────────────
+  const _myVendorId = localStorage.getItem('s4l_vendorId');
+  const _productVendorId = typeof product.vendor === 'object'
+    ? (product.vendor?._id || product.vendor?.id)
+    : product.vendor;
+  if (_myVendorId && _productVendorId && _myVendorId === String(_productVendorId)) {
+    const _pid = product._id || product.id;
+    addBtns.forEach((btn) => {
+      btn.disabled = true;
+      btn.textContent = 'Your listing';
+      btn.style.cssText = 'background:#f0faf9;color:#0b6b6a;border:1.5px solid rgba(11,107,106,0.3);cursor:default;opacity:0.75';
+    });
+    if (buyBtn) {
+      buyBtn.disabled = false;
+      buyBtn.textContent = '✏️ Edit product';
+      buyBtn.style.cssText = 'background:#0b6b6a;color:#fff';
+      buyBtn.onclick = (e) => {
+        e.preventDefault();
+        window.location.href = `/account/vendor/edit-product.html?id=${_pid}`;
+      };
+    }
+  }
+
   // ── Coming Soon ────────────────────────────────────────────
   if (product.comingSoon) {
     // Disable all buy buttons and replace text

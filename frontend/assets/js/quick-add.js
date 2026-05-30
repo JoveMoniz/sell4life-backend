@@ -314,6 +314,14 @@ window.__quickAddLoaded = true;
     _sourceBtn = btn;
     const product = (window._qaProducts || {})[btn.dataset.id];
     if (!product) return;
+
+    // Block vendor from adding their own product
+    const _myVid = localStorage.getItem('s4l_vendorId');
+    const _pvid  = typeof product.vendor === 'object'
+      ? (product.vendor?._id || product.vendor?.id)
+      : product.vendor;
+    if (_myVid && _pvid && _myVid === String(_pvid)) return;
+
     if (product.variants && product.variants.length > 0) {
       open(product);            // open() filters blank rows; falls to directAddToCart if none real
     } else {
