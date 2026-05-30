@@ -25,13 +25,11 @@ window.__quickAddLoaded = true;
         <div class="qa-header">
           <img class="qa-img" src="" alt="">
           <div class="qa-meta">
-            <div class="qa-name"></div>
             <div class="qa-price"></div>
           </div>
         </div>
         <div class="qa-variants"></div>
         <button class="qa-confirm" disabled>Select an option</button>
-        <button class="qa-clear-cart">🗑 Clear cart</button>
       </div>
     `;
     document.body.appendChild(modal);
@@ -56,12 +54,6 @@ window.__quickAddLoaded = true;
       }
       if (e.target.classList.contains('qa-confirm') && !e.target.disabled) {
         addToCart(); return;
-      }
-      if (e.target.classList.contains('qa-clear-cart')) {
-        localStorage.setItem('cart', '[]');
-        document.dispatchEvent(new Event('cartUpdated'));
-        refreshBasketBtns();
-        close();
       }
     });
   }
