@@ -245,15 +245,26 @@
   }
 }
 
-/* ── Mobile landscape: short screen, use most of height ─ */
+/* ── Mobile landscape: short screen — subtract header + padding so nothing overflows ─ */
 @media (max-height: 520px) and (orientation: landscape) {
-  .slider-wrapper,
+  .slider-wrapper {
+    /* 100vh minus ~80px for header + product-page top padding */
+    height: calc(100vh - 80px);
+    max-height: calc(100vh - 80px);
+  }
+
   .slide-img {
-    max-height: 84vh;
+    max-height: calc(100vh - 80px);
   }
 
   .thumb-img {
     width: 40px;
     height: 40px;
+  }
+
+  /* Thumbnails on landscape: smaller and scrollable below slider */
+  .thumbnail-gallery {
+    justify-content: flex-start;
+    padding: 4px 0;
   }
 }

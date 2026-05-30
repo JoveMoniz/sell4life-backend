@@ -148,19 +148,20 @@
       if (!active) return;
       active.classList.add('active-thumb');
 
-      const isHorizontal = window.innerWidth <= 1280;
-      const thumbStart    = isHorizontal ? active.offsetLeft  : active.offsetTop;
-      const thumbSize     = isHorizontal ? active.offsetWidth : active.offsetHeight;
-      const galleryScroll = isHorizontal ? thumbnailGallery.scrollLeft : thumbnailGallery.scrollTop;
-      const gallerySize   = isHorizontal ? thumbnailGallery.offsetWidth : thumbnailGallery.offsetHeight;
-
-      if (isHorizontal && realIndex === 0 && galleryScroll === 0) return;
+      // Always scroll so the active thumbnail is centred in the strip
       const behavior = smooth ? 'smooth' : 'auto';
-      if (thumbStart < galleryScroll) {
-        thumbnailGallery.scrollTo(isHorizontal ? { left: thumbStart, behavior } : { top: thumbStart, behavior });
-      } else if (thumbStart + thumbSize > galleryScroll + gallerySize) {
-        const scrollTo = thumbStart - gallerySize + thumbSize;
-        thumbnailGallery.scrollTo(isHorizontal ? { left: scrollTo, behavior } : { top: scrollTo, behavior });
+      const isHorizontal = window.innerWidth <= 1280;
+
+      if (isHorizontal) {
+        const target = active.offsetLeft
+          - (thumbnailGallery.offsetWidth / 2)
+          + (active.offsetWidth           / 2);
+        thumbnailGallery.scrollTo({ left: Math.max(0, target), behavior });
+      } else {
+        const target = active.offsetTop
+          - (thumbnailGallery.offsetHeight / 2)
+          + (active.offsetHeight           / 2);
+        thumbnailGallery.scrollTo({ top: Math.max(0, target), behavior });
       }
     };
 
