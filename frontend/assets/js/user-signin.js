@@ -90,10 +90,13 @@ if (form && msg) {
         });
         const vData = await vRes.json();
         if (vData.isVendor && vData.vendor) {
+          const _vid = vData.vendor._id || vData.vendor.id || '';
           localStorage.setItem('s4l_isVendor', 'true');
           localStorage.setItem('s4l_vendorStatus', vData.vendor.status);
+          if (_vid) localStorage.setItem('s4l_vendorId', String(_vid));
         } else {
           localStorage.setItem('s4l_isVendor', 'false');
+          localStorage.removeItem('s4l_vendorId');
         }
       } catch {
         // Non-critical — vendor pages will re-check via vendor-guard.js
