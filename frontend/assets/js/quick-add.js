@@ -116,8 +116,7 @@ window.__quickAddLoaded = true;
       ? (product.images[0].startsWith('http') ? product.images[0] : `/assets/images/products/${product.images[0]}`)
       : (product.image || '/assets/images/products/sell4life-placeholder.png');
 
-    modal.querySelector('.qa-img').src    = img;
-    modal.querySelector('.qa-name').textContent = product.name;
+    modal.querySelector('.qa-img').src = img;
 
     const confirmBtn = modal.querySelector('.qa-confirm');
     const variantsEl = modal.querySelector('.qa-variants');
