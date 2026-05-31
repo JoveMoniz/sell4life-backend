@@ -607,7 +607,7 @@ async function computeVendorBalance(vendorId) {
   return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance };
 }
 
-router.get('/payouts', authMiddleware, requireApprovedVendor, requireTier('refurbished'), async (req, res) => {
+router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendorId = req.vendor._id;
 
@@ -637,7 +637,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, requireTier('refur
   }
 });
 
-router.post('/payouts/request', authMiddleware, requireApprovedVendor, requireTier('refurbished'), async (req, res) => {
+router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendorId = req.vendor._id;
 
