@@ -37,9 +37,19 @@ const vendorSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ['casual', 'professional'],
+      enum: ['casual', 'refurbished', 'professional', 'enterprise'],
       default: 'casual',
     },
+
+    // Tier 2 — Refurbished
+    refurbishedBadge: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Tier 4 — Enterprise (foundation only)
+    staffAccounts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    apiKey: { type: String, default: null },
 
     verified: {
       type: Boolean,

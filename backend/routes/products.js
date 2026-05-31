@@ -1,4 +1,4 @@
-import { requireApprovedVendor } from '../middleware/vendorMiddleware.js';
+import { requireApprovedVendor, stripTierFields } from '../middleware/vendorMiddleware.js';
 import { Router } from 'express';
 import mongoose from 'mongoose';
 
@@ -27,7 +27,18 @@ function generateSlug(text) {
    CREATE PRODUCT
 ====================================================== */
 
-router.post('/', authMiddleware, requireApprovedVendor, async (req, res) => {
+const tierFieldGuard = stripTierFields({
+  variants:           'professional',
+  addOns:             'professional',
+  seoTitle:           'professional',
+  seoDescription:     'professional',
+  conditionGrade:     'refurbished',
+  warrantyPeriod:     'refurbished',
+  testedStatus:       'refurbished',
+  refurbishmentNotes: 'refurbished',
+});
+
+router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (req, res) => {
   try {
     const vendor = req.vendor;
 
@@ -259,7 +270,7 @@ router.get('/:id', async (req, res) => {
    UPDATE PRODUCT
 ====================================================== */
 
-router.patch('/:id', authMiddleware, requireApprovedVendor, async (req, res) => {
+router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid product ID' });
   }
