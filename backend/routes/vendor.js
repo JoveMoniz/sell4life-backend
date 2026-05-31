@@ -5,7 +5,7 @@
 import mongoose from 'mongoose';
 import express from 'express';
 
-import { requireApprovedVendor } from '../middleware/vendorMiddleware.js';
+import { requireApprovedVendor, requireTier } from '../middleware/vendorMiddleware.js';
 
 import {
   canUpdateItemStatus,
@@ -283,7 +283,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
    TRANSACTIONS LEDGER
 ====================================================== */
 
-router.get('/transactions', authMiddleware, requireVendor, async (req, res) => {
+router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('refurbished'), async (req, res) => {
   try {
     const vendor = req.vendor; // set by requireVendor — no second DB lookup needed
     const vendorId = vendor._id;
@@ -607,7 +607,7 @@ async function computeVendorBalance(vendorId) {
   return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance };
 }
 
-router.get('/payouts', authMiddleware, requireVendor, async (req, res) => {
+router.get('/payouts', authMiddleware, requireApprovedVendor, requireTier('refurbished'), async (req, res) => {
   try {
     const vendorId = req.vendor._id;
 
@@ -637,7 +637,7 @@ router.get('/payouts', authMiddleware, requireVendor, async (req, res) => {
   }
 });
 
-router.post('/payouts/request', authMiddleware, requireVendor, async (req, res) => {
+router.post('/payouts/request', authMiddleware, requireApprovedVendor, requireTier('refurbished'), async (req, res) => {
   try {
     const vendorId = req.vendor._id;
 
@@ -718,7 +718,7 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
    CSV PRODUCT IMPORT
 ====================================================== */
 
-router.post('/products/import', authMiddleware, requireApprovedVendor, express.text({ type: 'text/csv', limit: '2mb' }), async (req, res) => {
+router.post('/products/import', authMiddleware, requireApprovedVendor, requireTier('professional'), express.text({ type: 'text/csv', limit: '2mb' }), async (req, res) => {
   try {
     const vendor = req.vendor;
     const raw = req.body;
