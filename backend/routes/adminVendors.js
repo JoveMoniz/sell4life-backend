@@ -206,6 +206,38 @@ router.patch('/:id/reactivate', async (req, res) => {
 });
 
 /* ======================================================
+   SET VENDOR TIER
+====================================================== */
+router.patch('/:id/tier', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, refurbishedBadge } = req.body;
+
+    const VALID_TIERS = ['casual', 'refurbished', 'professional', 'enterprise'];
+    if (!VALID_TIERS.includes(type)) {
+      return res.status(400).json({ message: `Invalid tier. Must be one of: ${VALID_TIERS.join(', ')}` });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
+
+    const update = { type };
+    if (type === 'refurbished' && typeof refurbishedBadge === 'boolean') {
+      update.refurbishedBadge = refurbishedBadge;
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(id, update, { new: true }).populate('userId', 'email');
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    res.json({ message: `Vendor tier updated to ${type}`, vendor });
+  } catch (error) {
+    console.error('❌ Set vendor tier error:', error);
+    res.status(500).json({ message: 'Failed to update vendor tier' });
+  }
+});
+
+/* ======================================================
    VENDOR PRODUCTS (admin view)
 ====================================================== */
 
