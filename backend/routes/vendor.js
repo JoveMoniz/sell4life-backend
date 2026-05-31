@@ -72,16 +72,27 @@ router.post('/create', authMiddleware, async (req, res) => {
       slug = `${storeSlug}-${counter++}`;
     }
 
+    const type = req.body.type || 'casual';
+    const VALID_TYPES = ['casual', 'refurbished', 'professional', 'enterprise'];
+    const vendorType = VALID_TYPES.includes(type) ? type : 'casual';
+
+    // Casual vendors are auto-approved — no admin review needed
+    const autoApprove = vendorType === 'casual';
+
     const vendor = await Vendor.create({
       userId: req.user._id,
       storeName,
       storeSlug: slug,
-      status: 'pending',
+      storeDescription: req.body.storeDescription || '',
+      type: vendorType,
+      status: autoApprove ? 'approved' : 'pending',
+      ...(autoApprove && { approvedAt: new Date() }),
     });
 
     res.json({
       success: true,
       vendor,
+      autoApproved: autoApprove,
     });
   } catch (err) {
     console.error('Vendor create error:', err);
