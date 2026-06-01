@@ -1,4 +1,4 @@
-import { requireApprovedVendor, stripTierFields } from '../middleware/vendorMiddleware.js';
+import { requireApprovedVendor, stripTierFields, requireTier } from '../middleware/vendorMiddleware.js';
 import { Router } from 'express';
 import mongoose from 'mongoose';
 
@@ -108,7 +108,7 @@ router.get('/slug/:slug', async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.slug }).populate({
       path: 'vendor',
-      select: 'storeName storeLogo',
+      select: 'storeName storeLogo storeSlug type refurbishedBadge',
       populate: {
         path: 'userId',
         select: 'username email',
@@ -352,6 +352,42 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     res.status(500).json({
       error: 'Failed to update product',
     });
+  }
+});
+
+/* ======================================================
+   DUPLICATE PRODUCT (Professional+)
+====================================================== */
+
+router.post('/:id/duplicate', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const original = await Product.findOne({ _id: req.params.id, vendor: req.vendor._id });
+    if (!original) return res.status(404).json({ error: 'Product not found' });
+
+    const data = original.toObject();
+    delete data._id;
+    delete data.createdAt;
+    delete data.updatedAt;
+    delete data.views;
+    delete data.salesCount;
+    data.active = false; // duplicate starts as draft
+    data.name = `${data.name} (Copy)`;
+
+    // Generate unique slug
+    let baseSlug = data.slug + '-copy';
+    let slug = baseSlug;
+    let n = 1;
+    while (await Product.findOne({ slug })) { slug = `${baseSlug}-${n++}`; }
+    data.slug = slug;
+
+    const copy = await Product.create(data);
+    res.json({ success: true, product: copy });
+  } catch (err) {
+    console.error('Duplicate product error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
