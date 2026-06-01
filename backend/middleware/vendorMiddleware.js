@@ -1,5 +1,24 @@
 import Vendor from '../models/vendor.js';
 
+// Authenticates requests using the X-API-Key header.
+// Sets req.vendor for downstream handlers — ready for future public API routes.
+export async function requireApiKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (!key) return res.status(401).json({ error: 'API key required' });
+  try {
+    const vendor = await Vendor.findOne({ apiKey: key, status: 'approved' });
+    if (!vendor) return res.status(401).json({ error: 'Invalid or inactive API key' });
+    if (vendor.type !== 'enterprise') {
+      return res.status(403).json({ error: 'API access requires Enterprise tier' });
+    }
+    req.vendor = vendor;
+    next();
+  } catch (err) {
+    console.error('API key auth error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 const TIER_RANK = { casual: 1, refurbished: 2, professional: 3, enterprise: 4 };
 
 export async function requireApprovedVendor(req, res, next) {

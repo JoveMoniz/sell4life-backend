@@ -227,6 +227,15 @@ router.patch('/:id/tier', async (req, res) => {
       update.refurbishedBadge = refurbishedBadge;
     }
 
+    // Auto-generate API key when upgrading to enterprise (only if not already set)
+    if (type === 'enterprise') {
+      const existing = await Vendor.findById(id).select('apiKey');
+      if (!existing?.apiKey) {
+        const { randomBytes } = await import('crypto');
+        update.apiKey = 's4l_' + randomBytes(24).toString('hex');
+      }
+    }
+
     const vendor = await Vendor.findByIdAndUpdate(id, update, { new: true }).populate('userId', 'email');
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 

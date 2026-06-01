@@ -1063,6 +1063,11 @@ router.get('/orders/:id', authMiddleware, requireVendor, async (req, res) => {
    GET VENDOR STATUS
 ====================================================== */
 
+// Enterprise vendors retrieve their API key
+router.get('/api-key', authMiddleware, requireApprovedVendor, requireTier('enterprise'), async (req, res) => {
+  res.json({ apiKey: req.vendor.apiKey || null });
+});
+
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const vendor = await Vendor.findOne({
