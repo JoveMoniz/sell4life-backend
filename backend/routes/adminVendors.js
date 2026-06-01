@@ -826,4 +826,104 @@ router.post('/disputes/:disputeId/respond', authMiddleware, adminMiddleware, asy
   }
 });
 
+/* ======================================================
+   UPGRADE REQUESTS
+====================================================== */
+
+router.get('/upgrade-requests', async (req, res) => {
+  try {
+    const vendors = await Vendor.find({ 'upgradeRequest.status': 'pending' })
+      .populate('userId', 'email')
+      .select('_id storeName type upgradeRequest');
+
+    const requests = vendors.map(v => ({
+      _id: v._id,
+      vendorId: v._id,
+      storeName: v.storeName,
+      email: v.userId?.email,
+      currentTier: v.type,
+      requestedTier: v.upgradeRequest?.requestedTier,
+      message: v.upgradeRequest?.message,
+      requestedAt: v.upgradeRequest?.requestedAt,
+    }));
+
+    res.json({ requests });
+  } catch (err) {
+    console.error('Admin upgrade requests error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/:id/upgrade', async (req, res) => {
+  try {
+    const { action } = req.body;
+    const vendorId = req.params.id;
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({ error: 'Invalid vendor ID' });
+    }
+
+    const vendor = await Vendor.findById(vendorId).populate('userId', 'email');
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    if (!vendor.upgradeRequest || vendor.upgradeRequest.status !== 'pending') {
+      return res.status(400).json({ error: 'No pending upgrade request' });
+    }
+
+    const requestedTier = vendor.upgradeRequest.requestedTier;
+    const currentTier = vendor.type;
+
+    if (action === 'approve') {
+      await Vendor.findByIdAndUpdate(vendorId, {
+        type: requestedTier,
+        'upgradeRequest.status': 'approved',
+      });
+    } else {
+      await Vendor.findByIdAndUpdate(vendorId, {
+        'upgradeRequest.status': 'rejected',
+      });
+    }
+
+    // Send notification email (non-blocking)
+    (async () => {
+      try {
+        const nodemailer = (await import('nodemailer')).default;
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASSWORD,
+          },
+        });
+
+        const status = action === 'approve' ? 'Approved' : 'Rejected';
+        await transporter.sendMail({
+          to: vendor.userId.email,
+          subject: `Tier Upgrade Request ${status}`,
+          html: `
+            <p>Your tier upgrade request has been <strong>${status.toLowerCase()}</strong>.</p>
+            <p><strong>Current Tier:</strong> ${currentTier}</p>
+            <p><strong>Requested Tier:</strong> ${requestedTier}</p>
+            ${action === 'approve' ? '<p>Your account has been upgraded and all new features are now available.</p>' : ''}
+            <p>You can manage your account at: <a href="https://${process.env.FRONTEND_URL || 'sell4life.com'}/account/vendor/settings.html">Store Settings</a></p>
+          `,
+        });
+      } catch (e) {
+        console.error('Upgrade notification email error:', e.message);
+      }
+    })();
+
+    res.json({ success: true, message: `Upgrade request ${action}ed` });
+  } catch (err) {
+    console.error('Admin upgrade action error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
