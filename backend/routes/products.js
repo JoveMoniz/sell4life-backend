@@ -243,7 +243,7 @@ router.get('/:id', async (req, res) => {
 
     const product = await Product.findById(id).populate({
       path: 'vendor',
-      select: 'storeName storeLogo',
+      select: 'storeName storeLogo storeSlug type refurbishedBadge',
       populate: {
         path: 'userId',
         select: 'username email',
