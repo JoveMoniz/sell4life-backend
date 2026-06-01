@@ -1068,6 +1068,19 @@ router.get('/api-key', authMiddleware, requireApprovedVendor, requireTier('enter
   res.json({ apiKey: req.vendor.apiKey || null });
 });
 
+// Generate or regenerate API key
+router.post('/api-key/generate', authMiddleware, requireApprovedVendor, requireTier('enterprise'), async (req, res) => {
+  try {
+    const { randomBytes } = await import('crypto');
+    const apiKey = 's4l_' + randomBytes(24).toString('hex');
+    await req.vendor.updateOne({ apiKey });
+    res.json({ apiKey });
+  } catch (err) {
+    console.error('API key generation error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const vendor = await Vendor.findOne({
