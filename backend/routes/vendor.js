@@ -544,12 +544,14 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
 
 const COMMISSION_RATE_PAYOUT = 0.08;
 const MIN_PAYOUT = 20;
+const HOLD_DAYS = 30;
 
 async function computeVendorBalance(vendorId) {
   const ordersRaw = await Order.find({ 'vendorOrders.vendorId': vendorId });
 
   let totalGross = 0;
   let totalRefunds = 0;
+  let nextClearanceMs = null; // earliest time a held item will clear
 
   ordersRaw.forEach(order => {
     const vendorItems = (order.items || []).filter(
@@ -559,11 +561,21 @@ async function computeVendorBalance(vendorId) {
     const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
     if (!isPaid) return;
 
-    // Only count items that have been delivered — prevents payout before shipping
-    const deliveredItems = vendorItems.filter(item => item.status === 'Delivered');
-    totalGross += deliveredItems.reduce(
-      (s, item) => s + Number(item.price || 0) * Number(item.quantity || 0), 0
-    );
+    // Only count items delivered more than HOLD_DAYS ago — prevents early payout
+    const now = Date.now();
+    const holdMs = HOLD_DAYS * 24 * 60 * 60 * 1000;
+    vendorItems.forEach(item => {
+      if (item.status !== 'Delivered') return;
+      const deliveredAt = item.deliveredAt ? new Date(item.deliveredAt).getTime() : 0;
+      if (!deliveredAt) return;
+      const clearsAt = deliveredAt + holdMs;
+      if (now >= clearsAt) {
+        totalGross += Number(item.price || 0) * Number(item.quantity || 0);
+      } else {
+        // Track the next upcoming clearance date
+        if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
+      }
+    });
 
     vendorItems.forEach(item => {
       const price = Number(item.price || 0);
@@ -606,7 +618,13 @@ async function computeVendorBalance(vendorId) {
 
   const pendingBalance = Number(Math.max(0, netAfterFees - totalChargebacks - totalPaidOut).toFixed(2));
 
-  return { grossRevenue: Number(totalGross.toFixed(2)), totalRefunds: Number(totalRefunds.toFixed(2)), commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance };
+  return {
+    grossRevenue: Number(totalGross.toFixed(2)),
+    totalRefunds: Number(totalRefunds.toFixed(2)),
+    commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance,
+    holdDays: HOLD_DAYS,
+    nextClearanceDate: nextClearanceMs ? new Date(nextClearanceMs).toISOString() : null,
+  };
 }
 
 router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) => {
