@@ -1727,4 +1727,79 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
   }
 });
 
+/* ======================================================
+   REQUEST TIER UPGRADE
+====================================================== */
+
+router.post('/request-upgrade', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    const { message } = req.body;
+
+    if (!vendor || vendor.status !== 'approved') {
+      return res.status(403).json({ error: 'Only approved vendors can request upgrades' });
+    }
+
+    const currentTier = vendor.type || 'casual';
+    const tierRank = { casual: 1, refurbished: 2, professional: 3, enterprise: 4 };
+    const currentRank = tierRank[currentTier] || 1;
+
+    if (currentRank >= 4) {
+      return res.status(400).json({ error: 'Already at highest tier' });
+    }
+
+    const nextTier = ['refurbished', 'professional', 'enterprise', 'enterprise'][currentRank];
+
+    // Store upgrade request in database
+    await Vendor.findByIdAndUpdate(vendor._id, {
+      upgradeRequest: {
+        requestedAt: new Date(),
+        requestedTier: nextTier,
+        message: message || '',
+        status: 'pending',
+      },
+    });
+
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@sell4life.com';
+    const storeName = vendor.storeName || vendor.businessName || 'Unknown Store';
+    const user = await User.findById(vendor.userId).lean();
+    const vendorEmail = user?.email;
+
+    // Send email to admin (non-blocking)
+    (async () => {
+      try {
+        const nodemailer = (await import('nodemailer')).default;
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASSWORD,
+          },
+        });
+
+        await transporter.sendMail({
+          to: adminEmail,
+          subject: `[Upgrade Request] ${storeName} (${currentTier} → ${nextTier})`,
+          html: `
+            <p><strong>${storeName}</strong> has requested a tier upgrade:</p>
+            <p><strong>Current Tier:</strong> ${currentTier}</p>
+            <p><strong>Requested:</strong> ${nextTier}</p>
+            <p><strong>Vendor Email:</strong> ${vendorEmail}</p>
+            <p><strong>Message:</strong></p>
+            <p>${(message || '').replace(/\n/g, '<br>')}</p>
+            <p><a href="https://${process.env.FRONTEND_URL || 'sell4life.com'}/account/admin/vendors.html?id=${vendor._id}">View Vendor</a></p>
+          `,
+        });
+      } catch (e) {
+        console.error('Upgrade request email error:', e.message);
+      }
+    })();
+
+    res.json({ ok: true, message: `Your upgrade request to ${nextTier} has been sent to admins. We'll review and contact you soon.` });
+  } catch (err) {
+    console.error('UPGRADE REQUEST ERROR:', err);
+    res.status(500).json({ error: 'Failed to send upgrade request' });
+  }
+});
+
 export default router;
