@@ -835,6 +835,7 @@ router.get('/upgrade-requests', async (req, res) => {
     const vendors = await Vendor.find({ 'upgradeRequest.status': 'pending' })
       .populate('userId', 'email')
       .select('_id storeName type upgradeRequest');
+    console.log(`[upgrade-requests] found ${vendors.length} pending`);
 
     const requests = vendors.map(v => ({
       _id: v._id,
