@@ -237,6 +237,37 @@ const productSchema = new mongoose.Schema(
     },
 
     /* ==============================
+       REFURBISHED FIELDS
+    ============================== */
+
+    conditionGrade: {
+      type: String,
+      enum: ['Excellent', 'Good', 'Fair', 'For Parts', ''],
+      default: '',
+    },
+
+    warrantyPeriod: {
+      type: String,
+      default: '',
+    },
+
+    testedStatus: {
+      type: String,
+      enum: ['Fully Tested', 'Partially Tested', 'Untested', ''],
+      default: '',
+    },
+
+    refurbishmentNotes: {
+      type: String,
+      default: '',
+    },
+
+    serialNumber: {
+      type: String,
+      default: '',
+    },
+
+    /* ==============================
        SHIPPING
     ============================== */
 
