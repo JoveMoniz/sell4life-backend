@@ -514,6 +514,7 @@ router.get('/:id/transactions', async (req, res) => {
         storeSlug:    vendor.storeSlug || '',
         email:        vendor.userId?.email || '—',
         status:       vendor.status,
+        type:         vendor.type || 'casual',
         vatRegistered: isVatRegistered,
         vatNumber:    vendor.vatNumber || '',
       },
@@ -633,7 +634,7 @@ router.get('/financials', async (req, res) => {
     const vendorIds = Object.keys(vendorMap);
     const vendors = await Vendor.find({ _id: { $in: vendorIds } })
       .populate('userId', 'email')
-      .select('storeName storeSlug status vatRegistered');
+      .select('storeName storeSlug status vatRegistered type');
 
     const vendorRows = vendors.map(v => {
       const m = vendorMap[String(v._id)] || {};
@@ -646,6 +647,7 @@ router.get('/financials', async (req, res) => {
         storeSlug: v.storeSlug || '',
         email: v.userId?.email || '—',
         status: v.status,
+        type: v.type || 'casual',
         vatRegistered: v.vatRegistered || false,
         orderCount: m.orderIds ? m.orderIds.size : 0,
         gross: Math.round(gross * 100) / 100,
