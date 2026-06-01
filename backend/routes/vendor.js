@@ -559,7 +559,9 @@ async function computeVendorBalance(vendorId) {
     const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
     if (!isPaid) return;
 
-    totalGross += vendorItems.reduce(
+    // Only count items that have been delivered — prevents payout before shipping
+    const deliveredItems = vendorItems.filter(item => item.status === 'Delivered');
+    totalGross += deliveredItems.reduce(
       (s, item) => s + Number(item.price || 0) * Number(item.quantity || 0), 0
     );
 
