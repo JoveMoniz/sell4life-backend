@@ -1748,7 +1748,7 @@ router.post('/request-upgrade', authMiddleware, requireApprovedVendor, async (re
       return res.status(400).json({ error: 'Already at highest tier' });
     }
 
-    const nextTier = ['refurbished', 'professional', 'enterprise', 'enterprise'][currentRank];
+    const nextTier = { casual: 'refurbished', refurbished: 'professional', professional: 'enterprise' }[currentTier];
 
     // Store upgrade request in database
     await Vendor.findByIdAndUpdate(vendor._id, {
