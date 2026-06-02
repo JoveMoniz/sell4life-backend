@@ -9,6 +9,8 @@ export const RESERVE_STANDARD  = 0.10;
 export const RESERVE_TRUSTED   = 0.05;
 export const TRUSTED_MONTHS    = 6;
 export const MIN_PAYOUT        = 20;
+const STRIPE_PCT   = 0.014;
+const STRIPE_FIXED = 0.20;
 
 export function resolveReserveRate(vendor, ordersRaw) {
   const approvedAt = vendor.approvedAt ? new Date(vendor.approvedAt).getTime() : Date.now();
@@ -38,10 +40,11 @@ export async function computeVendorBalance(vendorId) {
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross       = 0; // cleared items only (payout-eligible)
-  let totalReserved    = 0; // in reserve window
-  let totalGrossAllTime = 0; // all paid+delivered items (for all-time commission display)
-  let totalRefunds     = 0;
+  let totalGross        = 0;
+  let totalReserved     = 0;
+  let totalGrossAllTime = 0;
+  let totalRefunds      = 0;
+  let totalStripeFees   = 0;
   let nextClearanceMs      = null;
   let nextReserveReleaseMs = null;
 
@@ -94,6 +97,15 @@ export async function computeVendorBalance(vendorId) {
         totalRefunds += price * Number(item.returnQuantity);
       }
     });
+
+    // Vendor's proportional share of the Stripe fee for this order
+    const itemsTotal      = vendorItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+    const orderTotal      = Number(order.total || 0);
+    const vendorFraction  = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 0;
+    const rawFee          = Number(order.stripeFeeAmount || 0);
+    const estimatedFee    = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
+    const orderFee        = rawFee > 0 ? rawFee : estimatedFee;
+    totalStripeFees      += Number((orderFee * vendorFraction).toFixed(2));
   });
 
   // Cleared balance (payout-eligible)
@@ -138,6 +150,7 @@ export async function computeVendorBalance(vendorId) {
     grossRevenueAllTime:  Number(totalGrossAllTime.toFixed(2)),
     commissionAllTime,
     netAfterFeesAllTime,
+    totalStripeFees: Number(totalStripeFees.toFixed(2)),
     // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
     holdDays: HOLD_DAYS, reserveDays: RESERVE_DAYS,
