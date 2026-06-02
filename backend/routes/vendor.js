@@ -545,13 +545,21 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
 const COMMISSION_RATE_PAYOUT = 0.08;
 const MIN_PAYOUT = 20;
 const HOLD_DAYS = 30;
+const RESERVE_DAYS = 90;
+const RESERVE_RATE = 0.10;
 
 async function computeVendorBalance(vendorId) {
   const ordersRaw = await Order.find({ 'vendorOrders.vendorId': vendorId });
 
   let totalGross = 0;
+  let totalReserved = 0;
   let totalRefunds = 0;
-  let nextClearanceMs = null; // earliest time a held item will clear
+  let nextClearanceMs = null;
+  let nextReserveReleaseMs = null;
+
+  const now = Date.now();
+  const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
+  const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
   ordersRaw.forEach(order => {
     const vendorItems = (order.items || []).filter(
@@ -561,19 +569,31 @@ async function computeVendorBalance(vendorId) {
     const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
     if (!isPaid) return;
 
-    // Only count items delivered more than HOLD_DAYS ago — prevents early payout
-    const now = Date.now();
-    const holdMs = HOLD_DAYS * 24 * 60 * 60 * 1000;
     vendorItems.forEach(item => {
       if (item.status !== 'Delivered') return;
       const deliveredAt = item.deliveredAt ? new Date(item.deliveredAt).getTime() : 0;
       if (!deliveredAt) return;
-      const clearsAt = deliveredAt + holdMs;
-      if (now >= clearsAt) {
-        totalGross += Number(item.price || 0) * Number(item.quantity || 0);
-      } else {
-        // Track the next upcoming clearance date
+
+      const clearsAt         = deliveredAt + holdMs;
+      const reserveReleasesAt = deliveredAt + reserveMs;
+      const itemValue        = Number(item.price || 0) * Number(item.quantity || 0);
+
+      if (now < clearsAt) {
+        // Still in delivery hold — nothing available yet
         if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
+        return;
+      }
+
+      if (now >= reserveReleasesAt) {
+        // Reserve period over — full amount available
+        totalGross += itemValue;
+      } else {
+        // In reserve window — 90% available, 10% held
+        totalGross    += itemValue * (1 - RESERVE_RATE);
+        totalReserved += itemValue * RESERVE_RATE;
+        if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs) {
+          nextReserveReleaseMs = reserveReleasesAt;
+        }
       }
     });
 
@@ -616,14 +636,19 @@ async function computeVendorBalance(vendorId) {
   const paidPayouts = await Payout.find({ vendorId, status: 'paid' });
   const totalPaidOut = Number(paidPayouts.reduce((s, p) => s + p.amount, 0).toFixed(2));
 
-  const pendingBalance = Number(Math.max(0, netAfterFees - totalChargebacks - totalPaidOut).toFixed(2));
+  const pendingBalance  = Number(Math.max(0, netAfterFees - totalChargebacks - totalPaidOut).toFixed(2));
+  const reservedBalance = Number((totalReserved * (1 - COMMISSION_RATE_PAYOUT)).toFixed(2));
 
   return {
     grossRevenue: Number(totalGross.toFixed(2)),
     totalRefunds: Number(totalRefunds.toFixed(2)),
     commission, netAfterFees, totalChargebacks, totalPaidOut, pendingBalance,
+    reservedBalance,
     holdDays: HOLD_DAYS,
-    nextClearanceDate: nextClearanceMs ? new Date(nextClearanceMs).toISOString() : null,
+    reserveDays: RESERVE_DAYS,
+    reserveRate: RESERVE_RATE,
+    nextClearanceDate:     nextClearanceMs     ? new Date(nextClearanceMs).toISOString()     : null,
+    nextReserveReleaseDate: nextReserveReleaseMs ? new Date(nextReserveReleaseMs).toISOString() : null,
   };
 }
 
