@@ -1752,13 +1752,16 @@ router.post('/request-upgrade', authMiddleware, requireApprovedVendor, async (re
 
     // Store upgrade request in database
     await Vendor.findByIdAndUpdate(vendor._id, {
-      upgradeRequest: {
-        requestedAt: new Date(),
-        requestedTier: nextTier,
-        message: message || '',
-        status: 'pending',
+      $set: {
+        upgradeRequest: {
+          requestedAt: new Date(),
+          requestedTier: nextTier,
+          message: message || '',
+          status: 'pending',
+        },
       },
     });
+    console.log(`[request-upgrade] saved for vendor ${vendor._id} → ${nextTier}`);
 
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@sell4life.com';
     const storeName = vendor.storeName || vendor.businessName || 'Unknown Store';

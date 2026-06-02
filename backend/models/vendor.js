@@ -83,6 +83,16 @@ const vendorSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+
+    upgradeRequest: {
+      requestedAt: Date,
+      requestedTier: String,
+      message: String,
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+      },
+    },
   },
   { timestamps: true }
 );
