@@ -1,5 +1,6 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
+import { computeVendorBalance } from '../utils/vendorBalance.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -517,6 +518,7 @@ router.get('/:id/transactions', async (req, res) => {
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const net = Number((totalSales - totalRefunds).toFixed(2));
+    const balance = await computeVendorBalance(vendor._id);
     res.json({
       vendor: {
         _id:          vendor._id,
@@ -544,6 +546,7 @@ router.get('/:id/transactions', async (req, res) => {
       truncated,
       showing:     ordersRaw.length,
       totalOrders: totalMatchingOrders,
+      balance,
     });
   } catch (err) {
     console.error('Admin vendor transactions error:', err);
