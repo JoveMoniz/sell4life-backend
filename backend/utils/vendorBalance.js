@@ -40,9 +40,10 @@ export async function computeVendorBalance(vendorId) {
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross        = 0;
-  let totalReserved     = 0;
-  let totalGrossAllTime = 0;
+  let totalGross        = 0;  // cleared items only (hold passed)
+  let totalReserved     = 0;  // in reserve window
+  let totalGrossAllTime = 0;  // delivered items (for hold/reserve math)
+  let totalGrossAllPaid = 0;  // ALL paid items regardless of status (for commission display)
   let totalRefunds      = 0;
   let totalStripeFees   = 0;
   let nextClearanceMs      = null;
@@ -55,6 +56,12 @@ export async function computeVendorBalance(vendorId) {
     const ps     = (order.paymentStatus || '').toLowerCase();
     const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
     if (!isPaid) return;
+
+    // Count ALL paid items for all-time commission (matches transactions page)
+    vendorItems.forEach(item => {
+      if (['Cancelled'].includes(item.status)) return;
+      totalGrossAllPaid += Number(item.price || 0) * Number(item.quantity || 0);
+    });
 
     vendorItems.forEach(item => {
       if (item.status !== 'Delivered') return;
@@ -113,8 +120,8 @@ export async function computeVendorBalance(vendorId) {
   const commission   = Number((netSales * COMMISSION_RATE).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
-  // All-time commission (for display — matches transactions page)
-  const netSalesAllTime      = Math.max(0, totalGrossAllTime - totalRefunds);
+  // All-time commission (for display — matches transactions page, counts all paid items)
+  const netSalesAllTime      = Math.max(0, totalGrossAllPaid - totalRefunds);
   const commissionAllTime    = Number((netSalesAllTime * COMMISSION_RATE).toFixed(2));
   const netAfterFeesAllTime  = Number((netSalesAllTime - commissionAllTime).toFixed(2));
 
