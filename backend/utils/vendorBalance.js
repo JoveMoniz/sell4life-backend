@@ -2,12 +2,12 @@ import Order  from '../models/order.js';
 import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 
-export const COMMISSION_RATE = 0.08;
-export const HOLD_DAYS       = 30;
-export const RESERVE_DAYS    = 90;
-export const RESERVE_STANDARD = 0.10;
-export const RESERVE_TRUSTED  = 0.05;
-export const TRUSTED_MONTHS   = 6;
+export const COMMISSION_RATE   = 0.08;
+export const HOLD_DAYS         = 30;
+export const RESERVE_DAYS      = 90;
+export const RESERVE_STANDARD  = 0.10;
+export const RESERVE_TRUSTED   = 0.05;
+export const TRUSTED_MONTHS    = 6;
 export const MIN_PAYOUT        = 20;
 
 export function resolveReserveRate(vendor, ordersRaw) {
@@ -38,9 +38,10 @@ export async function computeVendorBalance(vendorId) {
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross    = 0;
-  let totalReserved = 0;
-  let totalRefunds  = 0;
+  let totalGross       = 0; // cleared items only (payout-eligible)
+  let totalReserved    = 0; // in reserve window
+  let totalGrossAllTime = 0; // all paid+delivered items (for all-time commission display)
+  let totalRefunds     = 0;
   let nextClearanceMs      = null;
   let nextReserveReleaseMs = null;
 
@@ -54,14 +55,22 @@ export async function computeVendorBalance(vendorId) {
 
     vendorItems.forEach(item => {
       if (item.status !== 'Delivered') return;
-      const deliveredAt = item.deliveredAt ? new Date(item.deliveredAt).getTime() : 0;
+
+      // Fall back to order creation date if deliveredAt not recorded
+      const deliveredAt = item.deliveredAt
+        ? new Date(item.deliveredAt).getTime()
+        : new Date(order.createdAt || 0).getTime();
       if (!deliveredAt) return;
 
       const clearsAt          = deliveredAt + holdMs;
       const reserveReleasesAt = deliveredAt + reserveMs;
       const itemValue         = Number(item.price || 0) * Number(item.quantity || 0);
 
+      // Always count toward all-time gross (for commission display)
+      totalGrossAllTime += itemValue;
+
       if (now < clearsAt) {
+        // Still in delivery hold — track when it clears
         if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         return;
       }
@@ -87,16 +96,22 @@ export async function computeVendorBalance(vendorId) {
     });
   });
 
-  const netSales    = Math.max(0, totalGross - totalRefunds);
-  const commission  = Number((netSales * COMMISSION_RATE).toFixed(2));
+  // Cleared balance (payout-eligible)
+  const netSales     = Math.max(0, totalGross - totalRefunds);
+  const commission   = Number((netSales * COMMISSION_RATE).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
+
+  // All-time commission (for display — matches transactions page)
+  const netSalesAllTime      = Math.max(0, totalGrossAllTime - totalRefunds);
+  const commissionAllTime    = Number((netSalesAllTime * COMMISSION_RATE).toFixed(2));
+  const netAfterFeesAllTime  = Number((netSalesAllTime - commissionAllTime).toFixed(2));
 
   let totalChargebacks = 0;
   ordersRaw.forEach(order => {
     const vendorItems = (order.items || []).filter(
       item => String(item.vendorId) === String(vendorId)
     );
-    const itemsTotal = vendorItems.reduce(
+    const itemsTotal  = vendorItems.reduce(
       (s, item) => s + Number(item.price || 0) * Number(item.quantity || 0), 0
     );
     const orderTotal  = Number(order.total || 0);
@@ -115,9 +130,15 @@ export async function computeVendorBalance(vendorId) {
 
   return {
     pendingBalance, reservedBalance,
-    grossRevenue:  Number(totalGross.toFixed(2)),
-    totalRefunds:  Number(totalRefunds.toFixed(2)),
+    // Cleared-only figures (for payout math)
+    grossRevenue: Number(totalGross.toFixed(2)),
+    totalRefunds: Number(totalRefunds.toFixed(2)),
     commission, netAfterFees, totalChargebacks, totalPaidOut,
+    // All-time figures (for display — matches transactions page)
+    grossRevenueAllTime:  Number(totalGrossAllTime.toFixed(2)),
+    commissionAllTime,
+    netAfterFeesAllTime,
+    // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
     holdDays: HOLD_DAYS, reserveDays: RESERVE_DAYS,
     nextClearanceDate:      nextClearanceMs      ? new Date(nextClearanceMs).toISOString()      : null,
