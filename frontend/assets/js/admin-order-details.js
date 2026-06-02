@@ -594,9 +594,9 @@ document.addEventListener('click', async (e) => {
           body: JSON.stringify({ quantity: Number(approveBtn.dataset.qty) }) }
       );
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Failed'); return; }
       loadOrder();
-    } catch (err) { alert('Something went wrong'); }
+    } catch (err) { showAlert('Something went wrong'); }
     finally { approveBtn.disabled = false; approveBtn.textContent = 'Approve'; }
     return;
   }
@@ -604,7 +604,7 @@ document.addEventListener('click', async (e) => {
   /* --- Reject return --- */
   const rejectBtn = e.target.closest('.reject-return-btn');
   if (rejectBtn) {
-    const reason = prompt('Rejection reason (optional):') ?? '';
+    const reason = (await showPrompt('Rejection reason (optional):')) ?? '';
     rejectBtn.disabled = true;
     rejectBtn.textContent = '...';
     try {
@@ -614,9 +614,9 @@ document.addEventListener('click', async (e) => {
           body: JSON.stringify({ reason }) }
       );
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Failed'); return; }
       loadOrder();
-    } catch (err) { alert('Something went wrong'); }
+    } catch (err) { showAlert('Something went wrong'); }
     finally { rejectBtn.disabled = false; rejectBtn.textContent = 'Reject'; }
     return;
   }
@@ -635,9 +635,9 @@ document.addEventListener('click', async (e) => {
           body: JSON.stringify({ quantity: Number(markReturnedBtn.dataset.qty), condition }) }
       );
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Failed'); return; }
       loadOrder();
-    } catch (err) { alert('Something went wrong'); }
+    } catch (err) { showAlert('Something went wrong'); }
     finally { markReturnedBtn.disabled = false; markReturnedBtn.textContent = 'Mark Returned'; }
     return;
   }
@@ -671,7 +671,7 @@ document.addEventListener('click', async (e) => {
     const qty = Number(document.getElementById('modalQtyInput').value);
 
     if (!qty || qty < 1 || qty > _refundTarget.maxQty) {
-      alert(`Enter a quantity between 1 and ${_refundTarget.maxQty}`);
+      await showAlert(`Enter a quantity between 1 and ${_refundTarget.maxQty}`);
       return;
     }
 
@@ -692,16 +692,16 @@ document.addEventListener('click', async (e) => {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Refund failed');
+        await showAlert(data.error || 'Refund failed');
         return;
       }
 
       document.getElementById('itemRefundModal').style.display = 'none';
-      alert(`Refund of £${Number(data.refundedAmount || 0).toFixed(2)} processed successfully.`);
+      await showAlert(`Refund of £${Number(data.refundedAmount || 0).toFixed(2)} processed successfully.`);
       loadOrder();
     } catch (err) {
       console.error(err);
-      alert('Something went wrong. Please try again.');
+      await showAlert('Something went wrong. Please try again.');
     } finally {
       btn.disabled    = false;
       btn.textContent = 'Confirm Refund';
@@ -738,14 +738,14 @@ updateBtn.addEventListener('click', async () => {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data.error || 'Update failed');
+      await showAlert(data.error || 'Update failed');
       return;
     }
 
     loadOrder();
   } catch (err) {
     console.error(err);
-    alert('Something went wrong');
+    await showAlert('Something went wrong');
   } finally {
     updateBtn.textContent = 'Update Status';
   }
@@ -767,15 +767,15 @@ if (cancelRefundBtn) {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to cancel refund');
+        await showAlert(data.error || 'Failed to cancel refund');
         return;
       }
 
-      alert('Refund schedule cancelled');
+      await showAlert('Refund schedule cancelled');
       loadOrder();
     } catch (err) {
       console.error(err);
-      alert('Something went wrong');
+      await showAlert('Something went wrong');
     } finally {
       cancelRefundBtn.disabled    = false;
       cancelRefundBtn.textContent = 'Cancel Refund';

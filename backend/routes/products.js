@@ -356,6 +356,42 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
 });
 
 /* ======================================================
+   BULK EDIT (Professional+)
+   PATCH /products/bulk { ids: [...], price?, stock?, active? }
+====================================================== */
+router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const { ids, price, stock, active } = req.body;
+
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ error: 'Invalid product ID in ids' });
+    }
+
+    const update = {};
+    if (price  !== undefined && price  !== null && Number.isFinite(Number(price)))  update.price  = Number(price);
+    if (stock  !== undefined && stock  !== null && Number.isFinite(Number(stock)))  update.stock  = Math.max(0, Math.round(Number(stock)));
+    if (active !== undefined) update.active = !!active;
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'Nothing to update' });
+    }
+
+    const result = await Product.updateMany(
+      { _id: { $in: ids }, vendor: req.vendor._id },
+      { $set: update }
+    );
+
+    res.json({ success: true, updated: result.modifiedCount });
+  } catch (err) {
+    console.error('Bulk edit error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    DUPLICATE PRODUCT (Professional+)
 ====================================================== */
 

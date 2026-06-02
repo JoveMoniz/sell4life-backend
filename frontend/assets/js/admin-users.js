@@ -215,15 +215,15 @@ document.getElementById('usersTable').addEventListener('click', async e => {
   // Ban
   const banBtn = e.target.closest('.user-ban-btn');
   if (banBtn) {
-    if (!confirm('Ban this user?')) return;
+    if (!await showConfirm('Ban this user?')) return;
     banBtn.disabled = true;
     banBtn.textContent = '...';
     try {
       const res  = await authFetch(`${API}/admin/users/${banBtn.dataset.id}/ban`, { method: 'PATCH' });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Failed'); return; }
       loadUsers(currentQuery, currentPage);
-    } catch (err) { alert('Something went wrong'); }
+    } catch (err) { showAlert('Something went wrong'); }
     finally { banBtn.disabled = false; banBtn.textContent = 'Ban'; }
     return;
   }
@@ -231,15 +231,15 @@ document.getElementById('usersTable').addEventListener('click', async e => {
   // Unban
   const unbanBtn = e.target.closest('.user-unban-btn');
   if (unbanBtn) {
-    if (!confirm('Unban this user?')) return;
+    if (!await showConfirm('Unban this user?')) return;
     unbanBtn.disabled = true;
     unbanBtn.textContent = '...';
     try {
       const res  = await authFetch(`${API}/admin/users/${unbanBtn.dataset.id}/unban`, { method: 'PATCH' });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Failed'); return; }
       loadUsers(currentQuery, currentPage);
-    } catch (err) { alert('Something went wrong'); }
+    } catch (err) { showAlert('Something went wrong'); }
     finally { unbanBtn.disabled = false; unbanBtn.textContent = 'Unban'; }
     return;
   }
@@ -308,16 +308,16 @@ async function saveRole(userId, newRole, btn) {
     });
     const data = await res.json();
 
-    if (!res.ok) { alert(data.error || 'Failed to update role'); return; }
+    if (!res.ok) { await showAlert(data.error || 'Failed to update role'); return; }
 
     if (data.requiresReauth) {
-      alert('Your role changed. Please sign in again.');
+      await showAlert('Your role changed. Please sign in again.');
       localStorage.clear();
       window.location.href = '/account/admin/signin.html';
       return;
     }
 
-    alert('Role updated. User must sign out and sign in again.');
+    await showAlert('Role updated. User must sign out and sign in again.');
     loadUsers(currentQuery, currentPage);
   } catch (err) {
     console.error('Update error:', err);

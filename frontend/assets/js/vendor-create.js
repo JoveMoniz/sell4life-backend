@@ -76,13 +76,21 @@ form.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Success — show notice, hide form
+    localStorage.setItem('s4l_isVendor', 'true');
+    localStorage.setItem('s4l_vendorType', storeType);
+
+    if (data.autoApproved) {
+      // Casual vendors are approved instantly — go straight to dashboard
+      localStorage.setItem('s4l_vendorStatus', 'approved');
+      window.location.replace('/account/vendor/dashboard-casual.html');
+      return;
+    }
+
+    // Other tiers need admin review — show pending notice
+    localStorage.setItem('s4l_vendorStatus', 'pending');
     form.style.display = 'none';
     const notice = document.getElementById('successNotice');
     if (notice) notice.style.display = 'block';
-
-    localStorage.setItem('s4l_isVendor', 'true');
-    localStorage.setItem('s4l_vendorStatus', 'pending');
 
   } catch {
     msg.textContent = 'Server error. Please try again.';

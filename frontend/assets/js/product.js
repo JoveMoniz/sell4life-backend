@@ -58,6 +58,12 @@ console.log('product.js loaded');
     $('.product-category').textContent = sub ? `${cat} › ${sub}` : cat;
   }
 
+  // Casual vendors sell single items → use "Sold" instead of "Out of stock"
+  const _vendorType = (product.vendor && typeof product.vendor === 'object' && product.vendor !== null)
+    ? (product.vendor.type || null)
+    : null;
+  const _oosLabel = _vendorType === 'casual' ? 'Sold' : 'Out of stock';
+
   // ── Price ──────────────────────────────────────────────────
   if ($('.product-price')) {
     $('.product-price').textContent = `£${Number(product.price).toFixed(2)}`;
@@ -81,7 +87,13 @@ console.log('product.js loaded');
   // ── Stock badge ────────────────────────────────────────────
   const stockBadge = document.getElementById('pd-stock-badge');
   if (stockBadge && product.stock !== undefined) {
-    if (product.stock > 0 && product.stock <= 2) {
+    if (product.stock <= 0 && _vendorType === 'casual') {
+      stockBadge.textContent = 'Sold';
+      stockBadge.className = 'pd-stock-badge oos';
+    } else if (product.stock <= 0) {
+      stockBadge.textContent = 'Out of stock';
+      stockBadge.className = 'pd-stock-badge oos';
+    } else if (product.stock <= 2) {
       stockBadge.textContent = `Only ${product.stock} left!`;
       stockBadge.className = 'pd-stock-badge critical';
     } else if (product.stock <= 5) {
@@ -115,10 +127,21 @@ console.log('product.js loaded');
     return `<p class="pd-gallery-short">${text}</p>`;
   }
 
-  // ── Gallery info: bullets under slider (desktop only) ──────
+  // ── Gallery info: bullets under slider (desktop) ──────────
   const galleryInfoEl = document.getElementById('pd-gallery-info');
   if (galleryInfoEl && bulletPoints) {
     galleryInfoEl.innerHTML = renderBullets(bulletPoints);
+  }
+
+  // ── Bullet points in right column (all screen sizes) ────────
+  const bulletsEl = document.getElementById('pd-bullets');
+  if (bulletsEl && bulletPoints) {
+    const lines = bulletPoints.split(/\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length) {
+      bulletsEl.innerHTML = '<ul class="pd-bullets">' +
+        lines.map(l => `<li>${l.replace(/^[•\-\*✓]\s*/, '')}</li>`).join('') +
+        '</ul>';
+    }
   }
 
   // ── Full description + read more ───────────────────────────
@@ -176,6 +199,16 @@ console.log('product.js loaded');
     const verifiedBadge = document.getElementById('pd-verified-badge');
     if (verifiedBadge && displayName !== 'Seller') {
       verifiedBadge.classList.add('show');
+    }
+
+    // Verified Refurbisher Badge — only for refurbished vendors with badge enabled
+    const vObj = typeof vendorObj === 'object' ? vendorObj : null;
+    if (vObj?.refurbishedBadge && vObj?.type === 'refurbished') {
+      const refurbBadge = document.createElement('span');
+      refurbBadge.className = 'pd-refurb-badge';
+      refurbBadge.textContent = '🔧 Verified Refurbisher';
+      const sellerInfo = document.querySelector('.pd-seller-info');
+      if (sellerInfo) sellerInfo.appendChild(refurbBadge);
     }
   } else {
     if (sellerStrip) sellerStrip.style.display = 'none';
@@ -299,9 +332,9 @@ console.log('product.js loaded');
           const oos = stockVal !== undefined && stockVal <= 0;
           addBtns.forEach((btn) => {
             btn.disabled = oos;
-            btn.textContent = oos ? 'Out of stock' : 'Add to Basket';
+            btn.textContent = oos ? _oosLabel : 'Add to Basket';
           });
-          if (buyBtn) { buyBtn.disabled = oos; buyBtn.textContent = oos ? 'Out of stock' : 'Buy Now'; }
+          if (buyBtn) { buyBtn.disabled = oos; buyBtn.textContent = oos ? _oosLabel : 'Buy Now'; }
         }
         switchGalleryToVariant(v);
       }
@@ -382,8 +415,8 @@ console.log('product.js loaded');
   const isOos = product.stock !== undefined && product.stock <= 0 && (!product.variants || product.variants.length === 0);
 
   if (isOos) {
-    addBtns.forEach((btn) => { btn.disabled = true; btn.textContent = 'Out of stock'; });
-    if (buyBtn) { buyBtn.disabled = true; buyBtn.textContent = 'Out of stock'; }
+    addBtns.forEach((btn) => { btn.disabled = true; btn.textContent = _oosLabel; });
+    if (buyBtn) { buyBtn.disabled = true; buyBtn.textContent = _oosLabel; }
   }
 
   // ── Prevent vendor from purchasing their own product ──────────────────
@@ -391,7 +424,8 @@ console.log('product.js loaded');
   const _productVendorId = typeof product.vendor === 'object'
     ? (product.vendor?._id || product.vendor?.id)
     : product.vendor;
-  if (_myVendorId && _productVendorId && _myVendorId === String(_productVendorId)) {
+  const _loggedIn = !!localStorage.getItem('s4l_token');
+  if (_loggedIn && _myVendorId && _productVendorId && _myVendorId === String(_productVendorId)) {
     const _pid = product._id || product.id;
     addBtns.forEach((btn) => {
       btn.disabled = true;

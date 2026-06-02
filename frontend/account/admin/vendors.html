@@ -9,7 +9,7 @@
 
     <title>Admin – Vendors</title>
 
-    <link rel="stylesheet" href="/assets/css/admin.css" />
+    <link rel="stylesheet" href="/assets/css/admin.css?v=20260602a" />
     <style>#logoutBtn { padding: 5px 10px; font-size: 12px; font-weight: 500; }</style>
   </head>
 
@@ -56,27 +56,51 @@
       </div>
     </div>
 
-    <!-- PAYOUT REQUESTS PANEL -->
-    <div id="payout-panel" class="admin-payout-panel">
-      <div id="payout-panel-toggle" class="admin-payout-toggle">
-        <strong>Payout Requests</strong>
+    <!-- NOTIFICATION BUTTONS -->
+    <div class="admin-notif-bar">
+      <button type="button" id="payout-panel-toggle" class="admin-notif-btn">
+        Payout Requests
         <span id="payout-badge" class="admin-payout-badge">0</span>
-      </div>
-      <div id="payout-panel-body" class="admin-payout-body">
-        <table class="admin-payout-table">
-          <thead>
-            <tr>
-              <th>Vendor</th>
-              <th>Amount</th>
-              <th>Requested</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="payout-requests-body">
-            <tr><td colspan="4" class="admin-payout-empty">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
+      </button>
+      <button type="button" id="upgrade-panel-toggle" class="admin-notif-btn">
+        Tier Upgrades
+        <span id="upgrade-badge" class="admin-payout-badge">0</span>
+      </button>
+    </div>
+
+    <!-- PAYOUT DROPDOWN -->
+    <div id="payout-panel-body" class="admin-notif-panel">
+      <table class="admin-payout-table">
+        <thead>
+          <tr>
+            <th>Vendor</th>
+            <th>Amount</th>
+            <th>Requested</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="payout-requests-body">
+          <tr><td colspan="4" class="admin-payout-empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- UPGRADE DROPDOWN -->
+    <div id="upgrade-panel-body" class="admin-notif-panel">
+      <table class="admin-payout-table">
+        <thead>
+          <tr>
+            <th>Vendor</th>
+            <th>Current Tier</th>
+            <th>Requested</th>
+            <th>Message</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="upgrade-requests-body">
+          <tr><td colspan="5" class="admin-payout-empty">No pending requests</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- TOOLBAR -->
@@ -116,7 +140,7 @@
     <!-- Scripts -->
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/require-admin.js"></script>
-    <script type="module" src="/assets/js/admin-vendors.js?v=20260523b"></script>
+    <script type="module" src="/assets/js/admin-vendors.js?v=20260602c"></script>
     <script type="module" src="/assets/js/admin-logout.js?v=20260211"></script>
   </body>
 </html>

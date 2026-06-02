@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>List an Item | Sell4Life</title>
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style>
+      .cl-form { max-width: 640px; display: flex; flex-direction: column; gap: 22px; }
+
+      .cl-field { display: flex; flex-direction: column; gap: 6px; }
+      .cl-field label {
+        font-size: 0.88rem; font-weight: 700; color: #111827;
+      }
+      .cl-field input, .cl-field select, .cl-field textarea {
+        padding: 10px 13px; border: 1.5px solid #d1d5db;
+        border-radius: 8px; font-size: 0.95rem;
+        font-family: inherit; outline: none;
+        transition: border-color 0.15s;
+      }
+      .cl-field input:focus, .cl-field select:focus, .cl-field textarea:focus {
+        border-color: #0b6b6a;
+      }
+      .cl-field textarea { resize: vertical; min-height: 80px; }
+      .cl-hint { font-size: 0.78rem; color: #9ca3af; }
+      .cl-req { color: #ef4444; }
+
+      /* Photos */
+      .cl-photos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+      .cl-photo-slot {
+        aspect-ratio: 1;
+        border: 2px dashed #d1d5db;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; position: relative; overflow: hidden;
+        background: #f9fafb; transition: border-color 0.15s;
+      }
+      .cl-photo-slot:hover { border-color: #0b6b6a; }
+      .cl-photo-slot input[type=file] { display: none; }
+      .cl-photo-slot img {
+        width: 100%; height: 100%; object-fit: cover; border-radius: 8px;
+      }
+      .cl-photo-slot .slot-label {
+        font-size: 0.72rem; color: #9ca3af; text-align: center; padding: 4px;
+      }
+      .cl-photo-slot .slot-remove {
+        position: absolute; top: 4px; right: 4px;
+        background: rgba(0,0,0,0.55); color: #fff;
+        border: none; border-radius: 50%; width: 20px; height: 20px;
+        font-size: 11px; cursor: pointer; display: none;
+        align-items: center; justify-content: center;
+      }
+      .cl-photo-slot.has-image .slot-remove { display: flex; }
+      .cl-subcat-wrap-hidden { display: none; }
+      .cl-optional { font-weight: 400; color: #9ca3af; }
+
+      /* Video slot */
+      .cl-video-slot {
+        border: 2px dashed #d1d5db; border-radius: 10px;
+        padding: 18px; text-align: center; cursor: pointer;
+        background: #f9fafb; transition: border-color 0.15s;
+        position: relative;
+      }
+      .cl-video-slot:hover { border-color: #0b6b6a; }
+      .cl-video-slot.uploading { border-color: #f18c28; }
+      .cl-video-slot p { font-size: 0.85rem; color: #6b7280; margin: 4px 0 0; }
+      .cl-video-slot video { width: 100%; border-radius: 6px; max-height: 180px; }
+      .cl-video-remove {
+        position: absolute; top: 8px; right: 8px;
+        background: rgba(0,0,0,0.55); color: #fff; border: none;
+        border-radius: 50%; width: 24px; height: 24px; font-size: 12px;
+        cursor: pointer; display: none; align-items: center; justify-content: center;
+      }
+      .cl-video-slot.has-video .cl-video-remove { display: flex; }
+      #cl-video-input { display: none; }
+      .cl-photo-slot.uploading { border-color: #f18c28; }
+      .cl-photo-slot .upload-spinner {
+        position: absolute; inset: 0; background: rgba(255,255,255,0.75);
+        display: none; align-items: center; justify-content: center;
+        font-size: 0.72rem; color: #0b6b6a; font-weight: 600;
+      }
+      .cl-photo-slot.uploading .upload-spinner { display: flex; }
+
+      /* Price row */
+      .cl-price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+      /* Submit */
+      .cl-submit {
+        padding: 13px; background: #0b6b6a; color: #fff;
+        border: none; border-radius: 10px; font-size: 1rem;
+        font-weight: 700; cursor: pointer; transition: background 0.2s;
+        margin-top: 4px;
+      }
+      .cl-submit:hover { background: #095f5e; }
+      .cl-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+      .cl-msg { font-size: 0.88rem; min-height: 20px; }
+      .cl-msg.error { color: #dc2626; }
+      .cl-msg.success { color: #15803d; }
+
+      @media (max-width: 480px) {
+        .cl-photos { grid-template-columns: repeat(3, 1fr); }
+        .cl-price-row { grid-template-columns: 1fr; }
+      }
+    </style>
+    <style id="s4l-fouc">html{visibility:hidden}</style>
+  </head>
+
+  <body class="s4l-loading" data-vendor-tier="casual">
+    <div class="vendor-layout">
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/account/vendor/dashboard-casual.html" class="vendor-back-link">← Back to dashboard</a>
+          <h1 class="vendor-title">List an Item</h1>
+
+          <form class="cl-form" id="cl-form" novalidate>
+
+            <!-- Title -->
+            <div class="cl-field">
+              <label for="cl-title">What are you selling? <span class="cl-req">*</span></label>
+              <input type="text" id="cl-title" placeholder="e.g. iPhone 13 Pro — 256GB Space Grey" maxlength="120" required />
+              <span class="cl-hint">Keep it clear and specific — buyers search by title</span>
+            </div>
+
+            <!-- Photos -->
+            <div class="cl-field">
+              <label>Photos <span class="cl-req">*</span></label>
+              <div class="cl-photos" id="cl-photos">
+                <div class="cl-photo-slot" data-slot="1"><input type="file" accept="image/*" /><span class="slot-label">Main<br>photo</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="2"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="3"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="4"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="5"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="6"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="7"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="8"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="9"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+                <div class="cl-photo-slot" data-slot="10"><input type="file" accept="image/*" /><span class="slot-label">+ Add</span><div class="upload-spinner">Uploading…</div><button type="button" class="slot-remove">✕</button></div>
+              </div>
+              <span class="cl-hint">Tap a slot to take a photo or pick from gallery. First photo is the main image.</span>
+            </div>
+
+            <!-- Video -->
+            <div class="cl-field">
+              <label>Video <span class="cl-optional">(optional — show it working or in use)</span></label>
+              <div class="cl-video-slot" id="cl-video-slot">
+                <input type="file" id="cl-video-input" accept="video/*" />
+                <span class="cl-video-icon">🎥</span>
+                <p>Tap to record or choose a video</p>
+                <button type="button" class="cl-video-remove" id="cl-video-remove">✕</button>
+              </div>
+            </div>
+
+            <!-- Price + Shipping -->
+            <div class="cl-price-row">
+              <div class="cl-field">
+                <label for="cl-price">Price (£) <span class="cl-req">*</span></label>
+                <input type="number" id="cl-price" placeholder="0.00" min="0.01" step="0.01" required />
+              </div>
+              <div class="cl-field">
+                <label for="cl-shipping">Shipping cost (£)</label>
+                <input type="number" id="cl-shipping" placeholder="0.00 = Free" min="0" step="0.01" />
+              </div>
+            </div>
+
+            <!-- Condition -->
+            <div class="cl-field">
+              <label for="cl-condition">Condition <span class="cl-req">*</span></label>
+              <select id="cl-condition" required>
+                <option value="">— Select condition —</option>
+                <option value="New">New — unused, in original packaging</option>
+                <option value="Used - Like New">Used — like new, barely used</option>
+                <option value="Used - Good">Used — good condition, minor wear</option>
+                <option value="Used - Fair">Used — fair condition, visible wear</option>
+                <option value="For Parts">For parts / not working</option>
+              </select>
+            </div>
+
+            <!-- Category -->
+            <div class="cl-field">
+              <label for="cl-category">Category <span class="cl-req">*</span></label>
+              <select id="cl-category" required>
+                <option value="">— Select category —</option>
+                <option value="fashion">Fashion & Clothing</option>
+                <option value="electronics">Electronics & Technology</option>
+                <option value="home">Home, Garden & DIY</option>
+                <option value="books">Books, Music & Films</option>
+                <option value="toys">Toys & Games</option>
+                <option value="health">Health & Beauty</option>
+                <option value="sports">Sports & Outdoors</option>
+                <option value="automotive">Automotive</option>
+                <option value="food">Food & Drink</option>
+                <option value="baby">Baby & Kids</option>
+                <option value="pets">Pets</option>
+                <option value="arts">Arts, Crafts & Hobbies</option>
+                <option value="office">Office & Stationery</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <!-- Subcategory -->
+            <div class="cl-field cl-subcat-wrap-hidden" id="cl-subcat-wrap">
+              <label for="cl-subcategory">Subcategory</label>
+              <select id="cl-subcategory">
+                <option value="">— Select subcategory —</option>
+              </select>
+            </div>
+
+            <!-- Description -->
+            <div class="cl-field">
+              <label for="cl-desc">Description <span class="cl-optional">(optional)</span></label>
+              <textarea id="cl-desc" placeholder="Describe your item — size, colour, any defects, reason for selling…" maxlength="2000"></textarea>
+            </div>
+
+            <div class="cl-msg" id="cl-msg"></div>
+            <button type="submit" class="cl-submit" id="cl-submit">List Item</button>
+
+          </form>
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script>
+      // Redirect non-casual vendors to the full form
+      const _tier = localStorage.getItem('s4l_vendorType');
+      if (_tier && _tier !== 'casual') {
+        window.location.replace('/account/vendor/add-product.html');
+      }
+
+      const CLD_CLOUD  = 'djpkj0s7w';
+      const CLD_PRESET = 'lhhkniqv';
+      const photoUrls  = { 1:null,2:null,3:null,4:null,5:null,6:null,7:null,8:null,9:null,10:null };
+      const pending    = new Set();
+
+      const SUBCATS = {
+        fashion:["Women's Dresses","Women's Tops & T-Shirts","Women's Trousers & Skirts","Women's Coats & Jackets","Women's Knitwear & Cardigans","Women's Swimwear","Women's Lingerie & Nightwear","Women's Activewear","Women's Plus Size","Men's T-Shirts & Tops","Men's Shirts","Men's Trousers & Chinos","Men's Suits & Blazers","Men's Hoodies & Sweatshirts","Men's Activewear","Men's Underwear & Socks","Men's Coats & Jackets","Girls Clothing (3-13)","Boys Clothing (3-13)","Baby & Infant Clothing (0-2)","School Uniform","Trainers & Sneakers","Boots","Heels & Wedges","Sandals & Flip Flops","Formal & Smart Shoes","Sports Shoes","Slippers","Bags & Handbags","Backpacks","Hats & Caps","Scarves & Wraps","Belts","Sunglasses","Jewellery","Watches","Gloves & Mittens"],
+        electronics:["Smartphones","Mobile Phone Cases & Covers","Mobile Chargers & Cables","Screen Protectors","Power Banks","Tablets & E-Readers","Tablet Accessories","Laptops","Desktop Computers","Computer Monitors","PC Components (CPU, GPU, RAM)","Storage (SSDs, HDDs, USB Drives)","Keyboards & Mice","Laptop Bags & Sleeves","Computer Accessories","TVs","Projectors & Screens","Blu-ray & DVD Players","Remote Controls","Headphones & Earphones","Speakers","Soundbars & Home Cinema","DAC & Amplifiers","Gaming Consoles","Video Games","Gaming Controllers","Gaming Headsets","Gaming Chairs & Desks","PC Gaming Accessories","Digital Cameras (DSLR / Mirrorless)","Action Cameras","Camera Lenses","Camera Bags & Accessories","Tripods & Stabilisers","Smart Speakers & Displays","Smart Home Hubs","Smart Plugs & Switches","Smart Security Cameras & Doorbells","Smart Lighting","Smartwatches","Fitness Trackers","VR & AR Headsets","Printers & Scanners","Ink & Toner Cartridges","Routers & Networking","Range Extenders","Microwaves","Coffee Machines","Kettles","Toasters","Air Fryers","Cables & Adaptors","Batteries","Car Electronics"],
+        home:["Sofas & Armchairs","Sofa Beds","Coffee Tables & Side Tables","Dining Tables & Chairs","Beds & Bed Frames","Mattresses","Wardrobes & Dressing Tables","Chest of Drawers","Bookcases & Shelving","TV Units & Media Furniture","Office & Study Furniture","Kids Furniture","Duvets & Duvets Sets","Pillows","Bed Sheets & Fitted Sheets","Mattress Toppers & Protectors","Towels & Bathrobes","Weighted Blankets","Pots & Pans","Kitchen Knives","Baking Trays & Tins","Kitchen Utensils & Gadgets","Mixing Bowls & Measuring","Dinnerware & Plates","Glasses & Mugs","Food Storage & Containers","Lunch Boxes","Bathroom Accessories","Shower Curtains & Rails","Bath Mats","Soap Dispensers & Toothbrush Holders","Mirrors","Towel Rails","Garden Furniture & Parasols","Garden Sheds & Storage","Plant Pots & Planters","Seeds, Bulbs & Compost","Lawn Mowers & Garden Tools","BBQ Grills & Accessories","Outdoor Heaters & Fire Pits","Hoses & Watering","Ceiling Lights & Pendants","Floor & Table Lamps","LED Strip Lights","Outdoor & Garden Lighting","Smart Lighting","Wall Art & Prints","Clocks","Candles & Holders","Cushions & Throws","Rugs","Curtains & Blinds","Vases & Ornaments","Power Tools","Hand Tools","Ladders & Steps","Paint, Brushes & Rollers","Wallpaper & Paste","Screws, Fixings & Rawlplugs","Safety & Security (Locks, Alarms)","Cleaning Products","Mops, Brushes & Cloths","Laundry (Detergent, Pegs, Airers)","Storage Boxes & Baskets"],
+        books:["Literary Fiction","Crime & Thriller","Science Fiction","Fantasy","Romance","Horror & Gothic","Historical Fiction","Humour","Short Stories & Poetry","Biographies & Memoirs","History","Politics & Current Affairs","True Crime","Science & Nature","Philosophy","Psychology & Mental Health","Self-Help & Motivation","Business & Entrepreneurship","Economics & Finance","Law","Cookbooks & Food Writing","Travel Writing","Sport & Fitness Books","Art, Architecture & Photography Books","Design & Fashion Books","Parenting & Families","Religion & Spirituality","Children's Picture Books (0-5)","Children's Fiction (6-9)","Children's Fiction (9-12)","Young Adult (YA)","Educational & Textbooks (School)","Academic & University","Comics & Graphic Novels","Manga","CDs & Music Albums","Vinyl Records","DVDs & Blu-ray (Film)","DVDs & Blu-ray (TV Series)","Magazines & Periodicals"],
+        toys:["Baby Toys (0-12 months)","Toddler Toys (1-3 years)","Preschool Toys (3-5 years)","Action Figures & Playsets","Superhero & Movie Figures","Dolls & Dollhouses","Doll Accessories & Clothing","LEGO Sets","Other Building & Construction","Board Games","Card Games & Trading Cards","Puzzles","Remote Control Cars & Trucks","Remote Control Aircraft & Drones","Arts & Crafts Kits for Kids","Science & Discovery Kits","Outdoor Play Equipment","Trampolines","Paddling Pools","Scooters","Balance Bikes & Tricycles","Ride-On Cars","Soft Toys & Stuffed Animals","Fidget & Sensory Toys","Collectible Figures & Blind Boxes","Role Play & Dress Up","Kitchen & Food Play","Electronic & Interactive Toys","Coding & STEM Toys","Sports Toys & Games","Pool & Beach Toys"],
+        health:["Face Moisturisers & Creams","Cleansers, Toners & Micellar Water","Serums & Face Oils","Face Masks & Exfoliators","Sunscreen & SPF","Eye Cream & Treatments","Lip Care","Foundation & Concealer","Powder, Bronzer & Blush","Lipstick, Lip Gloss & Liner","Eyeshadow Palettes","Eyeliner & Mascara","Eyebrow Products","Makeup Setting Sprays & Primers","Makeup Brushes & Sponges","Makeup Remover & Wipes","Shampoo & Conditioner","Hair Treatments & Masks","Hair Styling (Mousse, Gel, Wax, Spray)","Hair Oil & Serum","Hair Colour & Bleach","Heated Styling Tools","Hairbrushes & Combs","Hair Accessories","Perfume (Women's)","Perfume (Men's)","Unisex & Niche Fragrances","Body Sprays & Deodorants","Shaving Razors & Blades","Shaving Foam & Gel","Aftershave & Post-Shave","Electric Shavers & Trimmers","Beard Care & Grooming","Men's Skincare","Vitamins & Multivitamins","Protein Powder & Bars","Pre-Workout & Sports Nutrition","Weight Management","Omega 3, Collagen & Specialist Supplements","Toothbrushes (Manual & Electric)","Toothpaste & Whitening","Mouthwash & Floss","Dental Accessories","Feminine Care","Sexual Health & Contraception","First Aid Kits & Plasters","Pain Relief & Cold & Flu","Blood Pressure Monitors & Health Monitors","Mobility Aids & Supports (Knee, Back, Wrist)","Aromatherapy & Essential Oils","Massage & Relaxation","Bath & Shower Gels","Body Lotion & Creams","Soap & Hand Wash"],
+        sports:["Dumbbells & Barbells","Weight Benches & Racks","Resistance Bands & Tubes","Yoga Mats & Accessories","Cardio Equipment (Treadmills, Bikes, Rowing)","Pull-Up Bars & Suspension Trainers","Foam Rollers & Recovery","Road Bikes","Mountain Bikes","Electric Bikes","Cycling Helmets","Cycling Clothing","Cycling Accessories","Running Shoes (Men's)","Running Shoes (Women's)","Running Clothing & Tights","Running Accessories & Gadgets","Swimming Costumes & Trunks","Swim Goggles & Caps","Swimming Equipment & Pull Buoys","Football Boots & Trainers","Footballs","Football Clothing","Rugby","Cricket","Basketball","Netball","Tennis Rackets & Strings","Badminton","Squash","Golf Clubs","Golf Bags & Trolleys","Golf Clothing & Accessories","Camping Tents","Sleeping Bags & Mats","Hiking Boots & Trail Shoes","Hiking Clothing","Rucksacks & Hydration Packs","Camping Cooking & Lanterns","Surfing & Bodyboarding","Kayaking & Paddleboarding","Water Ski & Wakeboard","Wetsuits","Ski & Snowboard Equipment","Ski Clothing & Accessories","Boxing Gloves & Bags","Martial Arts & MMA","Wrestling","Fishing Rods","Fishing Reels & Lines","Fishing Tackle & Bait","Hunting & Shooting Accessories","Sports Nutrition & Recovery","Sports Protective Gear"],
+        automotive:["Dash Cams","Sat Nav & GPS","Car Stereos & Head Units","Car Speakers & Amplifiers","Parking Sensors & Cameras","Car Seat Covers","Car Mats (Rubber & Carpet)","Steering Wheel Covers","Phone Holders & Mounts","Car Air Fresheners","Sunshades & Window Covers","Car Cleaning & Valeting Kits","Car Wax & Polish","Scratch Removers & Paint Protection","Jump Starters & Battery Chargers","Car Inverters & Power Adapters","Tyre Inflators & Gauges","Engine Oil & Additives","Coolant & Antifreeze","Brake Pads & Discs","Oil, Air & Fuel Filters","Spark Plugs","Bulbs & LED Lighting","Wipers","Tyres","Alloy Wheels","Wheel Trims & Hub Caps","Car Body Trim & Accessories","Car Tools & Garage Equipment","Jacks & Axle Stands","Tow Ropes & Recovery Straps","Tow Bars","Child Car Seats & Boosters","Motorbike Helmets","Motorbike Clothing & Gloves","Motorbike Parts","Motorbike Accessories","Van Racking & Storage","Van Accessories"],
+        food:["Fresh Fruit","Fresh Vegetables","Fresh Herbs","Bread & Bakery","Cakes & Pastries","Meat & Poultry","Fish & Seafood","Dairy (Milk, Cheese, Butter, Yoghurt)","Eggs","Tinned Vegetables & Beans","Tinned Fish & Meat","Tinned Soups","Pasta, Noodles & Rice","Grains, Pulses & Lentils","Breakfast Cereals & Granola","Porridge & Oats","Sauces, Gravies & Marinades","Ketchup, Mustard & Mayo","Spices, Herbs & Seasonings","Salt & Pepper","Cooking Oils, Vinegar & Dressings","Snacks, Crisps & Popcorn","Nuts & Dried Fruit","Chocolate & Sweets","Biscuits & Cookies","Crackers","Tea","Coffee & Hot Chocolate","Herbal & Fruit Infusions","Soft Drinks & Juices","Energy Drinks","Water","Beer & Cider","Wine","Spirits & Liqueurs","Non-Alcoholic Alternatives","Organic & Natural Foods","Vegan & Plant-Based","Gluten-Free","Diabetic & Low-Sugar","World Foods (Asian, Caribbean, Middle Eastern, European)","Baking (Flour, Sugar, Yeast, Chocolate Chips)","Jam, Honey & Spreads","Pickles & Chutneys","Baby Food & Formula"],
+        baby:["Baby Bottles & Teats","Breast Pumps","Sterilisers & Warmers","Bibs & Feeding Accessories","Weaning & High Chairs","Baby Food & Formula","Snacks & Drinks for Toddlers","Nappies (Disposable)","Reusable Nappies & Wraps","Nappy Bags & Changing Mats","Baby Wipes","Baby Clothing (0-6 months)","Baby Clothing (6-18 months)","Baby Clothing (18m-2yr)","Toddler Clothing (2-5 years)","Pram Suits & Snowsuits","Baby Footwear","Pushchairs & Prams","Travel Systems","Buggy Boards","Baby Car Seats (Group 0, 0+)","Toddler Car Seats (Group 1, 2, 3)","Baby Monitors (Video & Audio)","Baby Alarms","Cots & Cribs","Moses Baskets & Stands","Baby Bedding & Sleeping Bags","Baby Baths & Changing Units","Baby Skincare & Bath Products","Baby Toiletries","Dummies & Teethers","Baby Carriers & Slings","Baby Bouncers & Rockers","Baby Walkers & Activity Centres","Baby Toys & Rattles","Stair Gates & Baby Safety","Baby Monitors & Safety","Kids Bedroom Furniture","Kids Bedding","School Bags & Lunchboxes","Kids Stationery","Children's Books (0-5)","Children's Books (5-12)"],
+        pets:["Dog Dry Food","Dog Wet Food & Pouches","Dog Treats & Chews","Dog Leads & Harnesses","Dog Collars & ID Tags","Dog Beds & Crates","Dog Coats & Accessories","Dog Toys","Dog Grooming (Brushes, Shampoo, Clippers)","Dog Training & Behaviour","Dog Health & Dental","Cat Dry Food","Cat Wet Food & Pouches","Cat Treats","Cat Litter & Litter Trays","Cat Beds & Cat Trees","Cat Toys","Cat Collars & Leads","Cat Grooming","Cat Flaps & Doors","Cat Health","Fish Tanks & Aquariums","Fish Food","Aquarium Filters, Heaters & Pumps","Aquarium Decorations","Bird Cages & Aviaries","Bird Food & Seed","Bird Treats & Accessories","Rabbit & Guinea Pig Food","Small Animal Cages & Runs","Small Animal Bedding & Accessories","Reptile Vivariums & Enclosures","Reptile Heat & Lighting","Reptile Food & Supplements","Veterinary & Pet Health Products","Flea & Tick Treatment","Pet Carriers & Travel Accessories"],
+        arts:["Acrylic Paints & Sets","Oil Paints & Sets","Watercolour Paints","Gouache & Inks","Spray Paints","Paintbrushes & Palette Knives","Palette & Mixing Trays","Canvas (Stretched & Boards)","Watercolour Paper","Sketchbooks","Pencils, Charcoal & Pastels","Colouring Pencils & Pens","Fine Liners & Technical Pens","Markers & Brush Pens","Fabric & Felt","Yarn & Wool (Knitting & Crochet)","Knitting Needles & Crochet Hooks","Sewing Machines","Sewing Thread & Needles","Fabric Scissors & Cutting Tools","Embroidery & Cross Stitch Kits","Scrapbooking & Card Making","Washi Tape & Stickers","Resin Art Supplies","Jewellery Making (Beads, Wire, Clasps)","Clay & Air-Dry Clay","Sculpting Tools","Printmaking & Lino Cutting","Candle Making (Wax, Wicks, Moulds)","Soap Making","Photography Equipment","Darkroom & Film Photography","Acoustic Guitars","Electric Guitars & Basses","Piano & Digital Keyboards","Drums & Electronic Drum Kits","Ukulele","Violin & Strings","Wind & Brass Instruments","Music Accessories (Strings, Picks, Stands)","Sheet Music & Music Books","Coin Collecting","Stamp Collecting","Trading Cards & Collectibles (Pokémon, Football etc.)","Model Making & Miniatures","Airfix & Scale Models","3D Printing Supplies","Laser Cutting Materials","Party & Event Supplies","Balloons & Decorations"],
+        office:["Ballpoint & Rollerball Pens","Fountain Pens","Gel Pens","Highlighters & Markers","Pencils & Mechanical Pencils","Notebooks (Hardback)","Notebooks (Softback & Spiral)","Planners & Diaries","Sticky Notes & Memo Pads","Folders & Ring Binders","Document Wallets & Sleeves","Filing Cabinets & Desktop Organisers","Paper (A4, A3, Coloured)","Card & Envelopes","Printer Labels & Stickers","Ink Cartridges (Inkjet)","Toner Cartridges (Laser)","Printers","Scanners","Shredders","Laminators & Laminating Pouches","Binding Machines","Desks & Computer Desks","Office Chairs","Monitor Stands & Arms","Cable Management","Whiteboards & Flip Charts","Notice Boards","Staples, Staplers & Hole Punches","Tape & Adhesives","Scissors & Cutters","Rubber Bands & Paper Clips","Postage Scales & Franking","Packaging (Boxes, Bubble Wrap, Tape)"]
+      };
+
+      // Subcategory populate
+      document.getElementById('cl-category').addEventListener('change', function() {
+        const val  = this.value;
+        const wrap = document.getElementById('cl-subcat-wrap');
+        const sel  = document.getElementById('cl-subcategory');
+        if (!val || !SUBCATS[val]) { wrap.classList.add('cl-subcat-wrap-hidden'); return; }
+        sel.innerHTML = '<option value="">— Select subcategory —</option>' +
+          SUBCATS[val].map(s => `<option value="${s}">${s}</option>`).join('');
+        wrap.classList.remove('cl-subcat-wrap-hidden');
+      });
+
+      // Video upload
+      let videoUrl = null;
+      const videoSlot   = document.getElementById('cl-video-slot');
+      const videoInput  = document.getElementById('cl-video-input');
+      const videoRemove = document.getElementById('cl-video-remove');
+
+      videoSlot.addEventListener('click', function(e) {
+        if (e.target === videoRemove || videoRemove.contains(e.target)) return;
+        if (!videoSlot.classList.contains('has-video')) videoInput.click();
+      });
+
+      videoRemove.addEventListener('click', function() {
+        videoUrl = null;
+        videoSlot.classList.remove('has-video', 'uploading');
+        videoSlot.querySelector('video')?.remove();
+        videoSlot.querySelector('.cl-video-icon').style.display = '';
+        videoSlot.querySelector('p').textContent = 'Tap to record or choose a video';
+        videoInput.value = '';
+      });
+
+      videoInput.addEventListener('change', async function() {
+        const file = this.files[0];
+        if (!file) return;
+        if (file.size > 50 * 1024 * 1024) {
+          showMsg('Video must be under 50 MB.', 'error'); this.value = ''; return;
+        }
+        videoSlot.classList.add('uploading');
+        videoSlot.querySelector('p').textContent = 'Uploading video…';
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('upload_preset', CLD_PRESET);
+          const r = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/video/upload`, { method: 'POST', body: fd });
+          const d = await r.json();
+          if (!d.secure_url) throw new Error('Upload failed');
+          videoUrl = d.secure_url;
+          videoSlot.classList.add('has-video');
+          videoSlot.querySelector('.cl-video-icon').style.display = 'none';
+          videoSlot.querySelector('p').textContent = 'Video ready ✓';
+          const vid = document.createElement('video');
+          vid.src = d.secure_url; vid.controls = true;
+          videoSlot.prepend(vid);
+        } catch {
+          showMsg('Video upload failed. Please try again.', 'error');
+          videoSlot.querySelector('p').textContent = 'Tap to record or choose a video';
+        } finally {
+          videoSlot.classList.remove('uploading');
+          this.value = '';
+        }
+      });
+
+      // Photo upload
+      document.getElementById('cl-photos').addEventListener('click', function(e) {
+        const slot = e.target.closest('.cl-photo-slot');
+        if (!slot) return;
+        if (e.target.closest('.slot-remove')) {
+          const n = slot.dataset.slot;
+          photoUrls[n] = null;
+          slot.classList.remove('has-image');
+          slot.querySelector('img')?.remove();
+          slot.querySelector('.slot-label').style.display = '';
+          return;
+        }
+        if (pending.has(slot.dataset.slot)) return;
+        slot.querySelector('input[type=file]').click();
+      });
+
+      document.getElementById('cl-photos').addEventListener('change', async function(e) {
+        if (e.target.type !== 'file') return;
+        const slot = e.target.closest('.cl-photo-slot');
+        const n    = slot.dataset.slot;
+        const file = e.target.files[0];
+        if (!file) return;
+
+        pending.add(n);
+        slot.classList.add('uploading');
+
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('upload_preset', CLD_PRESET);
+          const r = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/image/upload`, { method: 'POST', body: fd });
+          const d = await r.json();
+          if (!d.secure_url) throw new Error('Upload failed');
+
+          photoUrls[n] = d.secure_url;
+          slot.classList.add('has-image');
+          slot.querySelector('.slot-label').style.display = 'none';
+
+          let img = slot.querySelector('img');
+          if (!img) { img = document.createElement('img'); slot.prepend(img); }
+          img.src = d.secure_url;
+        } catch {
+          showMsg('Photo upload failed. Please try again.', 'error');
+        } finally {
+          pending.delete(n);
+          slot.classList.remove('uploading');
+          e.target.value = '';
+        }
+      });
+
+      function showMsg(text, type) {
+        const el = document.getElementById('cl-msg');
+        el.textContent = text;
+        el.className = 'cl-msg ' + (type || '');
+      }
+
+      // Submit
+      document.getElementById('cl-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (pending.size) { showMsg('Please wait — photos still uploading.', 'error'); return; }
+
+        const title     = document.getElementById('cl-title').value.trim();
+        const price     = parseFloat(document.getElementById('cl-price').value);
+        const shipping  = parseFloat(document.getElementById('cl-shipping').value) || 0;
+        const condition = document.getElementById('cl-condition').value;
+        const category  = document.getElementById('cl-category').value;
+        const subcat    = document.getElementById('cl-subcategory').value;
+        const desc      = document.getElementById('cl-desc').value.trim();
+
+        if (!title)     { showMsg('Please enter a title.', 'error'); return; }
+        if (!price || price <= 0) { showMsg('Please enter a valid price.', 'error'); return; }
+        if (!condition) { showMsg('Please select a condition.', 'error'); return; }
+        if (!category)  { showMsg('Please select a category.', 'error'); return; }
+
+        const images = Object.values(photoUrls).filter(Boolean);
+        if (!images.length) { showMsg('Please add at least one photo.', 'error'); return; }
+
+        const btn = document.getElementById('cl-submit');
+        btn.disabled = true;
+        btn.textContent = 'Listing…';
+        showMsg('', '');
+
+        try {
+          const token = localStorage.getItem('s4l_token');
+          const res = await fetch(`${window.API_BASE}/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            credentials: 'include',
+            body: JSON.stringify({
+              name: title,
+              description: desc,
+              price,
+              shippingCost: shipping,
+              condition,
+              category,
+              subcategory: subcat,
+              images,
+              ...(videoUrl && { videoUrl }),
+              active: true,
+              stock: 1,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) { showMsg(data.error || data.message || 'Something went wrong.', 'error'); return; }
+
+          showMsg('Item listed successfully!', 'success');
+          setTimeout(() => window.location.replace('/account/vendor/products.html'), 1200);
+        } catch {
+          showMsg('Server error. Please try again.', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'List Item';
+        }
+      });
+    </script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
+  </body>
+</html>

@@ -28,6 +28,41 @@ body {
   display: none;
 }
 
+/* Bullet points — right column (mobile/tablet only, hidden on desktop where left column shows them) */
+#pd-bullets {
+  display: block;
+}
+
+.pd-bullets {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+}
+
+.pd-bullets li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #edf4f4;
+  font-size: 0.92rem;
+  color: #333;
+  line-height: 1.5;
+}
+
+.pd-bullets li::before {
+  content: '✓';
+  color: #0b6b6a;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Hide right-column bullets on desktop where left gallery info shows them */
+@media (min-width: 1400px) {
+  #pd-bullets { display: none; }
+}
+
 @media (min-width: 1400px) {
   .product-gallery {
     padding-left: 24px;
@@ -37,31 +72,6 @@ body {
     display: block;
     max-width: 650px;
     padding: 20px 8px 0;
-  }
-
-  .pd-bullets {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .pd-bullets li {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid #edf4f4;
-    font-size: 0.95rem;
-    color: #333;
-    line-height: 1.5;
-  }
-
-  .pd-bullets li::before {
-    content: '✓';
-    color: #0b6b6a;
-    font-weight: 700;
-    flex-shrink: 0;
-    margin-top: 1px;
   }
 
   .pd-gallery-short {
@@ -148,6 +158,13 @@ body {
   background: #ffe5e5;
   color: #cc0000;
   border: 1px solid #ffaaaa;
+}
+
+.pd-stock-badge.oos {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
 }
 
 /* ── Descriptions ─────────────────────────────────────────── */
@@ -270,6 +287,21 @@ body {
 
 .pd-verified-badge.show {
   display: inline-flex;
+}
+
+.pd-refurb-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  border-radius: 20px;
+  padding: 2px 9px;
+  white-space: nowrap;
+  margin-top: 3px;
+  width: fit-content;
 }
 
 .pd-seller-link {

@@ -191,6 +191,27 @@ function buildVendorPanel(v) {
           Platform Financials ↗
         </a>
       </div>
+
+      <div style="display:flex;gap:8px;align-items:center;padding-top:10px;margin-top:4px;border-top:1px solid #f3f4f6">
+        <span style="font-size:0.78rem;font-weight:600;color:#6b7280">Set tier:</span>
+        <select class="tier-select" data-id="${v._id}"
+          style="padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.8rem;cursor:pointer">
+          <option value="casual"       ${v.type==='casual'       ?'selected':''}>Casual</option>
+          <option value="refurbished"  ${v.type==='refurbished'  ?'selected':''}>Refurbished</option>
+          <option value="professional" ${v.type==='professional' ?'selected':''}>Professional</option>
+          <option value="enterprise"   ${v.type==='enterprise'   ?'selected':''}>Enterprise</option>
+        </select>
+        ${v.type === 'refurbished' ? `
+        <label style="font-size:0.78rem;display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="refurb-badge-check" data-id="${v._id}" ${v.refurbishedBadge ? 'checked' : ''} />
+          Verified Badge
+        </label>` : ''}
+        <button class="set-tier-btn" data-id="${v._id}"
+          style="padding:4px 12px;background:#0b6b6a;color:#fff;border:none;border-radius:4px;font-size:0.8rem;cursor:pointer">
+          Save
+        </button>
+        <span class="tier-msg" data-id="${v._id}" style="font-size:0.78rem;color:#15803d"></span>
+      </div>
     </div>`;
 }
 
@@ -206,13 +227,63 @@ document.getElementById('vendorsTable').addEventListener('click', async (e) => {
     try {
       const res = await authFetch(`${API}/admin/vendors/${id}/${action}`, { method: 'PATCH' });
       if (!res.ok) {
-        alert('Action failed');
+        showAlert('Action failed');
         return;
       }
       loadVendors(currentPage, currentQuery, currentStatus);
     } catch (err) {
       console.error(err);
     }
+    return;
+  }
+
+  // Set tier — inline confirm
+  const tierBtn = e.target.closest('.set-tier-btn');
+  if (tierBtn) {
+    const id = tierBtn.dataset.id;
+    const select = document.querySelector(`.tier-select[data-id="${id}"]`);
+    const msg = document.querySelector(`.tier-msg[data-id="${id}"]`);
+    const type = select?.value;
+    if (!type) return;
+    msg.innerHTML = `Change to <strong style="text-transform:capitalize">${type}</strong>?
+      <button class="tier-confirm-yes" data-id="${id}" data-type="${type}"
+        style="margin-left:6px;padding:2px 8px;background:#374151;color:#fff;border:none;border-radius:4px;font-size:0.75rem;cursor:pointer">Yes</button>
+      <button class="tier-confirm-no" data-id="${id}"
+        style="padding:2px 8px;background:none;color:#6b7280;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;cursor:pointer">No</button>`;
+    msg.style.color = '#374151';
+    return;
+  }
+
+  // Tier inline confirm — yes
+  const confirmYes = e.target.closest('.tier-confirm-yes');
+  if (confirmYes) {
+    const id = confirmYes.dataset.id;
+    const type = confirmYes.dataset.type;
+    const msg = document.querySelector(`.tier-msg[data-id="${id}"]`);
+    const tierBtn2 = document.querySelector(`.set-tier-btn[data-id="${id}"]`);
+    const badgeCheck = document.querySelector(`.refurb-badge-check[data-id="${id}"]`);
+    msg.innerHTML = 'Saving…';
+    if (tierBtn2) tierBtn2.disabled = true;
+    try {
+      const body = { type };
+      if (badgeCheck) body.refurbishedBadge = badgeCheck.checked;
+      const res = await authFetch(`${API}/admin/vendors/${id}/tier`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { msg.textContent = 'Failed'; msg.style.color = '#b91c1c'; }
+      else { msg.textContent = `Saved — ${type}`; msg.style.color = '#15803d'; setTimeout(() => { msg.textContent = ''; }, 3000); }
+    } catch { msg.textContent = 'Error'; msg.style.color = '#b91c1c'; }
+    finally { if (tierBtn2) tierBtn2.disabled = false; }
+    return;
+  }
+
+  // Tier inline confirm — no
+  const confirmNo = e.target.closest('.tier-confirm-no');
+  if (confirmNo) {
+    const msg = document.querySelector(`.tier-msg[data-id="${confirmNo.dataset.id}"]`);
+    if (msg) msg.innerHTML = '';
     return;
   }
 
@@ -383,10 +454,7 @@ async function loadPayoutRequests() {
 }
 
 document.getElementById('payout-panel-toggle').addEventListener('click', () => {
-  const body = document.getElementById('payout-panel-body');
-  if (!body) return;
-  const isOpen = body.style.display === 'block';
-  body.style.display = isOpen ? 'none' : 'block';
+  document.getElementById('payout-panel-body')?.classList.toggle('is-open');
 });
 
 document.getElementById('payout-requests-body').addEventListener('click', async (e) => {
@@ -399,7 +467,7 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
   const ref = row?.querySelector('.payout-ref-input')?.value?.trim() || '';
 
   const label = action === 'paid' ? 'Mark this payout as paid?' : 'Reject this payout request?';
-  if (!confirm(label)) return;
+  if (!await showConfirm(label)) return;
 
   btn.disabled = true;
   try {
@@ -411,13 +479,13 @@ document.getElementById('payout-requests-body').addEventListener('click', async 
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      alert('Action failed');
+      showAlert('Action failed');
       btn.disabled = false;
       return;
     }
     loadPayoutRequests();
   } catch (err) {
-    alert('Network error');
+    showAlert('Network error');
     btn.disabled = false;
   }
 });
@@ -430,7 +498,7 @@ let lastVendors = [];
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#vendors-export-csv')) return;
   if (!lastVendors.length) {
-    alert('No vendors loaded to export.');
+    showAlert('No vendors loaded to export.');
     return;
   }
 
@@ -479,7 +547,105 @@ document.addEventListener('click', (e) => {
 });
 
 /* =========================================
+   UPGRADE REQUESTS PANEL
+========================================= */
+async function loadUpgradeRequests() {
+  const tbody = document.getElementById('upgrade-requests-body');
+  const badge = document.getElementById('upgrade-badge');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="5" class="admin-payout-empty">Loading…</td></tr>';
+
+  try {
+    const res = await authFetch(`${API}/admin/vendors/upgrade-requests`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="5" class="admin-payout-empty" style="color:#b91c1c">Error: ${data.error || res.status}</td></tr>`;
+      return;
+    }
+
+    const requests = data.requests || [];
+
+    if (badge) {
+      badge.textContent = requests.length;
+      badge.style.display = requests.length ? 'inline-block' : 'none';
+    }
+
+    if (!requests.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="5" class="admin-payout-empty">No pending upgrade requests</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = requests
+      .map((r) => {
+        const requestedAt = new Date(r.requestedAt).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+        return `<tr data-upgrade-id="${r._id}">
+  <td><strong>${r.storeName}</strong><br><small style="color:#6b7280">${r.email}</small></td>
+  <td><span style="text-transform:capitalize">${r.currentTier}</span></td>
+  <td><span style="text-transform:capitalize;font-weight:600;color:#f59e0b">${r.requestedTier}</span></td>
+  <td><div style="max-width:200px;white-space:normal;word-wrap:break-word;color:#6b7280;font-size:0.85rem">${(r.message || '(no message)').substring(0, 100)}</div></td>
+  <td>
+    <div style="display:flex;gap:6px">
+      <button class="btn-upgrade-approve" data-id="${r._id}" data-action="approve" style="padding:4px 10px;background:#15803d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">Approve</button>
+      <button class="btn-upgrade-reject" data-id="${r._id}" data-action="reject" style="padding:4px 10px;background:#b91c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem">Reject</button>
+    </div>
+  </td>
+</tr>`;
+      })
+      .join('');
+  } catch (err) {
+    console.error('Upgrade requests error:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="admin-payout-empty" style="color:#b91c1c">Failed to load: ${err.message}</td></tr>`;
+  }
+}
+
+document.getElementById('upgrade-panel-toggle').addEventListener('click', () => {
+  const body = document.getElementById('upgrade-panel-body');
+  if (!body) return;
+  const opening = !body.classList.contains('is-open');
+  body.classList.toggle('is-open');
+  if (opening) loadUpgradeRequests();
+});
+
+document.getElementById('upgrade-requests-body').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+
+  const label = action === 'approve' ? 'Approve this tier upgrade?' : 'Reject this upgrade request?';
+  if (!await showConfirm(label)) return;
+
+  btn.disabled = true;
+  try {
+    const res = await authFetch(`${API}/admin/vendors/${id}/upgrade`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      showAlert('Action failed');
+      btn.disabled = false;
+      return;
+    }
+    loadUpgradeRequests();
+    loadVendors();
+  } catch (err) {
+    showAlert('Network error');
+    btn.disabled = false;
+  }
+});
+
+/* =========================================
    INIT
 ========================================= */
 loadVendors();
 loadPayoutRequests();
+loadUpgradeRequests();

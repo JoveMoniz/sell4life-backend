@@ -34,46 +34,47 @@
           </div>
 
           <div class="vendor-stats">
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="products">
               <h3 id="stat-products">0</h3>
               <p>Products</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="orders">
               <h3 id="stat-orders">0</h3>
               <p>Total Orders</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="orders">
               <h3 id="stat-active">0</h3>
               <p>Active Orders</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="orders">
               <h3 id="stat-completed">0</h3>
               <p>Completed</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="refunds">
               <h3 id="stat-refunded">0</h3>
               <p>Refunded Items</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="revenue">
               <h3 id="stat-revenue">£0.00</h3>
               <p>Gross Revenue</p>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" data-tier-stat="refunds">
               <h3 id="stat-loss">£0.00</h3>
               <p>Refunded Amount</p>
             </div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card" data-tier-stat="revenue">
             <h3 id="stat-net">£0.00</h3>
             <p>Net Revenue</p>
           </div>
+
 
           <section class="vendor-orders-preview">
             <h2>Recent Orders</h2>
@@ -109,6 +110,31 @@
     </div>
 
     <script src="/assets/js/config-global.js"></script>
+    <script>
+      // Casual vendors get their own simple dashboard
+      const _t = localStorage.getItem('s4l_vendorType');
+      if (_t === 'casual') window.location.replace('/account/vendor/dashboard-casual.html');
+    </script>
+    <script src="/assets/js/tier-config.js"></script>
+    <script>
+      // Stat visibility: which stats need which tier
+      const STAT_TIER = { products: 'casual', orders: 'casual', revenue: 'casual', refunds: 'refurbished' };
+
+      function applyDashboardTier(type) {
+        const rank = TIER_RANK[type] || 1;
+        document.querySelectorAll('[data-tier-stat]').forEach(function(el) {
+          const required = TIER_RANK[STAT_TIER[el.dataset.tierStat]] || 1;
+          el.style.display = rank >= required ? '' : 'none';
+        });
+      }
+
+      document.addEventListener('vendorLoaded', function(e) {
+        applyDashboardTier(e.detail?.type || 'casual');
+      });
+
+      const cachedTier = localStorage.getItem('s4l_vendorType');
+      if (cachedTier) applyDashboardTier(cachedTier);
+    </script>
 
     <script>
       (async () => {
@@ -158,7 +184,8 @@
         }
       })();
     </script>
-    <script src="/assets/js/layout.js?v=20260531"></script>
+
+    <script src="/assets/js/layout.js?v=20260603"></script>
     <script src="/assets/js/live-updates.js?v=20260522"></script>
     <script src="/assets/js/vendor-dashboard.js?v=20260522c"></script>
   </body>

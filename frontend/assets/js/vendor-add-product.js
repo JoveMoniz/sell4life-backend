@@ -1113,9 +1113,7 @@ function bindVariants() {
       const img  = td.querySelector('.vr-img-preview');
       const url  = td.querySelector('[name="vr-image"]');
       const doIt = async () => {
-        const ok = window.confirmAction
-          ? await window.confirmAction('Clear this variant image? The colour swatch will remain.')
-          : confirm('Clear this variant image?');
+        const ok = await showConfirm('Clear this variant image? The colour swatch will remain.');
         if (!ok) return;
         if (img)  img.src = '';
         if (url)  url.value = '';
@@ -1141,6 +1139,47 @@ function bindVariants() {
       });
     }
   });
+
+  // Bulk variant image upload — one picker fills rows sequentially, creates new rows as needed
+  const vrBulkBtn   = document.getElementById('vr-bulk-img-btn');
+  const vrBulkInput = document.getElementById('vr-bulk-img-input');
+  if (vrBulkBtn && vrBulkInput) {
+    vrBulkBtn.addEventListener('click', () => vrBulkInput.click());
+    vrBulkInput.addEventListener('change', async () => {
+      const files = Array.from(vrBulkInput.files);
+      if (!files.length) return;
+      vrBulkBtn.disabled = true;
+      vrBulkBtn.textContent = 'Uploading…';
+      const tbody = document.getElementById('variant-rows');
+      for (const file of files) {
+        try {
+          const url = await uploadToCloudinary(file);
+          // Find first row with no image, or add a new row
+          const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+          let targetRow = rows.find(r => !r.querySelector('[name="vr-image"]')?.value.trim());
+          if (!targetRow) { addVariantRow({}); targetRow = tbody?.querySelector('tr:last-child'); }
+          if (!targetRow) continue;
+          const urlInput = targetRow.querySelector('[name="vr-image"]');
+          const img      = targetRow.querySelector('.vr-img-preview');
+          const wrap     = targetRow.querySelector('.vr-thumb-wrap');
+          if (urlInput) urlInput.value = url;
+          if (img)      img.src = url;
+          if (wrap)     wrap.classList.add('has-img');
+          sampleDominantColor(url, (hex) => {
+            const picker = targetRow.querySelector('[name="vr-color"]');
+            if (picker && picker.dataset.userSet !== 'true') {
+              picker.value = hex; picker.dataset.userSet = 'true';
+            }
+          });
+        } catch {
+          window.showToast?.('One image failed to upload — skipped', 'error');
+        }
+      }
+      vrBulkInput.value = '';
+      vrBulkBtn.disabled = false;
+      vrBulkBtn.textContent = '📷 Bulk upload images';
+    });
+  }
 
   // Inject "Set all: [Clr] [Img]" control above variant table — works regardless of HTML version
   const vbTable = document.querySelector('.vb-table');
@@ -1358,15 +1397,15 @@ if (form) {
     e.preventDefault();
 
     const token = localStorage.getItem('s4l_token');
-    if (!token) { alert('Not authenticated'); return; }
+    if (!token) { await showAlert('Not authenticated'); return; }
 
     const vendorRes = await fetch(`${API_BASE}/vendor/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const { vendor } = await vendorRes.json();
-    if (!vendor)                      { alert('Create your store first'); return; }
-    if (vendor.status === 'pending')  { alert('Your store is under review'); return; }
-    if (vendor.status === 'suspended'){ alert('Your store is suspended'); return; }
+    if (!vendor)                      { await showAlert('Create your store first'); return; }
+    if (vendor.status === 'pending')  { await showAlert('Your store is under review'); return; }
+    if (vendor.status === 'suspended'){ await showAlert('Your store is suspended'); return; }
 
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -1434,6 +1473,11 @@ if (form) {
       variantDisplay:   document.getElementById('vb-color-mode')?.checked !== false ? 'color' : 'image',
       variants: getVariants(),
       addOns: getAddOns(),
+      conditionGrade:     document.getElementById('refurb-condition-grade')?.value  || undefined,
+      testedStatus:       document.getElementById('refurb-tested-status')?.value    || undefined,
+      warrantyPeriod:     document.getElementById('refurb-warranty')?.value.trim()  || undefined,
+      serialNumber:       document.getElementById('refurb-serial')?.value.trim()    || undefined,
+      refurbishmentNotes: document.getElementById('refurb-notes')?.value.trim()     || undefined,
     };
 
     // Validation

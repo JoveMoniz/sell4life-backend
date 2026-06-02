@@ -2,6 +2,14 @@
 // BASIC PAGE CHECK
 // =====================================================
 
+// Safety: remove loading state after 3 seconds if stuck
+setTimeout(() => {
+  if (document.body.classList.contains('s4l-loading')) {
+    document.body.classList.remove('s4l-loading');
+    document.getElementById('s4l-fouc')?.remove();
+  }
+}, 3000);
+
 const path = location.pathname.toLowerCase();
 
 const noLayoutPages = [
@@ -18,6 +26,23 @@ const noLayoutPages = [
 ];
 
 const shouldInjectLayout = !noLayoutPages.some((route) => path.includes(route));
+
+function drawLogoUnderline(svgId, txtId, yLine, sw) {
+  document.fonts.ready.then(() => {
+    const svg = document.getElementById(svgId);
+    const txt = document.getElementById(txtId);
+    if (!svg || !txt) return;
+    const w = txt.getBBox().width;
+    svg.setAttribute('width', (w + 4) + 'px');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '0');  line.setAttribute('y1', yLine);
+    line.setAttribute('x2', w);   line.setAttribute('y2', yLine);
+    line.setAttribute('stroke', '#f18c28');
+    line.setAttribute('stroke-width', sw);
+    line.setAttribute('stroke-linecap', 'square');
+    svg.appendChild(line);
+  });
+}
 
 // =====================================================
 // GLOBAL FUNCTIONS
@@ -53,6 +78,51 @@ window.confirmAction = function (message) {
   });
 };
 
+/* ── Styled dialogs ── */
+(function () {
+  const css = `
+.s4l-dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:9999;animation:s4l-fadein .15s ease}
+@keyframes s4l-fadein{from{opacity:0}to{opacity:1}}
+.s4l-dialog{background:#fff;border-radius:12px;padding:24px 28px;max-width:420px;width:calc(100% - 32px);box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.s4l-dialog-msg{font-size:.9rem;color:#111827;margin:0 0 20px;line-height:1.5;white-space:pre-wrap}
+.s4l-dialog-input{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;margin-bottom:16px;box-sizing:border-box;font-family:inherit;color:#374151}
+.s4l-dialog-actions{display:flex;gap:8px;justify-content:flex-end}
+.s4l-dialog-primary{padding:7px 18px;background:#111827;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer}
+.s4l-dialog-secondary{padding:7px 18px;background:#fff;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;cursor:pointer}`;
+  const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
+  function _dlg(html, setup) {
+    return new Promise(resolve => {
+      const ov = document.createElement('div');
+      ov.className = 's4l-dialog-overlay';
+      ov.innerHTML = `<div class="s4l-dialog">${html}</div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e => { if (e.target === ov) { ov.remove(); resolve(null); } });
+      setup(ov, resolve);
+    });
+  }
+  window.showAlert = msg => _dlg(
+    `<p class="s4l-dialog-msg">${msg}</p><div class="s4l-dialog-actions"><button class="s4l-dialog-primary">OK</button></div>`,
+    (el, res) => el.querySelector('.s4l-dialog-primary').onclick = () => { el.remove(); res(); }
+  );
+  window.showConfirm = msg => _dlg(
+    `<p class="s4l-dialog-msg">${msg}</p><div class="s4l-dialog-actions"><button class="s4l-dialog-secondary s4l-no">Cancel</button><button class="s4l-dialog-primary s4l-yes">Confirm</button></div>`,
+    (el, res) => {
+      el.querySelector('.s4l-yes').onclick = () => { el.remove(); res(true); };
+      el.querySelector('.s4l-no').onclick  = () => { el.remove(); res(false); };
+    }
+  );
+  window.showPrompt = (msg, placeholder = '') => _dlg(
+    `<p class="s4l-dialog-msg">${msg}</p><input class="s4l-dialog-input" type="text" placeholder="${placeholder}"/><div class="s4l-dialog-actions"><button class="s4l-dialog-secondary s4l-no">Cancel</button><button class="s4l-dialog-primary s4l-yes">OK</button></div>`,
+    (el, res) => {
+      const inp = el.querySelector('input');
+      inp.focus();
+      el.querySelector('.s4l-yes').onclick = () => { el.remove(); res(inp.value); };
+      el.querySelector('.s4l-no').onclick  = () => { el.remove(); res(null); };
+      inp.onkeydown = e => { if (e.key === 'Enter') { el.remove(); res(inp.value); } if (e.key === 'Escape') { el.remove(); res(null); } };
+    }
+  );
+})();
+
 window.showToast = function (message, type = 'success') {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -77,6 +147,9 @@ function logout() {
   localStorage.removeItem('s4l_token');
   localStorage.removeItem('s4l_user');
   localStorage.removeItem('s4l_isVendor');
+  localStorage.removeItem('s4l_vendorId');
+  localStorage.removeItem('s4l_vendorType');
+  localStorage.removeItem('s4l_vendorStatus');
 
   window.showToast('You have been logged out');
 
@@ -101,6 +174,8 @@ async function loadLayout() {
         const res = await fetch('/includes/header.html', { cache: 'no-store' });
         const html = await res.text();
         document.body.insertAdjacentHTML('afterbegin', html);
+        drawLogoUnderline('s4l-logo-desktop', 's4l-logo-txt-d', 44, '3');
+        drawLogoUnderline('s4l-logo-mobile',  's4l-logo-txt-m', 38, '2.5');
       }
 
       // ⚠️ delay to ensure DOM ready
@@ -116,6 +191,7 @@ async function loadLayout() {
         const res = await fetch('/includes/footer.html', { cache: 'no-store' });
         const html = await res.text();
         document.body.insertAdjacentHTML('beforeend', html);
+        drawLogoUnderline('s4l-logo-footer', 's4l-logo-txt-f', 28, '1.5');
       }
     } catch (err) {
       console.warn('Footer skipped', err);
@@ -198,8 +274,40 @@ async function loadVendorSidebar() {
     );
   }
 
+  // URL is the most reliable signal — casual pages always have '-casual' in the path
+  const isCasualPage = window.location.pathname.includes('-casual');
+  const pageTier = isCasualPage ? 'casual' : document.body.dataset.vendorTier;
+  let vendorData = null;
+  let sidebarFile;
+
+  if (pageTier === 'casual') {
+    sidebarFile = '/account/vendor/vendor-sidebar-casual.html';
+  } else {
+    // Fetch from API for shared pages (orders, products, payouts, settings…)
+    try {
+      const vRes = await fetch(`${window.API_BASE}/vendor/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (vRes.ok) {
+        const vJson = await vRes.json();
+        vendorData = vJson.vendor || null;
+        if (vendorData?.type) localStorage.setItem('s4l_vendorType', vendorData.type);
+      }
+    } catch {}
+
+    const vendorType = vendorData?.type || localStorage.getItem('s4l_vendorType') || 'casual';
+    const sidebarMap = {
+      casual:       '/account/vendor/vendor-sidebar-casual.html',
+      refurbished:  '/account/vendor/vendor-sidebar-refurbished.html',
+      professional: '/account/vendor/vendor-sidebar.html',
+      enterprise:   '/account/vendor/vendor-sidebar.html',
+    };
+    sidebarFile = sidebarMap[vendorType] || '/account/vendor/vendor-sidebar.html';
+  }
+
   try {
-    const res = await fetch('/account/vendor/vendor-sidebar.html', {
+    const res = await fetch(sidebarFile, {
       cache: 'no-store',
     });
 
@@ -212,8 +320,8 @@ async function loadVendorSidebar() {
       if (a.getAttribute('href') === path) a.classList.add('active');
     });
 
-    // Populate vendor identity
-    populateVendorIdentity(container);
+    // Populate vendor identity — pass pre-fetched data to avoid second API call
+    populateVendorIdentity(container, vendorData);
 
     // Orders badge
     loadOrderBadge(container);
@@ -229,6 +337,10 @@ async function loadVendorSidebar() {
   } catch (err) {
     console.warn('Sidebar skipped', err);
   }
+
+  // Ensure loading state is cleared even if sidebar fails
+  document.getElementById('s4l-fouc')?.remove();
+  document.body.classList.remove('s4l-loading');
 }
 
 async function loadOrderBadge(container) {
@@ -281,17 +393,50 @@ function injectMobileBar() {
   `;
   document.body.prepend(bar);
 
-  // Dropdown nav
+  // Dropdown nav — tier-aware
   const currentPath = window.location.pathname;
-  const links = [
-    { href: '/account/vendor/dashboard.html', label: 'Dashboard' },
-    { href: '/account/vendor/products.html', label: 'Products' },
-    { href: '/account/vendor/add-product.html', label: 'Add Product' },
-    { href: '/account/vendor/orders.html', label: 'Orders' },
-    { href: '/account/vendor/transactions.html', label: 'Transactions' },
-    { href: '/account/vendor/tools.html', label: 'Tools' },
-    { href: '/account/signin.html', label: 'Logout', cls: 'vendor-logout' },
-  ];
+  const _mTier = window.location.pathname.includes('-casual')
+    ? 'casual'
+    : (document.body.dataset.vendorTier || localStorage.getItem('s4l_vendorType') || 'casual');
+  const _casual = _mTier === 'casual';
+
+  const _refurbished = _mTier === 'refurbished';
+
+  const mobileNavMap = {
+    casual: [
+      { href: '/account/vendor/dashboard-casual.html',   label: 'Dashboard' },
+      { href: '/account/vendor/products.html',           label: 'My Listings' },
+      { href: '/account/vendor/add-product-casual.html', label: 'Add Product' },
+      { href: '/account/vendor/orders.html',             label: 'Orders' },
+      { href: '/account/vendor/payouts.html',            label: 'Payouts' },
+      { href: '/account/vendor/settings.html',           label: 'Store Settings' },
+      { href: '/account/signin.html',                    label: 'Logout', cls: 'vendor-logout' },
+    ],
+    refurbished: [
+      { href: '/account/vendor/dashboard.html',          label: 'Dashboard' },
+      { href: '/account/vendor/products.html',           label: 'Products' },
+      { href: '/account/vendor/add-product.html',        label: 'Add Product' },
+      { href: '/account/vendor/orders.html',             label: 'Orders' },
+      { href: '/account/vendor/transactions.html',       label: 'Transactions' },
+      { href: '/account/vendor/payouts.html',            label: 'Payouts' },
+      { href: '/account/vendor/settings.html',           label: 'Store Settings' },
+      { href: '/account/signin.html',                    label: 'Logout', cls: 'vendor-logout' },
+    ],
+    professional: [
+      { href: '/account/vendor/dashboard.html',          label: 'Dashboard' },
+      { href: '/account/vendor/products.html',           label: 'Products' },
+      { href: '/account/vendor/add-product.html',        label: 'Add Product' },
+      { href: '/account/vendor/orders.html',             label: 'Orders' },
+      { href: '/account/vendor/transactions.html',       label: 'Transactions' },
+      { href: '/account/vendor/payouts.html',            label: 'Payouts' },
+      { href: '/account/vendor/settings.html',           label: 'Store Settings' },
+      { href: '/account/vendor/tools.html',              label: 'Tools' },
+      { href: '/account/signin.html',                    label: 'Logout', cls: 'vendor-logout' },
+    ],
+  };
+  mobileNavMap.enterprise = mobileNavMap.professional;
+
+  const links = mobileNavMap[_mTier] || mobileNavMap.professional;
 
   const nav = document.createElement('div');
   nav.className = 'vendor-mobile-nav';
@@ -326,7 +471,7 @@ function injectMobileBar() {
   });
 }
 
-async function populateVendorIdentity(container) {
+async function populateVendorIdentity(container, prefetchedVendor = null) {
   try {
     // User info comes from localStorage (set at login, always available)
     let displayName = '';
@@ -338,16 +483,19 @@ async function populateVendorIdentity(container) {
       }
     } catch {}
 
-    // Vendor store info from API
-    const token = localStorage.getItem('s4l_token');
-    const vendorRes = await fetch(`${window.API_BASE}/vendor/me`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
+    // Use pre-fetched vendor data if available, otherwise fetch
+    let vendor = prefetchedVendor;
+    if (!vendor) {
+      const token = localStorage.getItem('s4l_token');
+      const vendorRes = await fetch(`${window.API_BASE}/vendor/me`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      });
+      if (!vendorRes.ok) return;
+      const json = await vendorRes.json();
+      vendor = json.vendor;
+    }
 
-    if (!vendorRes.ok) return;
-
-    const { vendor } = await vendorRes.json();
     if (!vendor) return;
 
     const storeEl = container.querySelector('#sidebar-store-name');
@@ -370,6 +518,12 @@ async function populateVendorIdentity(container) {
     const mobileAvatarEl = document.getElementById('mobile-bar-avatar');
     if (mobileAvatarEl && vendor.storeName)
       mobileAvatarEl.textContent = vendor.storeName.charAt(0).toUpperCase();
+
+    // Cache tier and dispatch event so sidebar + pages can react
+    if (vendor.type) {
+      localStorage.setItem('s4l_vendorType', vendor.type);
+      document.dispatchEvent(new CustomEvent('vendorLoaded', { detail: { type: vendor.type, vendor } }));
+    }
   } catch (err) {
     console.warn('Vendor identity skipped', err);
   }
@@ -791,11 +945,17 @@ if (!shouldInjectLayout) {
   document.body.classList.remove('s4l-loading');
 }
 
-// Hard timeout: never leave the body hidden more than 3 s
+// Hard timeout: never leave the body hidden more than 2 seconds (more aggressive for logged-in users)
 setTimeout(() => {
-  document.getElementById('s4l-fouc')?.remove();
-  document.body.classList.remove('s4l-loading');
-}, 3000);
+  if (document.body.classList.contains('s4l-loading')) {
+    console.warn('Page still loading after 2s, forcing reveal...');
+    document.getElementById('s4l-fouc')?.remove();
+    document.body.classList.remove('s4l-loading');
+    document.body.style.visibility = 'visible';
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.visibility = 'visible';
+  }
+}, 2000);
 
 // =====================================================
 // GLOBAL CART CLEANUP (POST PAYMENT)

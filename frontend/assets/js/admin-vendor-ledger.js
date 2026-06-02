@@ -55,7 +55,7 @@ async function loadLedger() {
     const data = await res.json();
     lastData = data;
     renderInfoBar(data.vendor);
-    renderCards(data.summary, data.vendor);
+    renderCards(data.summary, data.vendor, data.balance);
     renderTable(data.transactions, data.summary);
     renderCount(data.showing, data.totalOrders, data.truncated);
   } catch (err) {
@@ -80,10 +80,14 @@ function renderInfoBar(v) {
         ? 'color:#991b1b;background:#fee2e2'
         : 'color:#854d0e;background:#fef9c3';
 
+  const _tierColors = { casual:'#6b7280', refurbished:'#0369a1', professional:'#e07b00', enterprise:'#7c3aed' };
+  const _tierBg     = { casual:'#f3f4f6', refurbished:'#e0f2fe', professional:'#fff3e0', enterprise:'#ede9fe' };
+  const _tier = v.type || 'casual';
   bar.innerHTML = `
     <strong>${v.storeName}</strong>
     ${v.storeSlug ? `<span style="color:#9ca3af;font-size:11px">@${v.storeSlug}</span>` : ''}
     <span style="${statusCls};padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;text-transform:capitalize">${v.status}</span>
+    <span style="background:${_tierBg[_tier]||'#f3f4f6'};color:${_tierColors[_tier]||'#6b7280'};padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;text-transform:capitalize">${_tier}</span>
     ${v.vatRegistered ? '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">VAT</span>' : ''}
     <span class="vl-email">${v.email}</span>
   `;
@@ -96,18 +100,33 @@ function renderInfoBar(v) {
 /* ======================================================
    SUMMARY CARDS
 ====================================================== */
-function renderCards(s, v) {
+function renderCards(s, v, b) {
   const el = document.getElementById('vl-cards');
   if (!el || !s) return;
 
-  const vatCard =
-    v && v.vatRegistered && s.totalVat
-      ? `<div class="vl-card">
+  const vatCard = v && v.vatRegistered && s.totalVat
+    ? `<div class="vl-card">
         <div class="vl-card-label">VAT Collected</div>
         <div class="vl-card-value">${fmt(s.totalVat)}</div>
         <div class="vl-card-sub">incl. in gross</div>
-       </div>`
-      : '';
+       </div>` : '';
+
+  const reserveRate  = b ? Math.round((b.reserveRate || 0.10) * 100) : 10;
+  const trustedLabel = b?.trustedSeller
+    ? '<span style="color:#15803d;font-size:0.72rem;font-weight:600">✓ Trusted</span>'
+    : `<span style="color:#9ca3af;font-size:0.72rem">${reserveRate}% rate</span>`;
+
+  const reserveCard = b ? `
+    <div class="vl-card">
+      <div class="vl-card-label">Available Payout ${trustedLabel}</div>
+      <div class="vl-card-value positive">${fmt(b.pendingBalance)}</div>
+      <div class="vl-card-sub">cleared &amp; requestable</div>
+    </div>
+    <div class="vl-card">
+      <div class="vl-card-label">In Reserve</div>
+      <div class="vl-card-value" style="color:#f59e0b">${fmt(b.reservedBalance)}</div>
+      <div class="vl-card-sub">${reserveRate}% held · releases at 90 days</div>
+    </div>` : '';
 
   el.innerHTML = `
     <div class="vl-card">
@@ -136,6 +155,7 @@ function renderCards(s, v) {
       <div class="vl-card-sub">after commission</div>
     </div>
     ${vatCard}
+    ${reserveCard}
   `;
 }
 
@@ -265,7 +285,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#vl-export-csv')) return;
   if (!lastData || !lastData.transactions || !lastData.transactions.length) {
-    alert('No data to export.');
+    showAlert('No data to export.');
     return;
   }
 

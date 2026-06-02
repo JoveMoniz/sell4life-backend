@@ -81,6 +81,49 @@
   <p>Both previewed on the real header background colour at desktop and mobile sizes.</p>
 
   <!-- ═══════════════════════════════════════════════════ -->
+  <!-- YOUR SKETCH — Wordmark + asymmetric arrow underline -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="preview-section">
+    <div class="preview-label" style="color:#c0392b">★ Your Sketch — Refined</div>
+    <div class="preview-desc">
+      <strong>$ell4Life</strong> — dollar sign and 4 in orange, rest in white.
+      Underlined by an orange line ending in an asymmetric arrow: top arm tall and long,
+      bottom arm short. Tip sits immediately after the last letter.
+    </div>
+
+    <!-- Desktop -->
+    <div class="header-sim">
+      <svg width="116" height="40" viewBox="0 0 116 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <text id="sketch-txt-d" x="2" y="28" font-family="Roboto,Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="-0.5">
+          <tspan fill="#f18c28">$</tspan><tspan fill="#ffffff">ell</tspan><tspan fill="#f18c28">4</tspan><tspan fill="#ffffff">Life</tspan>
+        </text>
+        <line id="sketch-line-d" x1="2" y1="34" x2="114" y2="34" stroke="#f18c28" stroke-width="2" stroke-linecap="square"/>
+      </svg>
+
+      <div class="fake-nav"><span>Buy</span><span>Sell</span><span>Stores</span></div>
+      <div class="fake-icons">
+        <div class="fake-icon"></div>
+        <div class="fake-btn">Account ▾</div>
+      </div>
+    </div>
+    <div class="sim-label">↑ Desktop header</div>
+
+    <!-- Mobile -->
+    <div class="mobile-sim">
+      <svg width="84" height="30" viewBox="0 0 116 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sell4Life">
+        <text id="sketch-txt-m" x="2" y="28" font-family="Roboto,Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="-0.5">
+          <tspan fill="#f18c28">$</tspan><tspan fill="#ffffff">ell</tspan><tspan fill="#f18c28">4</tspan><tspan fill="#ffffff">Life</tspan>
+        </text>
+        <line id="sketch-line-m" x1="2" y1="34" x2="114" y2="34" stroke="#f18c28" stroke-width="2" stroke-linecap="square"/>
+      </svg>
+      <div class="fake-hamburger"><span></span><span></span><span></span></div>
+    </div>
+    <div class="sim-label">↑ Mobile header</div>
+  </div>
+
+  <hr />
+
+  <!-- ═══════════════════════════════════════════════════ -->
   <!-- OPTION A — Price Tag Icon + Wordmark               -->
   <!-- ═══════════════════════════════════════════════════ -->
   <div class="preview-section">
@@ -368,5 +411,17 @@
     </div>
   </div>
 
+<script>
+document.fonts.ready.then(function () {
+  ['d', 'm'].forEach(function (s) {
+    var txt  = document.getElementById('sketch-txt-' + s);
+    var line = document.getElementById('sketch-line-' + s);
+    if (!txt || !line) return;
+    var box = txt.getBBox();
+    line.setAttribute('x1', box.x);
+    line.setAttribute('x2', box.x + box.width);
+  });
+});
+</script>
 </body>
 </html>

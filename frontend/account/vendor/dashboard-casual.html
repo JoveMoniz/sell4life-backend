@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>My Store | Sell4Life</title>
+    <link rel="stylesheet" href="/assets/css/layout.css" />
+    <link rel="stylesheet" href="/assets/css/vendor.css?v=20260529" />
+    <style>
+      .casual-hero {
+        background: linear-gradient(135deg, #0b6b6a 0%, #0d8280 100%);
+        border-radius: 14px;
+        padding: 28px 32px;
+        color: #fff;
+        margin-bottom: 28px;
+      }
+      .casual-hero h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 4px;
+      }
+      .casual-hero p {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin: 0;
+      }
+
+      .casual-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+      .casual-stat {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+      }
+      .casual-stat .stat-num {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0b6b6a;
+        line-height: 1;
+        margin-bottom: 6px;
+      }
+      .casual-stat .stat-label {
+        font-size: 0.8rem;
+        color: #6b7280;
+        font-weight: 500;
+      }
+
+      .casual-empty {
+        background: #f0fdf9;
+        border: 2px dashed #a7f3d0;
+        border-radius: 12px;
+        padding: 36px;
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .casual-empty h3 {
+        font-size: 1.1rem;
+        color: #065f46;
+        margin: 0 0 8px;
+      }
+      .casual-empty p {
+        color: #6b7280;
+        font-size: 0.88rem;
+        margin: 0 0 18px;
+      }
+      .btn-add-first {
+        display: inline-block;
+        background: #0b6b6a;
+        color: #fff;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: background 0.2s;
+      }
+      .btn-add-first:hover { background: #095f5e; }
+
+      .casual-orders h2 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 14px;
+      }
+      .casual-order-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+        gap: 12px;
+      }
+      .casual-order-row .order-id { color: #6b7280; font-size: 0.78rem; font-family: monospace; }
+      .casual-order-row .order-item { font-weight: 600; color: #111827; flex: 1; }
+      .casual-order-row .order-price { font-weight: 700; color: #0b6b6a; white-space: nowrap; }
+      .order-status-badge {
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: capitalize;
+        white-space: nowrap;
+      }
+      .status-pending    { background: #fef3c7; color: #92400e; }
+      .status-processing { background: #dbeafe; color: #1e40af; }
+      .status-shipped    { background: #ede9fe; color: #5b21b6; }
+      .status-delivered  { background: #d1fae5; color: #065f46; }
+      .status-cancelled  { background: #fee2e2; color: #991b1b; }
+
+      .casual-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+      .casual-action-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 18px 20px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .casual-action-card:hover {
+        border-color: #0b6b6a;
+        box-shadow: 0 2px 10px rgba(11,107,106,0.1);
+      }
+      .casual-action-card .card-icon { font-size: 1.4rem; }
+      .casual-action-card .card-title { font-weight: 700; font-size: 0.9rem; color: #111827; }
+      .casual-action-card .card-desc  { font-size: 0.78rem; color: #6b7280; }
+
+      .no-orders { color: #9ca3af; font-size: 0.88rem; padding: 12px 0; }
+
+      @media (max-width: 600px) {
+        .casual-stats { grid-template-columns: repeat(2, 1fr); }
+        .casual-stats .casual-stat:last-child { grid-column: 1 / -1; }
+        .casual-hero { padding: 20px; }
+      }
+    </style>
+    <style id="s4l-fouc">html{visibility:hidden}</style>
+  </head>
+
+  <body class="s4l-loading" data-vendor-tier="casual">
+    <div class="vendor-layout">
+      <div id="vendor-sidebar"></div>
+
+      <main class="vendor-main">
+        <div class="vendor-container">
+          <a href="/index.html" class="vendor-back-link">← Back to home</a>
+
+          <div class="casual-hero">
+            <h1 id="store-greeting">Welcome back!</h1>
+            <p id="store-sub">Here's what's happening with your store today.</p>
+          </div>
+
+          <div class="casual-stats">
+            <div class="casual-stat">
+              <div class="stat-num" id="c-products">—</div>
+              <div class="stat-label">Active Listings</div>
+            </div>
+            <div class="casual-stat">
+              <div class="stat-num" id="c-orders">—</div>
+              <div class="stat-label">Orders</div>
+            </div>
+            <div class="casual-stat">
+              <div class="stat-num" id="c-revenue">—</div>
+              <div class="stat-label">Total Earned</div>
+            </div>
+          </div>
+
+          <div class="casual-empty" id="empty-state" style="display:none">
+            <h3>You have no listings yet</h3>
+            <p>It only takes a couple of minutes to list your first item.</p>
+            <a href="/account/vendor/add-product-casual.html" class="btn-add-first">+ Add your first product</a>
+          </div>
+
+          <div class="casual-orders" id="orders-section">
+            <h2>Recent Orders</h2>
+            <div id="c-order-list"><p class="no-orders">Loading…</p></div>
+          </div>
+
+          <div class="casual-actions">
+            <a href="/account/vendor/add-product-casual.html" class="casual-action-card">
+              <span class="card-icon">＋</span>
+              <span class="card-title">Add Product</span>
+              <span class="card-desc">List something new</span>
+            </a>
+            <a href="/account/vendor/products.html" class="casual-action-card">
+              <span class="card-icon">📦</span>
+              <span class="card-title">My Listings</span>
+              <span class="card-desc">Edit or remove items</span>
+            </a>
+            <a href="/account/vendor/orders.html" class="casual-action-card">
+              <span class="card-icon">🛍</span>
+              <span class="card-title">Orders</span>
+              <span class="card-desc">Mark items as shipped</span>
+            </a>
+            <a href="/account/vendor/settings.html" class="casual-action-card">
+              <span class="card-icon">⚙️</span>
+              <span class="card-title">Store Settings</span>
+              <span class="card-desc">Name, logo, description</span>
+            </a>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <script src="/assets/js/config-global.js"></script>
+    <script>
+      const _token = localStorage.getItem('s4l_token');
+      if (!_token) window.location.replace('/account/signin.html');
+
+      // Redirect non-casual vendors to the full dashboard
+      const _tier = localStorage.getItem('s4l_vendorType');
+      if (_tier && _tier !== 'casual') {
+        window.location.replace('/account/vendor/dashboard.html');
+      }
+
+      function authFetch(url, opts = {}) {
+        const headers = { ...(opts.headers || {}) };
+        if (_token) headers['Authorization'] = `Bearer ${_token}`;
+        return fetch(url, { ...opts, credentials: 'include', headers });
+      }
+
+      const STATUS_CLASS = {
+        pending: 'status-pending', processing: 'status-processing',
+        shipped: 'status-shipped', delivered: 'status-delivered',
+        cancelled: 'status-cancelled',
+      };
+
+      async function loadCasualDashboard() {
+        try {
+          // Stats
+          const statsRes = await authFetch(`${window.API_BASE}/vendor/dashboard`);
+          if (statsRes.ok) {
+            const d = await statsRes.json();
+            document.getElementById('c-products').textContent = d.products ?? 0;
+            document.getElementById('c-orders').textContent   = d.totalOrders ?? 0;
+            document.getElementById('c-revenue').textContent  = '£' + Number(d.grossRevenue || 0).toFixed(2);
+
+            if ((d.products ?? 0) === 0) {
+              document.getElementById('empty-state').style.display = '';
+            }
+          }
+
+          // Recent orders
+          const ordersRes = await authFetch(`${window.API_BASE}/vendor/orders?limit=5`);
+          const orderList = document.getElementById('c-order-list');
+          if (ordersRes.ok) {
+            const od = await ordersRes.json();
+            const orders = od.orders || [];
+            if (!orders.length) {
+              orderList.innerHTML = '<p class="no-orders">No orders yet.</p>';
+            } else {
+              orderList.innerHTML = orders.map(o => {
+                const item = o.vendorItems?.[0];
+                const name = item?.name || 'Order';
+                const price = item ? '£' + Number(item.price || 0).toFixed(2) : '';
+                const status = (item?.status || o.status || 'pending').toLowerCase();
+                const cls = STATUS_CLASS[status] || 'status-pending';
+                const shortId = String(o._id).slice(-6).toUpperCase();
+                return `
+                  <div class="casual-order-row">
+                    <span class="order-id">#${shortId}</span>
+                    <span class="order-item">${name}</span>
+                    <span class="order-price">${price}</span>
+                    <span class="order-status-badge ${cls}">${status}</span>
+                  </div>`;
+              }).join('');
+            }
+          } else {
+            orderList.innerHTML = '<p class="no-orders">Could not load orders.</p>';
+          }
+        } catch (err) {
+          console.error('Casual dashboard error:', err);
+        }
+      }
+
+      // Populate greeting from vendor data
+      document.addEventListener('vendorLoaded', function(e) {
+        const v = e.detail?.vendor;
+        if (v?.storeName) {
+          document.getElementById('store-greeting').textContent = `Welcome back, ${v.storeName}!`;
+        }
+      });
+
+      loadCasualDashboard();
+    </script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
+  </body>
+</html>

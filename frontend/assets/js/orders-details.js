@@ -277,7 +277,7 @@ function ensureReturnHandler() {
     // Cancel item
     const cancelItemBtn = e.target.closest('.btn-cancel-item');
     if (cancelItemBtn) {
-      if (!confirm('Request cancellation for this item?')) return;
+      if (!await showConfirm('Request cancellation for this item?')) return;
       const itemId  = cancelItemBtn.dataset.itemId;
       const orderId = new URLSearchParams(window.location.search).get('id');
       cancelItemBtn.disabled = true;
@@ -288,10 +288,10 @@ function ensureReturnHandler() {
           headers: { 'Content-Type': 'application/json' },
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Cancel request failed'); return; }
+        if (!res.ok) { await showAlert(data.error || 'Cancel request failed'); return; }
         location.reload();
       } catch (err) {
-        alert('Something went wrong. Please try again.');
+        await showAlert('Something went wrong. Please try again.');
       } finally {
         cancelItemBtn.disabled = false;
         cancelItemBtn.textContent = 'Cancel this item';
@@ -337,11 +337,11 @@ function ensureReturnHandler() {
         body:    JSON.stringify({ quantity: qty, reason }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Return request failed'); return; }
+      if (!res.ok) { await showAlert(data.error || 'Return request failed'); return; }
       location.reload();
     } catch (err) {
       console.error(err);
-      alert('Something went wrong. Please try again.');
+      await showAlert('Something went wrong. Please try again.');
     } finally {
       submitBtn.disabled   = false;
       submitBtn.textContent = 'Submit Request';

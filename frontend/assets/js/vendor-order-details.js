@@ -520,7 +520,7 @@ document.addEventListener('click', async (e) => {
     const qty    = Number(itemBtn.dataset.qty || 1);
 
     if (type === 'Vendor Cancel') {
-      const confirmed = confirm('Cancel this item?\n\nA partial refund will be issued immediately to the customer and cannot be undone.\n\nOnly proceed if you are certain you cannot fulfil this item.');
+      const confirmed = await showConfirm('Cancel this item?\n\nA partial refund will be issued immediately to the customer and cannot be undone.\n\nOnly proceed if you are certain you cannot fulfil this item.');
       if (!confirmed) return;
     }
 
@@ -538,7 +538,7 @@ document.addEventListener('click', async (e) => {
       await updateItemStatus(oid, itemId, type, qty, condition);
       location.reload();
     } catch (err) {
-      alert(err.message || 'Action failed');
+      showToast(err.message || 'Action failed', 'error');
       itemBtn.disabled = false;
       itemBtn.textContent = getVendorLabel(type);
     }
@@ -558,7 +558,7 @@ document.addEventListener('click', async (e) => {
       await updateOrderStatus(oid, type);
       location.reload();
     } catch (err) {
-      alert(err.message || 'Action failed');
+      showToast(err.message || 'Action failed', 'error');
       orderBtn.disabled = false;
       orderBtn.textContent = getVendorLabel(type);
     }

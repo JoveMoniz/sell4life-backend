@@ -389,7 +389,7 @@ async function updateOrderStatus(orderId, status) {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data.error || 'Update failed');
+      showAlert(data.error || 'Update failed');
       return;
     }
 
@@ -397,7 +397,7 @@ async function updateOrderStatus(orderId, status) {
     loadOrders(currentPage, currentQuery, currentStatus);
   } catch (err) {
     console.error(err);
-    alert('Something went wrong');
+    showAlert('Something went wrong');
   }
 }
 /* =================================

@@ -175,6 +175,27 @@ body {
   text-decoration: underline;
 }
 
+.featured-footer {
+  text-align: center;
+  margin-top: 36px;
+}
+
+.featured-shop-btn {
+  display: inline-block;
+  padding: 12px 36px;
+  background: #0b6b6a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.featured-shop-btn:hover {
+  background: #095f5e;
+}
+
 .featured-products-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

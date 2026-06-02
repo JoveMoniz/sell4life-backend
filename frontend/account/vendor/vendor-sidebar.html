@@ -5,17 +5,44 @@
     <div class="vendor-identity-store" id="sidebar-store-name">My Store</div>
     <div class="vendor-identity-slug" id="sidebar-store-slug"></div>
     <div class="vendor-identity-user" id="sidebar-user-name"></div>
+    <div class="vendor-tier-badge" id="sidebar-tier-badge"></div>
   </div>
 
   <nav class="vendor-nav">
-    <a href="/account/vendor/dashboard.html">Dashboard</a>
-    <a href="/account/vendor/products.html">Products</a>
-    <a href="/account/vendor/add-product.html">Add Product</a>
-    <a href="/account/vendor/orders.html">Orders</a>
-    <a href="/account/vendor/transactions.html">Transactions</a>
-    <a href="/account/vendor/payouts.html">Payouts</a>
-    <a href="/account/vendor/settings.html">Store Settings</a>
-    <a href="/account/vendor/tools.html">Tools</a>
+    <a href="/account/vendor/dashboard.html"   data-tier-min="casual">Dashboard</a>
+    <a href="/account/vendor/products.html"    data-tier-min="casual">Products</a>
+    <a href="/account/vendor/add-product.html" data-tier-min="casual">Add Product</a>
+    <a href="/account/vendor/orders.html"      data-tier-min="casual">Orders</a>
+    <a href="/account/vendor/transactions.html" data-tier-min="refurbished">Transactions</a>
+    <a href="/account/vendor/payouts.html"     data-tier-min="refurbished">Payouts</a>
+    <a href="/account/vendor/settings.html"    data-tier-min="casual">Store Settings</a>
+    <a href="/account/vendor/tools.html"       data-tier-min="professional">Tools</a>
     <a href="/account/signin.html" class="vendor-logout">Logout</a>
   </nav>
 </aside>
+
+<script>
+(function () {
+  const TIER_RANK = { casual: 1, refurbished: 2, professional: 3, enterprise: 4 };
+  const TIER_LABELS = { casual: 'Casual', refurbished: 'Refurbished', professional: 'Professional', enterprise: 'Enterprise' };
+
+  function applyTier(type) {
+    const rank = TIER_RANK[type] || 1;
+    document.querySelectorAll('[data-tier-min]').forEach(el => {
+      const required = TIER_RANK[el.dataset.tierMin] || 1;
+      el.style.display = rank >= required ? '' : 'none';
+    });
+    const badge = document.getElementById('sidebar-tier-badge');
+    if (badge) {
+      badge.textContent = TIER_LABELS[type] || 'Casual';
+      badge.dataset.tier = type || 'casual';
+    }
+  }
+
+  document.addEventListener('vendorLoaded', e => applyTier(e.detail?.type));
+
+  // Fallback: read from localStorage if event already fired
+  const cached = localStorage.getItem('s4l_vendorType');
+  if (cached) applyTier(cached);
+})();
+</script>

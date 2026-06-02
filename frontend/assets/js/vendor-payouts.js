@@ -30,6 +30,21 @@ function render(data, wrap) {
   const b = data;
   const payouts = data.payouts || [];
 
+  const holdDays = data.holdDays || 30;
+  const nextDate = data.nextClearanceDate
+    ? new Date(data.nextClearanceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null;
+
+  const holdNote = b.pendingBalance === 0 && nextDate
+    ? `<p style="font-size:12px;color:#6b7280;margin:8px 0 0">
+        Funds are held for ${holdDays} days after delivery. Next release: <strong>${nextDate}</strong>.
+       </p>`
+    : b.pendingBalance === 0
+    ? `<p style="font-size:12px;color:#6b7280;margin:8px 0 0">
+        No delivered orders yet. Funds are released ${holdDays} days after delivery.
+       </p>`
+    : '';
+
   const requestSection = data.hasPendingRequest
     ? `<div class="payout-pending-note">
         You have a payout request pending. Once processed by admin it will appear in the history below.
@@ -38,7 +53,7 @@ function render(data, wrap) {
         <h3>Request a Payout</h3>
         <p style="font-size:13px;color:#374151;margin:0 0 12px">
           Available balance: <strong>${fmt(b.pendingBalance)}</strong>
-          ${b.pendingBalance < data.minimumPayout
+          ${b.pendingBalance > 0 && b.pendingBalance < data.minimumPayout
             ? `<span style="color:#9ca3af;margin-left:6px">(minimum ${fmt(data.minimumPayout)})</span>`
             : ''}
         </p>
@@ -46,6 +61,7 @@ function render(data, wrap) {
           ${b.pendingBalance < data.minimumPayout ? 'disabled' : ''}>
           Request ${fmt(b.pendingBalance)}
         </button>
+        ${holdNote}
         <div class="payout-msg" id="payout-msg"></div>
        </div>`;
 
@@ -72,8 +88,8 @@ function render(data, wrap) {
       </div>
       <div class="payout-card">
         <div class="payout-card-label">Net Sales</div>
-        <div class="payout-card-value">${fmt(b.netAfterFees)}</div>
-        <div class="payout-card-sub">after commission</div>
+        <div class="payout-card-value">${fmt(b.netAfterFeesAllTime)}</div>
+        <div class="payout-card-sub">all time, after commission</div>
       </div>
       <div class="payout-card">
         <div class="payout-card-label">Total Paid Out</div>
@@ -82,8 +98,18 @@ function render(data, wrap) {
       </div>
       <div class="payout-card">
         <div class="payout-card-label">Commission</div>
-        <div class="payout-card-value negative">${fmt(b.commission)}</div>
-        <div class="payout-card-sub">8% platform fee</div>
+        <div class="payout-card-value negative">${fmt(b.commissionAllTime)}</div>
+        <div class="payout-card-sub">8% platform fee, all time</div>
+      </div>
+      <div class="payout-card">
+        <div class="payout-card-label">Stripe Fees</div>
+        <div class="payout-card-value" style="color:#1d4ed8">${fmt(b.totalStripeFees)}</div>
+        <div class="payout-card-sub">covered by platform</div>
+      </div>
+      <div class="payout-card">
+        <div class="payout-card-label">In Reserve</div>
+        <div class="payout-card-value" style="color:#f59e0b">${fmt(b.reservedBalance)}</div>
+        <div class="payout-card-sub">${Math.round((b.reserveRate || 0.10) * 100)}% held · releases at 90 days${b.trustedSeller ? ' · ✓ Trusted' : ''}</div>
       </div>
     </div>
 
@@ -107,7 +133,7 @@ function render(data, wrap) {
   const btn = document.getElementById('request-btn');
   if (btn) {
     btn.addEventListener('click', async () => {
-      if (!confirm(`Request a payout of ${fmt(b.pendingBalance)}?`)) return;
+      if (!await showConfirm(`Request a payout of ${fmt(b.pendingBalance)}?`)) return;
       btn.disabled = true;
       btn.textContent = 'Requesting…';
       const msgEl = document.getElementById('payout-msg');

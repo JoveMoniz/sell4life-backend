@@ -39,11 +39,21 @@
               <span id="vp-bulk-count">0 selected</span>
             </label>
             <div class="vp-bulk-actions">
+              <button type="button" class="vp-bulk-btn vp-bulk-btn-edit" id="btn-bulk-price">£ Price</button>
+              <button type="button" class="vp-bulk-btn vp-bulk-btn-edit" id="btn-bulk-stock">Stock</button>
               <button type="button" class="vp-bulk-btn" id="btn-bulk-archive">Archive</button>
               <button type="button" class="vp-bulk-btn" id="btn-bulk-unarchive" hidden>Restore</button>
               <button type="button" class="vp-bulk-btn vp-bulk-btn-danger" id="btn-bulk-delete">Delete</button>
             </div>
             <button type="button" class="vp-bulk-clear" id="btn-bulk-clear" title="Clear selection">&#10005;</button>
+          </div>
+
+          <!-- Bulk edit inline panel (slides open below bulk bar) -->
+          <div class="vp-bulk-edit-panel" id="vp-bulk-edit-panel" hidden>
+            <span class="vp-bulk-edit-label" id="vp-bulk-edit-label">Set price (£)</span>
+            <input type="number" id="vp-bulk-edit-value" min="0" step="0.01" placeholder="0.00" />
+            <button type="button" class="vp-bulk-btn vp-bulk-btn-edit" id="btn-bulk-edit-apply">Apply to selected</button>
+            <button type="button" class="vp-bulk-clear" id="btn-bulk-edit-cancel" title="Close">&#10005;</button>
           </div>
 
           <div class="vp-toolbar" id="vp-toolbar" hidden>
@@ -89,7 +99,7 @@
 
     <script src="/assets/js/config-global.js"></script>
     <script src="/assets/js/vendor-guard.js"></script>
-    <script src="/assets/js/layout.js?v=20260531"></script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
     <script src="/assets/js/vendor-products.js?v=20260529"></script>
   </body>
 </html>

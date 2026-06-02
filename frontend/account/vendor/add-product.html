@@ -15,7 +15,10 @@
       <main class="vendor-main">
         <div class="vendor-container">
           <a href="/account/vendor/products.html" class="vendor-back-link">← Products</a>
-          <h1 class="vendor-title">Add Product</h1>
+          <div class="ap-page-header">
+            <h1 class="vendor-title">Add Product</h1>
+            <a href="/account/vendor/tools.html" class="ap-csv-link">📊 Import multiple via CSV</a>
+          </div>
 
           <form id="add-product-form" class="ap-form">
 
@@ -421,7 +424,7 @@
             </div>
 
             <!-- INVENTORY -->
-            <div class="ap-section">
+            <div class="ap-section" data-tier-section="inventory">
               <div class="ap-section-head">Inventory</div>
               <div class="ap-row-2">
                 <div class="form-group">
@@ -448,8 +451,12 @@
             </div>
 
             <!-- VARIANTS -->
-            <div class="ap-section">
+            <div class="ap-section" data-tier-section="variants">
               <div class="ap-section-head">Variants</div>
+              <div style="margin-bottom:12px">
+                <button type="button" id="vr-bulk-img-btn" style="font-size:0.82rem;padding:6px 14px;background:#f0f9f8;border:1px solid #0b6b6a;color:#0b6b6a;border-radius:6px;cursor:pointer;font-weight:600">📷 Bulk upload variant images</button>
+                <input type="file" id="vr-bulk-img-input" accept="image/*" multiple style="display:none" />
+              </div>
               <div class="ap-toggle-group" style="margin-bottom:0">
                 <label class="ap-toggle">
                   <input type="checkbox" id="has-variants" />
@@ -495,7 +502,7 @@
             </div>
 
             <!-- ADD-ONS -->
-            <div class="ap-section">
+            <div class="ap-section" data-tier-section="addons">
               <div class="ap-section-head">Add-Ons</div>
               <div class="ap-toggle-group" style="margin-bottom:0">
                 <label class="ap-toggle">
@@ -552,8 +559,48 @@
               </div>
             </div>
 
+            <!-- REFURBISHED DETAILS -->
+            <div class="ap-section" data-tier-section="refurb">
+              <div class="ap-section-head">Refurbishment Details</div>
+              <div class="ap-row-2">
+                <div class="form-group">
+                  <label>Condition Grade</label>
+                  <select id="refurb-condition-grade">
+                    <option value="">— Select grade —</option>
+                    <option value="Excellent">Excellent — fully restored, looks new</option>
+                    <option value="Good">Good — minor cosmetic marks only</option>
+                    <option value="Fair">Fair — visible wear, fully functional</option>
+                    <option value="For Parts">For Parts — not fully functional</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Tested Status</label>
+                  <select id="refurb-tested-status">
+                    <option value="">— Select status —</option>
+                    <option value="Fully Tested">Fully Tested</option>
+                    <option value="Partially Tested">Partially Tested</option>
+                    <option value="Untested">Untested</option>
+                  </select>
+                </div>
+              </div>
+              <div class="ap-row-2">
+                <div class="form-group">
+                  <label>Warranty Period <span class="ap-hint">e.g. 3 months, 1 year</span></label>
+                  <input type="text" id="refurb-warranty" placeholder="e.g. 90 days" maxlength="60" />
+                </div>
+                <div class="form-group">
+                  <label>Serial Number <span class="ap-hint">Optional — for tracking</span></label>
+                  <input type="text" id="refurb-serial" placeholder="e.g. SN-12345" maxlength="100" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Refurbishment Notes <span class="ap-hint">Describe what was repaired or replaced</span></label>
+                <textarea id="refurb-notes" rows="3" placeholder="e.g. Replaced battery, cleaned screen, tested all functions…" maxlength="1000"></textarea>
+              </div>
+            </div>
+
             <!-- SEO (collapsible) -->
-            <div class="ap-section">
+            <div class="ap-section" data-tier-section="seo">
               <div class="ap-section-head ap-section-toggle" id="seo-toggle">
                 SEO &amp; Search
                 <span class="ap-toggle-icon" id="seo-icon">&#9658;</span>
@@ -607,10 +654,49 @@
     </div>
 
     <script src="/assets/js/config-global.js"></script>
+    <script>
+      if (localStorage.getItem('s4l_vendorType') === 'casual') {
+        window.location.replace('/account/vendor/add-product-casual.html');
+      }
+    </script>
     <script src="/assets/js/vendor-guard.js"></script>
-    <script src="/assets/js/layout.js?v=20260531"></script>
+    <script src="/assets/js/tier-config.js"></script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
     <script>
       window.__pageScripts = ['/assets/js/vendor-add-product.js'];
+
+      // Section tier map: section key → minimum tier required
+      const SECTION_TIER = {
+        inventory: 'refurbished',
+        refurb:    'refurbished',
+        variants:  'professional',
+        addons:    'professional',
+        seo:       'professional',
+      };
+
+      document.addEventListener('vendorLoaded', function(e) {
+        const type = e.detail?.type || 'casual';
+        const rank = TIER_RANK[type] || 1;
+
+        document.querySelectorAll('[data-tier-section]').forEach(function(el) {
+          const section = el.dataset.tierSection;
+          const required = TIER_RANK[SECTION_TIER[section]] || 1;
+          if (rank < required) {
+            el.style.display = 'none';
+          }
+        });
+      });
+
+      // Fallback: if vendorLoaded already fired, use cached value
+      const cachedTier = localStorage.getItem('s4l_vendorType');
+      if (cachedTier) {
+        const rank = TIER_RANK[cachedTier] || 1;
+        document.querySelectorAll('[data-tier-section]').forEach(function(el) {
+          const section = el.dataset.tierSection;
+          const required = TIER_RANK[{ inventory:'refurbished', refurb:'refurbished', variants:'professional', addons:'professional', seo:'professional' }[section]] || 1;
+          if (rank < required) el.style.display = 'none';
+        });
+      }
     </script>
   </body>
 </html>

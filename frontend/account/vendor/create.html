@@ -128,13 +128,16 @@
         <div class="form-field">
           <label for="storeType">Seller type</label>
           <select id="storeType">
-            <option value="casual">Casual — selling personal items</option>
-            <option value="professional">Professional — business / regular seller</option>
+            <option value="casual">Casual — personal items &amp; occasional listings</option>
+            <option value="refurbished">Refurbished — certified refurbishers &amp; repair businesses</option>
+            <option value="professional">Professional — small businesses, brands &amp; regular retailers</option>
+            <option value="enterprise">Enterprise — manufacturers, wholesalers &amp; large retailers</option>
           </select>
+          <span class="hint" id="tier-hint"></span>
         </div>
 
         <div class="create-msg" id="msg"></div>
-        <button type="submit" class="create-submit">Apply to Sell</button>
+        <button type="submit" class="create-submit" id="submitBtn">Start Selling</button>
       </form>
 
       <div class="create-notice" id="successNotice">
@@ -142,6 +145,25 @@
       </div>
     </div>
 
+    <script>
+      const TIER_HINTS = {
+        casual:       'Simple listings: title, photos, price, condition. No advanced features needed.',
+        refurbished:  'Adds: condition grade, warranty period, tested status & refurbishment notes.',
+        professional: 'Full access: variants, add-ons, SEO, bulk import, transactions & payouts.',
+        enterprise:   'All features + foundation for staff accounts & API access (coming soon).',
+      };
+      document.addEventListener('DOMContentLoaded', function() {
+        const sel = document.getElementById('storeType');
+        const hint = document.getElementById('tier-hint');
+        const btn = document.getElementById('submitBtn');
+        function update() {
+          if (hint) hint.textContent = TIER_HINTS[sel.value] || '';
+          if (btn) btn.textContent = sel.value === 'casual' ? 'Start Selling' : 'Apply to Sell';
+        }
+        sel.addEventListener('change', update);
+        update();
+      });
+    </script>
     <script src="/assets/js/config-global.js"></script>
     <script>
       // Auth guard — must be logged in to apply
@@ -162,7 +184,7 @@
         } catch { /* silent */ }
       })();
     </script>
-    <script src="/assets/js/layout.js?v=20260531"></script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
     <script src="/assets/js/vendor-create.js"></script>
   </body>
 </html>

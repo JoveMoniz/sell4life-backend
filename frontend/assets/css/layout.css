@@ -158,27 +158,14 @@ footer p {
   background: #086160;
 }
 
-.footer-logo {
-  font-size: 18px;
-  font-weight: bold;
-  letter-spacing: 3px;
+.footer-logo-link {
+  display: inline-block;
   text-decoration: none;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
   padding-top: 15px;
 }
-.footer-logo .logo-wordmark {
-  display: flex;
-  align-items: baseline;
-}
-.footer-logo-line {
+.footer-logo-svg {
+  overflow: visible;
   display: block;
-  height: 2px;
-  width: 100%;
-  background: #f28c28;
-  border-radius: 1px;
-  margin-top: 3px;
 }
 
 .logo-orange {
@@ -234,6 +221,7 @@ footer p {
   z-index: 5000;
 }
 
+
 .header-container {
   width: 100%;
   display: flex;
@@ -257,6 +245,11 @@ footer p {
   overflow: visible;
 }
 
+#s4l-logo-desktop,
+#s4l-logo-mobile {
+  overflow: visible;
+}
+
 .header-logo {
   display: flex;
   flex-direction: column;
@@ -274,15 +267,6 @@ footer p {
   align-items: baseline;
 }
 
-.header-logo::after {
-  content: '';
-  display: block;
-  height: 2px;
-  width: 100%;
-  background: #f28c28;
-  border-radius: 1px;
-  margin-top: 4px;
-}
 
 .header-nav {
   margin: 10px 0;
@@ -986,15 +970,6 @@ footer p {
     align-items: baseline;
   }
 
-  .mobile-logo::after {
-    content: '';
-    display: block;
-    height: 2px;
-    width: 100%;
-    background: #f28c28;
-    border-radius: 1px;
-    margin-top: 3px;
-  }
 
   /* Right-side icons */
   .mobile-right-icons {

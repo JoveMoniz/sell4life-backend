@@ -21,7 +21,11 @@ if (existingToken && existingUser) {
         if (data.isVendor && data.vendor) {
           localStorage.setItem('s4l_isVendor', 'true');
           localStorage.setItem('s4l_vendorStatus', data.vendor.status);
-          window.location.replace('/account/vendor/dashboard.html');
+          localStorage.setItem('s4l_vendorType', data.vendor.type || 'casual');
+          const _dest = (data.vendor.type || 'casual') === 'casual'
+            ? '/account/vendor/dashboard-casual.html'
+            : '/account/vendor/dashboard.html';
+          window.location.replace(_dest);
         } else {
           localStorage.setItem('s4l_isVendor', 'false');
           window.location.replace('/account/vendor/create.html');
@@ -93,10 +97,12 @@ if (form && msg) {
           const _vid = vData.vendor._id || vData.vendor.id || '';
           localStorage.setItem('s4l_isVendor', 'true');
           localStorage.setItem('s4l_vendorStatus', vData.vendor.status);
+          localStorage.setItem('s4l_vendorType', vData.vendor.type || 'casual');
           if (_vid) localStorage.setItem('s4l_vendorId', String(_vid));
         } else {
           localStorage.setItem('s4l_isVendor', 'false');
           localStorage.removeItem('s4l_vendorId');
+          localStorage.removeItem('s4l_vendorType');
         }
       } catch {
         // Non-critical — vendor pages will re-check via vendor-guard.js

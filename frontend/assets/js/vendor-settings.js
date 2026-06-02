@@ -65,18 +65,14 @@ function renderForm(v) {
       </div>
 
       <div class="settings-field">
-        <label class="settings-label">Store Type</label>
-        <div class="settings-type-row">
-          <label class="settings-type-opt ${v.type !== 'professional' ? 'selected' : ''}" id="type-casual">
-            <input type="radio" name="storeType" value="casual" ${v.type !== 'professional' ? 'checked' : ''} />
-            <strong>Casual</strong>
-            <span>Individual seller, occasional sales</span>
-          </label>
-          <label class="settings-type-opt ${v.type === 'professional' ? 'selected' : ''}" id="type-professional">
-            <input type="radio" name="storeType" value="professional" ${v.type === 'professional' ? 'checked' : ''} />
-            <strong>Professional</strong>
-            <span>Business or high-volume seller</span>
-          </label>
+        <label class="settings-label">Account Tier</label>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:13px;color:#374151">Current tier: <strong style="text-transform:capitalize">${esc(v.type || 'casual')}</strong></span>
+          ${v.type !== 'enterprise'
+            ? (v.upgradeRequest?.status === 'pending'
+                ? '<button type="button" id="btn-upgrade-toggle" disabled style="font-size:11px;padding:3px 10px;background:#f3f4f6;color:#9ca3af;border:1px solid #e5e7eb;border-radius:4px;cursor:not-allowed;white-space:nowrap">Requested ✓</button>'
+                : '<button type="button" id="btn-upgrade-toggle" style="font-size:11px;padding:3px 10px;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;white-space:nowrap">Request Upgrade</button>')
+            : ''}
         </div>
       </div>
     </div>
@@ -108,6 +104,25 @@ function renderForm(v) {
       <span class="settings-msg" id="settings-msg"></span>
     </div>
 
+    <!-- Enterprise API Key (Enterprise tier only) -->
+    ${v.type === 'enterprise' ? `
+    <div class="settings-section" id="api-key-section" style="margin-top:8px">
+      <div class="settings-section-title">API Access</div>
+      <div class="settings-field">
+        <label class="settings-label">Your API Key</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="settings-input" id="api-key-display" type="text" value="${esc(v.apiKey || '')}" readonly
+            placeholder="Click Generate to create your key"
+            style="font-family:monospace;font-size:13px;background:#f8fafc;color:#374151" />
+          ${v.apiKey
+            ? `<button type="button" id="copy-api-key" style="padding:8px 14px;background:#0b6b6a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;flex-shrink:0">Copy</button>`
+            : `<button type="button" id="generate-api-key" style="padding:8px 14px;background:#0b6b6a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;flex-shrink:0">Generate</button>`
+          }
+        </div>
+        <div class="settings-hint">Send this key in the <code>X-API-Key</code> header to authenticate API requests. Keep it secret — treat it like a password.</div>
+      </div>
+    </div>` : ''}
+
     <!-- Account Details -->
     <div class="settings-section" style="margin-top:8px">
       <div class="settings-section-title">Account Details</div>
@@ -126,8 +141,8 @@ function renderForm(v) {
         <input class="settings-input" id="vs-email" type="email" autocomplete="email" />
       </div>
       <div class="settings-field">
-        <label class="settings-label" for="vs-email-pass">Current Password</label>
-        <input class="settings-input" id="vs-email-pass" type="password" autocomplete="current-password" />
+        <label class="settings-label" for="vs-email-pass">Confirm Password</label>
+        <input class="settings-input" id="vs-email-pass" type="password" autocomplete="current-password" placeholder="Enter your password to confirm" />
       </div>
       <div class="settings-save-bar" style="margin-bottom:18px">
         <button class="settings-save-btn" id="vs-save-email">Update Email</button>
@@ -168,16 +183,76 @@ function renderForm(v) {
     }
   });
 
-  // Type radio visual
-  document.querySelectorAll('input[name="storeType"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      document.querySelectorAll('.settings-type-opt').forEach(el => el.classList.remove('selected'));
-      radio.closest('.settings-type-opt').classList.add('selected');
-    });
-  });
-
   // Save store settings
   document.getElementById('settings-save').addEventListener('click', () => saveSettings(v._id));
+
+  // Copy API key
+  const copyBtn = document.getElementById('copy-api-key');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const val = document.getElementById('api-key-display')?.value;
+      if (!val) return;
+      navigator.clipboard.writeText(val).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+      });
+    });
+  }
+
+  // Generate API key (for enterprise vendors who don't have one yet)
+  const genBtn = document.getElementById('generate-api-key');
+  if (genBtn) {
+    genBtn.addEventListener('click', async () => {
+      genBtn.disabled = true;
+      genBtn.textContent = 'Generating…';
+      try {
+        const res = await authFetch(`${API}/vendor/api-key/generate`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || 'Failed to generate key', 'error'); return; }
+        const display = document.getElementById('api-key-display');
+        if (display) display.value = data.apiKey;
+        genBtn.textContent = 'Copy';
+        genBtn.id = 'copy-api-key';
+        genBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(data.apiKey).then(() => {
+            genBtn.textContent = 'Copied!';
+            setTimeout(() => { genBtn.textContent = 'Copy'; }, 2000);
+          });
+        });
+      } catch {
+        showToast('Server error — please try again.', 'error');
+      } finally {
+        genBtn.disabled = false;
+      }
+    });
+  }
+
+  // Request tier upgrade
+  const upgradeToggle = document.getElementById('btn-upgrade-toggle');
+
+  if (upgradeToggle && !upgradeToggle.disabled) {
+    upgradeToggle.addEventListener('click', async () => {
+      upgradeToggle.disabled = true;
+      upgradeToggle.textContent = 'Sending…';
+      try {
+        const res = await authFetch(`${API}/vendor/request-upgrade`, {
+          method: 'POST',
+          body: JSON.stringify({ message: '' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        window.showToast?.(data.message || 'Upgrade request sent!');
+        upgradeToggle.textContent = 'Requested ✓';
+        upgradeToggle.style.color = '#9ca3af';
+        upgradeToggle.style.borderColor = '#e5e7eb';
+        upgradeToggle.style.cursor = 'not-allowed';
+      } catch (err) {
+        window.showToast?.(err.message || 'Failed to send upgrade request', 'error');
+        upgradeToggle.disabled = false;
+        upgradeToggle.textContent = 'Request Upgrade';
+      }
+    });
+  }
 
   // Account section
   attachAccountHandlers();
@@ -197,7 +272,6 @@ async function saveSettings() {
     storeDescription: document.getElementById('set-desc')?.value?.trim(),
     storeLogo:        document.getElementById('set-logo')?.value?.trim(),
     storeBanner:      document.getElementById('set-banner')?.value?.trim(),
-    type:             document.querySelector('input[name="storeType"]:checked')?.value,
   };
 
   if (!body.storeName) {

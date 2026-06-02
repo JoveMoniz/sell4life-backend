@@ -9,17 +9,14 @@ body {
 
 /* =====================================================
    ORDERS PAGE – Sell4Life
-   Clean, centered, predictable
+   Clean white/light-grey — teal as accent only
 ===================================================== */
 
 .page-account {
-  background: #0b6b6a;
-  color: #ffffff;
-  padding: 60px 20px;
+  background: #f5f7f8;
+  color: #111827;
+  padding: 48px 20px 80px;
   min-height: 60vh;
-
-  display: block;
-  flex-direction: column;
 }
 
 .order-page #orders-container {
@@ -27,43 +24,29 @@ body {
   max-width: 900px;
   margin: 0 auto;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 30px;
-  box-sizing: border-box;
 }
 
 /* Top row */
 .page-top {
   max-width: 900px;
-  margin: 0 auto 24px;
+  margin: 0 auto 20px;
 }
 
 .auth-back {
-  color: rgba(255, 255, 255, 0.85);
+  color: #0b6b6a;
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
 }
-
-.auth-back:hover {
-  text-decoration: underline;
-}
+.auth-back:hover { text-decoration: underline; }
 
 /* Heading */
 .page-account h1 {
   text-align: center;
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 40px;
-}
-
-.order-page .order-card {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  width: 100%;
-  box-sizing: border-box;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 32px;
+  color: #111827;
 }
 
 /* Loading / empty */
@@ -71,24 +54,24 @@ body {
 #orders-empty {
   text-align: center;
   font-size: 16px;
-  opacity: 1;
+  color: #6b7280;
 }
 
 /* Orders list */
 #orders-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-/* Order ID – readable, intentional */
+/* Order ID */
 .order-id {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.7px;
-  opacity: 1;
-  line-height: 1.1; /* 🔴 THIS is the key */
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #111827;
   margin: 0;
+  line-height: 1.2;
 }
 
 .order-header {
@@ -102,139 +85,84 @@ body {
 .order-total {
   font-size: 17px;
   font-weight: 700;
-  color: #f28c28;
+  color: #0b6b6a;
   white-space: nowrap;
-
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 8px;
-
-  /* REMOVE these */
-  margin-left: 0;
-  align-self: auto;
+  background: #f0fdf9;
+  border: 1px solid #d1fae5;
 }
-
 .order-page .order-total {
-  background: rgba(0, 0, 0, 0.3);
+  background: #f0fdf9;
 }
 
 /* Meta */
 .order-meta {
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  line-height: 1.3;
   margin-top: 0;
   gap: 2px;
-  font-size: 14.5px;
-  opacity: 1;
+  font-size: 13.5px;
+  color: #6b7280;
 }
 
-/* =========================================
-   MY ORDERS – LINK CLEANUP
-========================================= */
-
+/* Links */
 .page-account a {
   text-decoration: none;
   color: inherit;
 }
+.page-account a:hover { opacity: 0.8; }
 
-/* Keep hover intentional, not browser-default */
-
-.page-account a:hover {
-  opacity: 0.85;
-}
-
-.page-account h1 {
-  font-size: 24px;
-}
-
+/* Order card */
 .order-card {
-  padding: 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-
-  /* ✨ Surface separation */
-  background: #2e8078; /* slightly lighter than page */
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.order-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.09);
 }
 
-.order-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+.order-page .order-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 
 .order-card-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
+.order-header { flex-direction: row; align-items: center; }
+.order-card-link { display: block; }
 
-.order-header {
-  flex-direction: row;
-  align-items: center;
-}
-
-.order-card-link {
-  display: block;
-}
-
+/* Pay now */
 .pay-now-btn {
   position: relative;
   z-index: 5;
   cursor: pointer;
-  margin-top: 12px;
+  margin-top: 8px;
   padding: 10px;
   border-radius: 6px;
   border: none;
   background: #f59e0b;
-  color: white;
+  color: #fff;
   font-weight: 600;
+  font-size: 14px;
 }
+.pay-now-btn:hover { background: #d97706; }
 
-.pay-now-btn:hover {
-  cursor: pointer;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  #orders-container {
-    padding: 20px;
-  }
-
-  .page-account h1 {
-    font-size: 24px;
-  }
-
-  .order-card {
-    position: relative;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .order-card-header {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .order-header {
-    flex-direction: row;
-    align-items: center;
-  }
-}
-
-/*---------------- order details--------------*/
-/* =========================================
-   ORDER DETAILS PAGE ONLY
-   Targets #order-details explicitly
-========================================= */
+/* =====================================================
+   ORDER DETAILS PAGE
+===================================================== */
 
 .order-details-container {
   width: 100%;
@@ -243,317 +171,208 @@ body {
 }
 
 #order-details {
-  margin-top: 40px;
-  border-radius: 14px;
-  padding: 28px;
-  background: rgba(0, 0, 0, 0.15);
+  margin-top: 32px;
+  border-radius: 12px;
+  padding: 24px 28px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-/* Header info */
-
 #order-details h2 {
-  margin-bottom: 12px;
-  font-size: 22px;
+  margin-bottom: 10px;
+  font-size: 21px;
+  color: #111827;
+  font-weight: 700;
 }
 
 #order-details p {
-  margin: 6px 0;
-  opacity: 0.9;
+  margin: 5px 0;
+  color: #374151;
+  font-size: 14px;
 }
 
 /* Items list */
-
 #order-details .order-items {
-  margin-top: 28px;
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 /* Single item row */
-
 #order-details .order-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 14px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #f8fafc;
   border-radius: 10px;
+  border: 1px solid #e5e7eb;
 }
 
 /* Thumbnail */
-
 .order-details-page .order-thumb {
   width: 56px;
   height: 56px;
   object-fit: cover;
   border-radius: 8px;
-  background: #0b4f4f;
+  background: #e5e7eb;
 }
 
 #order-details .order-info div:first-child {
   font-weight: 600;
+  color: #111827;
 }
-
 #order-details .order-info div:last-child {
-  font-size: 14px;
-  opacity: 0.85;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 /* Line price */
-
 .order-details-page .order-price {
   text-align: right;
   font-weight: 600;
   white-space: nowrap;
+  color: #111827;
 }
 
-/* Total aligned with prices */
+/* Total */
 #order-details h3 {
-  margin-top: 28px;
+  margin-top: 24px;
   padding-top: 16px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   justify-content: flex-end;
+  color: #0b6b6a;
 }
 
-/* Ensure text hierarchy feels intentional */
-
-#order-details h2 {
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
-
+#order-details h2 { font-weight: 700; letter-spacing: 0.1px; }
 #order-details p,
 #order-details .order-info,
 #order-details .order-line {
-  font-size: 15px;
-  line-height: 1.4;
+  font-size: 14.5px;
+  line-height: 1.5;
 }
 
-/* Smaller meta text */
-
-#order-details .order-info div:last-child {
-  font-size: 14px;
-  opacity: 0.8;
-}
-
+/* Back link */
 .back-link {
   display: inline-block;
   margin-bottom: 20px;
-  color: #eaeaea;
+  color: #0b6b6a;
   text-decoration: none;
   font-size: 14px;
-  opacity: 0.8;
+  font-weight: 500;
 }
+.back-link:hover { text-decoration: underline; }
 
-.back-link:hover {
-  opacity: 1;
-}
-
+/* Actions dropdown */
 .order-actions-wrapper {
   position: relative;
   display: inline-block;
 }
-
 .order-actions-menu {
   display: none;
-
   position: absolute;
   top: 50px;
   left: 0;
-
   min-width: 220px;
-
   background: #ffffff;
-
   border-radius: 12px;
-
   padding: 10px;
-
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   z-index: 50;
+  border: 1px solid #e5e7eb;
 }
-
 .order-actions-menu.open {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* =========================================
-   ORDER DETAILS – MOBILE FIX
-   Make it readable with thumbs, not mice
-========================================= */
+/* Order history list */
+.order-history-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.history-label { font-weight: 500; }
+
+/* Payment status badges */
+.payment-status {
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+.payment-status.paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+.payment-status.pending,
+.payment-status.unpaid {
+  background: #fef3c7;
+  color: #92400e;
+}
+.payment-status.failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.payment-status.refunded {
+  background: #fde8e8;
+  color: #b91c1c;
+}
+
+/* Font */
+.order-details-page,
+.order-page {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #orders-container { padding: 0; }
+  .page-account h1 { font-size: 22px; }
+  .order-card { padding: 14px 16px; gap: 10px; }
+}
 
 @media (max-width: 480px) {
-  /* Orders list page */
-  .page-account {
-    padding: 32px 12px;
-  }
+  .page-account { padding: 28px 12px 60px; }
+  .page-account h1 { font-size: 20px; margin-bottom: 20px; }
+  .order-card { padding: 13px 12px; gap: 8px; border-radius: 10px; }
+  .order-id { font-size: 13.5px; }
+  .order-total { font-size: 15px; padding: 4px 10px; }
+  .order-meta { font-size: 12.5px; }
+  .pay-now-btn { width: 100%; padding: 12px; font-size: 15px; }
 
-  .page-account h1 {
-    font-size: 20px;
-    margin-bottom: 24px;
-  }
-
-  .order-page #orders-container {
-    padding: 16px 12px;
-    border-radius: 10px;
-  }
-
-  .order-card {
-    padding: 14px 12px;
-    gap: 8px;
-    border-radius: 10px;
-  }
-
-  .order-id {
-    font-size: 13.5px;
-    letter-spacing: 0.4px;
-  }
-
-  .order-total {
-    font-size: 15px;
-    padding: 4px 10px;
-  }
-
-  .order-meta {
-    font-size: 13px;
-  }
-
-  .pay-now-btn {
-    width: 100%;
-    padding: 12px;
-    font-size: 15px;
-  }
-
-  /* Order details page */
-  #order-details {
-    padding: 16px 12px;
-    margin-top: 24px;
-    border-radius: 10px;
-  }
-
-  #order-details h2 {
-    font-size: 18px;
-  }
-
-  #order-details h3 {
-    font-size: 1rem;
-    margin-top: 20px;
-    padding-top: 12px;
-  }
-
+  #order-details { padding: 16px 14px; margin-top: 20px; border-radius: 10px; }
+  #order-details h2 { font-size: 18px; }
+  #order-details h3 { font-size: 1rem; margin-top: 18px; padding-top: 12px; }
   #order-details .order-item {
     display: grid;
     grid-template-columns: 44px 1fr;
-    grid-template-areas:
-      'thumb info'
-      'lineprice lineprice';
-    gap: 12px;
-    padding: 12px;
+    grid-template-areas: 'thumb info' 'lineprice lineprice';
+    gap: 10px;
+    padding: 11px;
   }
-
   .order-details-page .order-thumb {
     grid-area: thumb;
     width: 44px;
     height: 44px;
     border-radius: 6px;
   }
-
-  #order-details .order-info {
-    grid-area: info;
-  }
-
+  #order-details .order-info { grid-area: info; }
   #order-details .order-line-price {
     grid-area: lineprice;
     justify-self: flex-end;
-    margin-top: 6px;
-    font-size: 14.5px;
+    margin-top: 4px;
+    font-size: 14px;
     font-weight: 600;
-    opacity: 0.9;
   }
-
-  .order-actions-menu {
-    min-width: 180px;
-  }
-}
-
-/* =========================================
-   ORDER DETAILS PAGE – FONT FIX
-========================================= */
-
-.order-details-page,
-.order-page {
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
-}
-
-.order-history-list li {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-}
-
-.history-label {
-  font-weight: 500;
-}
-
-.history-label:has(:contains('❌')) {
-  color: #dc2626;
-}
-
-.history-label:has(:contains('✅')) {
-  color: #16a34a;
-}
-
-/* Only order details needs white text */
-.payment-status {
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-
-.payment-status.paid {
-  background: linear-gradient(135deg, #0a7c2f, #0e9f3d);
-  color: white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-.payment-status.pending,
-.payment-status.unpaid {
-  background: #b45309; /* deep burnt orange */
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-.payment-status.unpaid {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.payment-status.failed {
-  background: rgba(196, 0, 0, 0.12);
-  color: #c40000;
-}
-
-.payment-status.refunded {
-  background: #fde8e8;
-  color: #b91c1c;
-  font-weight: 600;
+  .order-actions-menu { min-width: 180px; }
 }

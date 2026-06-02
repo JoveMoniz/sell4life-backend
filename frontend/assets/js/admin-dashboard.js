@@ -19,7 +19,7 @@ async function loadCounts() {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) return;
-    const { pendingVendors, pendingPayouts } = await res.json();
+    const { pendingVendors, pendingPayouts, pendingUpgrades } = await res.json();
 
     const vendorBadge = document.getElementById('badge-vendors');
     const payoutWrap = document.getElementById('badge-payouts-wrap');
@@ -27,8 +27,9 @@ async function loadCounts() {
     const payoutPlural = document.getElementById('badge-payouts-plural');
 
     if (vendorBadge) {
-      if (pendingVendors > 0) {
-        vendorBadge.textContent = pendingVendors;
+      const vendorTotal = (pendingVendors || 0) + (pendingUpgrades || 0);
+      if (vendorTotal > 0) {
+        vendorBadge.textContent = vendorTotal;
         vendorBadge.classList.remove('dash-badge--hidden');
       } else {
         vendorBadge.classList.add('dash-badge--hidden');

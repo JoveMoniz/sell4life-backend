@@ -22,12 +22,7 @@ window.__quickAddLoaded = true;
       <div class="qa-backdrop"></div>
       <div class="qa-box">
         <button class="qa-close" aria-label="Close">&times;</button>
-        <div class="qa-header">
-          <img class="qa-img" src="" alt="">
-          <div class="qa-meta">
-            <div class="qa-price"></div>
-          </div>
-        </div>
+        <div class="qa-price" style="display:none"></div>
         <div class="qa-variants"></div>
         <button class="qa-confirm" disabled>Select an option</button>
       </div>
@@ -111,15 +106,9 @@ window.__quickAddLoaded = true;
       return;
     }
 
-    const id  = product._id || product.id;
-    const img = (Array.isArray(product.images) && product.images[0])
-      ? (product.images[0].startsWith('http') ? product.images[0] : `/assets/images/products/${product.images[0]}`)
-      : (product.image || '/assets/images/products/sell4life-placeholder.png');
-
-    modal.querySelector('.qa-img').src = img;
-
     const confirmBtn = modal.querySelector('.qa-confirm');
     const variantsEl = modal.querySelector('.qa-variants');
+    const priceEl    = modal.querySelector('.qa-price');
 
     variantsEl.innerHTML = realVariants.map((v, i) => variantBtn(v, i)).join('');
 
@@ -128,14 +117,26 @@ window.__quickAddLoaded = true;
 
     confirmBtn.disabled    = true;
     confirmBtn.textContent = 'Select an option';
-    setPrice(Number(product.price || 0));
+
+    // Only show price if variants have different prices
+    const prices = realVariants.map(v => Number(v.price || product.price || 0));
+    const hasDifferentPrices = prices.some(p => p !== prices[0]);
+    if (priceEl) {
+      if (hasDifferentPrices) {
+        priceEl.style.display = '';
+        setPrice(Number(product.price || 0));
+      } else {
+        priceEl.style.display = 'none';
+      }
+    }
 
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
   function setPrice(n) {
-    modal.querySelector('.qa-price').textContent = `£${n.toFixed(2)}`;
+    const el = modal.querySelector('.qa-price');
+    if (el && el.style.display !== 'none') el.textContent = `£${n.toFixed(2)}`;
   }
 
   function close() {

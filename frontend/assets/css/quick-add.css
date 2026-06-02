@@ -59,38 +59,13 @@
 }
 .qa-close:hover { color: #111; }
 
-/* ── Header ──────────────────────────────────────────── */
-.qa-header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 14px;
-}
-
-.qa-img {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  flex-shrink: 0;
-  background: #f9f9f9;
-}
-
-.qa-name {
-  font-weight: 600;
-  color: #111;
-  font-size: 13.5px;
-  line-height: 1.35;
-  margin-bottom: 4px;
-}
-
 .qa-price {
   color: #ff8a2a;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 18px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 /* ── Variant buttons ─────────────────────────────────── */

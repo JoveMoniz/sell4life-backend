@@ -68,6 +68,10 @@
               <h3 id="txn-net">£0.00</h3>
               <p>Net to You</p>
             </div>
+            <div class="stat-card" id="txn-reserve-card" hidden>
+              <h3 id="txn-reserve">£0.00</h3>
+              <p id="txn-reserve-label">In Reserve</p>
+            </div>
           </div>
 
           <!-- VAT status toggle -->
@@ -139,6 +143,7 @@
       <div class="payout-sticky-left">
         <div class="payout-sticky-label">Available for Payout</div>
         <div class="payout-sticky-amount" id="payout-balance">£—</div>
+        <div id="payout-reserved" style="display:none;margin-top:2px"></div>
       </div>
       <div class="payout-sticky-note" id="payout-balance-note"></div>
       <button type="button" id="btn-request-payout" class="btn-payout-sticky" disabled>
@@ -168,7 +173,7 @@
       })();
     </script>
 
-    <script src="/assets/js/layout.js?v=20260531"></script>
-    <script src="/assets/js/vendor-transactions.js?v=20260523d"></script>
+    <script src="/assets/js/layout.js?v=20260603"></script>
+    <script src="/assets/js/vendor-transactions.js?v=20260602a"></script>
   </body>
 </html>

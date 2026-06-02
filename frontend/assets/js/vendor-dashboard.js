@@ -15,7 +15,7 @@ function authFetch(url, opts = {}) {
 }
 
 /* ======================================================
-   DISPLAY STATUS
+   DISPLAY STATUSP
 ====================================================== */
 function getDisplayStatus(order) {
   const payment = (order.paymentStatus || '').toLowerCase();
@@ -237,7 +237,7 @@ document.addEventListener('click', async (e) => {
       loadRecentOrders();
     }, 400);
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
     btn.disabled = false;
     btn.textContent = label;
   }

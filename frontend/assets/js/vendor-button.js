@@ -29,12 +29,12 @@ document.addEventListener('click', (e) => {
 
   // 🔴 NOT APPROVED → BLOCK
   if (vendorStatus === 'pending') {
-    alert('Your store is under review');
+    showAlert('Your store is under review');
     return;
   }
 
   if (vendorStatus === 'suspended') {
-    alert('Your store is suspended');
+    showAlert('Your store is suspended');
     return;
   }
 

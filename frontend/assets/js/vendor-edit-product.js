@@ -1279,9 +1279,7 @@ function bindVariants() {
       const img  = td.querySelector('.vr-img-preview');
       const url  = td.querySelector('[name="vr-image"]');
       const doIt = async () => {
-        const ok = window.confirmAction
-          ? await window.confirmAction('Clear this variant image? The colour swatch will remain.')
-          : confirm('Clear this variant image?');
+        const ok = await showConfirm('Clear this variant image? The colour swatch will remain.');
         if (!ok) return;
         if (img)  img.src = '';
         if (url)  url.value = '';
@@ -1290,6 +1288,46 @@ function bindVariants() {
       doIt();
     }
   });
+  // Bulk variant image upload
+  const vrBulkBtn   = document.getElementById('vr-bulk-img-btn');
+  const vrBulkInput = document.getElementById('vr-bulk-img-input');
+  if (vrBulkBtn && vrBulkInput) {
+    vrBulkBtn.addEventListener('click', () => vrBulkInput.click());
+    vrBulkInput.addEventListener('change', async () => {
+      const files = Array.from(vrBulkInput.files);
+      if (!files.length) return;
+      vrBulkBtn.disabled = true;
+      vrBulkBtn.textContent = 'Uploading…';
+      const tbody = document.getElementById('variant-rows');
+      for (const file of files) {
+        try {
+          const url = await uploadToCloudinary(file);
+          const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+          let targetRow = rows.find(r => !r.querySelector('[name="vr-image"]')?.value.trim());
+          if (!targetRow) { addVariantRow({}); targetRow = tbody?.querySelector('tr:last-child'); }
+          if (!targetRow) continue;
+          const urlInput = targetRow.querySelector('[name="vr-image"]');
+          const img      = targetRow.querySelector('.vr-img-preview');
+          const wrap     = targetRow.querySelector('.vr-thumb-wrap');
+          if (urlInput) urlInput.value = url;
+          if (img)      img.src = url;
+          if (wrap)     wrap.classList.add('has-img');
+          sampleDominantColor(url, (hex) => {
+            const picker = targetRow.querySelector('[name="vr-color"]');
+            if (picker && picker.dataset.userSet !== 'true') {
+              picker.value = hex; picker.dataset.userSet = 'true';
+            }
+          });
+        } catch {
+          window.showToast?.('One image failed — skipped', 'error');
+        }
+      }
+      vrBulkInput.value = '';
+      vrBulkBtn.disabled = false;
+      vrBulkBtn.textContent = '📷 Bulk upload images';
+    });
+  }
+
   variantRows?.addEventListener('input', (e) => {
     if (e.target.classList.contains('vb-color-pick')) {
       e.target.dataset.userSet = 'true';
@@ -1583,6 +1621,13 @@ async function loadProduct() {
     if (p.dimensions?.height)    setVal('product-height', p.dimensions.height);
     if (p.dimensions?.length)    setVal('product-length', p.dimensions.length);
 
+    // Refurbished fields
+    if (p.conditionGrade)     { const el = document.getElementById('refurb-condition-grade'); if (el) el.value = p.conditionGrade; }
+    if (p.testedStatus)       { const el = document.getElementById('refurb-tested-status');  if (el) el.value = p.testedStatus; }
+    if (p.warrantyPeriod)     setVal('refurb-warranty', p.warrantyPeriod);
+    if (p.serialNumber)       setVal('refurb-serial',   p.serialNumber);
+    if (p.refurbishmentNotes) setVal('refurb-notes',    p.refurbishmentNotes);
+
     // SEO
     setVal('product-seo-title', p.seoTitle);
     setVal('product-seo-desc',  p.seoDescription);
@@ -1688,6 +1733,11 @@ if (form) {
       variantDisplay:   document.getElementById('vb-color-mode')?.checked !== false ? 'color' : 'image',
       variants:         getVariants(),
       addOns:           getAddOns(),
+      conditionGrade:     document.getElementById('refurb-condition-grade')?.value  || undefined,
+      testedStatus:       document.getElementById('refurb-tested-status')?.value    || undefined,
+      warrantyPeriod:     val('refurb-warranty') || undefined,
+      serialNumber:       val('refurb-serial')   || undefined,
+      refurbishmentNotes: val('refurb-notes')    || undefined,
     };
 
     if (!product.name)                                   { window.showToast?.('Product name required', 'error');  reset(btn); return; }

@@ -125,9 +125,13 @@ function renderVendorTable(vendors) {
       const vatBadge = v.vatRegistered
         ? '<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:8px;margin-left:4px">VAT</span>'
         : '';
+      const tierColors = { casual:'#6b7280', refurbished:'#0369a1', professional:'#e07b00', enterprise:'#7c3aed' };
+      const tierBg     = { casual:'#f3f4f6', refurbished:'#e0f2fe', professional:'#fff3e0', enterprise:'#ede9fe' };
+      const tier = v.type || 'casual';
+      const tierBadge = `<span style="font-size:10px;background:${tierBg[tier]||'#f3f4f6'};color:${tierColors[tier]||'#6b7280'};padding:1px 6px;border-radius:8px;margin-left:4px;text-transform:capitalize">${tier}</span>`;
       return `<tr>
       <td>
-        <strong>${v.storeName}</strong>${vatBadge}
+        <strong>${v.storeName}</strong>${vatBadge}${tierBadge}
         ${v.storeSlug ? `<div style="font-size:11px;color:#9ca3af">@${v.storeSlug}</div>` : ''}
       </td>
       <td style="color:#6b7280;font-size:12px">${v.email}</td>
@@ -160,7 +164,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#btn-export-csv')) return;
   if (!lastVendors.length) {
-    alert('No data to export.');
+    showAlert('No data to export.');
     return;
   }
 

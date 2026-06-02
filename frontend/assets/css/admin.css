@@ -414,21 +414,11 @@ button {
 .inline-order-wrapper {
   height: 0;
   overflow: hidden;
-
   padding: 0 24px;
-  padding-top: 0;
-  padding-bottom: 0;
-
-  transition:
-    height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-    padding 0.3s ease,
-    opacity 0.3s ease,
-    transform 0.3s ease;
+  transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
 }
 /* open state */
 .order-details-row.open .inline-order-wrapper {
-  opacity: 1;
-  transform: translateY(0);
   padding: 16px 24px;
 }
 .inline-order-content {
@@ -1425,6 +1415,40 @@ body.admin-users .admin-users-table thead th {
   font-weight: 700;
 }
 
+.admin-notif-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-notif-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #374151;
+}
+
+.admin-notif-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  padding: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-notif-panel.is-open {
+  max-height: 400px;
+}
+
 .admin-payout-badge {
   background: #ef4444;
   color: #fff;
@@ -1529,4 +1553,67 @@ body.admin-users .admin-users-table thead th {
 .admin-toolbar-btn:hover {
   border-color: #0b6b6a;
   color: #0b6b6a;
+}
+
+/* ── Styled dialogs ── */
+.s4l-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: s4l-fadein 0.15s ease;
+}
+@keyframes s4l-fadein { from { opacity:0 } to { opacity:1 } }
+.s4l-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.s4l-dialog-msg {
+  font-size: 0.9rem;
+  color: #111827;
+  margin: 0 0 20px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.s4l-dialog-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  font-family: inherit;
+  color: #374151;
+}
+.s4l-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.s4l-dialog-primary {
+  padding: 7px 18px;
+  background: #111827;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.s4l-dialog-secondary {
+  padding: 7px 18px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
 }

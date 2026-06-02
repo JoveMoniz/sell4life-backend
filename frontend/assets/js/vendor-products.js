@@ -3,6 +3,8 @@
 ====================================================== */
 
 const IMAGE_BASE = '/assets/images/products/';
+const TIER_RANK_VP = { casual: 1, refurbished: 2, professional: 3, enterprise: 4 };
+const _isPro = (TIER_RANK_VP[localStorage.getItem('s4l_vendorType')] || 1) >= 3;
 
 let _allProducts = [];
 let _archivedProducts = [];
@@ -81,6 +83,7 @@ function renderCard(p) {
       <div class="vendor-product-actions">
         <a href="/account/vendor/edit-product.html?id=${id}" class="btn-edit">Edit</a>
         <a href="/product/product.html?id=${id}" class="btn-view-store" target="_blank" rel="noopener">View</a>
+        ${_isPro ? `<button class="btn-duplicate" data-id="${id}" title="Duplicate as draft">Copy</button>` : ''}
         ${p.archived
           ? `<button class="btn-unarchive" data-id="${id}">Unarchive</button>`
           : `<button class="btn-coming-soon-toggle${p.comingSoon ? ' is-coming-soon' : ''}" data-id="${id}" title="${p.comingSoon ? 'Click to unblock — Coming Soon is ON' : 'Click to enable Coming Soon'}">🕐</button>
@@ -126,6 +129,7 @@ function renderListRow(p) {
       <div class="vp-list-actions">
         <a href="/account/vendor/edit-product.html?id=${id}" class="btn-edit">Edit</a>
         <a href="/product/product.html?id=${id}" class="btn-view-store" target="_blank" rel="noopener">View</a>
+        ${_isPro ? `<button class="btn-duplicate" data-id="${id}" title="Duplicate as draft">Copy</button>` : ''}
         ${p.archived
           ? `<button class="btn-unarchive" data-id="${id}">Unarchive</button>`
           : `<button class="btn-coming-soon-toggle${p.comingSoon ? ' is-coming-soon' : ''}" data-id="${id}" title="${p.comingSoon ? 'Disable Coming Soon' : 'Enable Coming Soon'}">🕐 ${p.comingSoon ? 'Unblock' : 'Coming Soon'}</button>
@@ -390,6 +394,102 @@ document.getElementById('btn-bulk-archive')?.addEventListener('click',   () => b
 document.getElementById('btn-bulk-unarchive')?.addEventListener('click', () => bulkAction('unarchive'));
 document.getElementById('btn-bulk-delete')?.addEventListener('click',    () => bulkAction('delete'));
 
+/* ── Bulk price/stock edit ────────────────────────────── */
+
+document.getElementById('btn-bulk-price')?.addEventListener('click', () => {
+  const panel = document.getElementById('vp-bulk-edit-panel');
+  const label = document.getElementById('vp-bulk-edit-label');
+  const input = document.getElementById('vp-bulk-edit-value');
+  if (label) label.textContent = 'Set price (£)';
+  if (input) { input.type = 'number'; input.value = ''; }
+  if (panel) panel.hidden = false;
+  if (input) input.focus();
+  panel?.dataset.mode = 'price';
+});
+
+document.getElementById('btn-bulk-stock')?.addEventListener('click', () => {
+  const panel = document.getElementById('vp-bulk-edit-panel');
+  const label = document.getElementById('vp-bulk-edit-label');
+  const input = document.getElementById('vp-bulk-edit-value');
+  if (label) label.textContent = 'Set stock (qty)';
+  if (input) { input.type = 'number'; input.value = ''; input.step = '1'; }
+  if (panel) panel.hidden = false;
+  if (input) input.focus();
+  panel?.dataset.mode = 'stock';
+});
+
+document.getElementById('btn-bulk-edit-cancel')?.addEventListener('click', () => {
+  const panel = document.getElementById('vp-bulk-edit-panel');
+  if (panel) { panel.hidden = true; delete panel.dataset.mode; }
+});
+
+document.getElementById('btn-bulk-edit-apply')?.addEventListener('click', async () => {
+  const panel = document.getElementById('vp-bulk-edit-panel');
+  const input = document.getElementById('vp-bulk-edit-value');
+  const mode = panel?.dataset.mode;
+  const value = input?.value?.trim();
+
+  if (!mode || !value) return;
+  if (_selected.size === 0) { window.showToast?.('No products selected', 'error'); return; }
+
+  const token = localStorage.getItem('s4l_token');
+  const ids = [..._selected];
+  const n = ids.length;
+  const field = mode === 'price' ? 'price' : 'stock';
+  const fieldVal = mode === 'price' ? parseFloat(value) : parseInt(value, 10);
+
+  if (isNaN(fieldVal) || fieldVal < 0) {
+    window.showToast?.(`Invalid ${field}`, 'error');
+    return;
+  }
+
+  const msg = `Update ${field} to ${fieldVal} for ${n} product${n > 1 ? 's' : ''}?`;
+  const confirmed = await window.confirmAction?.(msg);
+  if (!confirmed) return;
+
+  const actBtn = document.getElementById('btn-bulk-edit-apply');
+  if (actBtn) { actBtn.disabled = true; actBtn.textContent = 'Applying…'; }
+
+  try {
+    const body = { ids };
+    if (mode === 'price') body.price = fieldVal;
+    else body.stock = fieldVal;
+
+    const res = await fetch(`${window.API_BASE}/products/bulk`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const updated = data.updated || ids.length;
+
+    _allProducts.forEach(p => {
+      const pid = p._id || p.id;
+      if (ids.includes(pid)) {
+        if (mode === 'price') p.price = fieldVal;
+        else p.stock = fieldVal;
+      }
+    });
+
+    _selected.clear();
+    renderProducts();
+    updateBulkBar();
+    if (panel) { panel.hidden = true; delete panel.dataset.mode; }
+    window.showToast?.(`Updated ${updated} product${updated !== 1 ? 's' : ''}`);
+  } catch (err) {
+    console.error(err);
+    window.showToast?.(err.message || 'Update failed', 'error');
+  } finally {
+    if (actBtn) { actBtn.disabled = false; actBtn.textContent = 'Apply to selected'; }
+  }
+});
+
 /* ── Load ────────────────────────────────────────── */
 
 async function loadVendorProducts() {
@@ -514,6 +614,33 @@ document.addEventListener('click', async (e) => {
   } catch {
     window.showToast?.('Product not found', 'error');
     btn.disabled = false; btn.textContent = 'Recover';
+  }
+});
+
+/* ── Duplicate ───────────────────────────────────── */
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('btn-duplicate')) return;
+  const btn = e.target;
+  const id  = btn.dataset.id;
+  const token = localStorage.getItem('s4l_token');
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await fetch(`${API_BASE}/products/${id}/duplicate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Duplicate failed', 'error'); return; }
+    // Navigate to edit the new copy immediately
+    window.location.href = `/account/vendor/edit-product.html?id=${data.product._id}`;
+  } catch {
+    showToast('Server error — please try again.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Copy';
   }
 });
 

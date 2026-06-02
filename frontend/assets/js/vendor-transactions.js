@@ -265,7 +265,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#btn-export-csv')) return;
 
   if (!lastTransactions.length) {
-    alert('No transactions to export.');
+    showAlert('No transactions to export.');
     return;
   }
 
@@ -363,11 +363,11 @@ document.addEventListener('click', async (e) => {
       body: JSON.stringify({ vatRegistered: newStatus, vatNumber }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Failed to update VAT status'); return; }
+    if (!res.ok) { showToast(data.error || 'Failed to update VAT status', 'error'); return; }
     if (bar) bar.dataset.vatRegistered = String(data.vatRegistered);
     loadTransactions();
   } catch (err) {
-    alert('Network error. Please try again.');
+    showToast('Network error. Please try again.', 'error');
   }
 });
 
@@ -383,12 +383,12 @@ document.addEventListener('click', async (e) => {
       body: JSON.stringify({ vatRegistered: true, vatNumber }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Invalid VAT number'); return; }
+    if (!res.ok) { showToast(data.error || 'Invalid VAT number', 'error'); return; }
     const bar = document.getElementById('vat-status-bar');
     if (bar) bar.dataset.vatRegistered = 'true';
     loadTransactions();
   } catch (err) {
-    alert('Network error. Please try again.');
+    showToast('Network error. Please try again.', 'error');
   }
 });
 
@@ -403,11 +403,41 @@ async function loadPayouts() {
 
   try {
     const res = await authFetch(`${API_BASE}/vendor/payouts`);
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = res.ok ? await res.json() : {};
 
     if (balanceEl) {
       balanceEl.textContent = '£' + Number(data.pendingBalance || 0).toFixed(2);
+    }
+
+    // Reserve summary card — always visible
+    const reserveCard  = document.getElementById('txn-reserve-card');
+    const reserveVal   = document.getElementById('txn-reserve');
+    const reserveLabel = document.getElementById('txn-reserve-label');
+    if (reserveCard) {
+      if (reserveVal) reserveVal.textContent = '£' + Number(data.reservedBalance || 0).toFixed(2);
+      if (reserveLabel) {
+        const rate    = Math.round((data.reserveRate || 0.10) * 100);
+        const trusted = data.trustedSeller ? ' · ✓ Trusted' : '';
+        reserveLabel.textContent = `In Reserve (${rate}%${trusted})`;
+      }
+      reserveCard.hidden = false;
+    }
+
+    // Reserved balance + trusted seller display
+    const reserveEl = document.getElementById('payout-reserved');
+    if (reserveEl) {
+      const rate    = Math.round((data.reserveRate || 0.10) * 100);
+      const held    = Number(data.reservedBalance || 0).toFixed(2);
+      const releaseDate = data.nextReserveReleaseDate
+        ? new Date(data.nextReserveReleaseDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : null;
+      const trustedText = data.trustedSeller
+        ? '<span style="color:#15803d;font-weight:600">✓ Trusted Seller — 5% rate</span>'
+        : `<span style="color:#9ca3af">6 months clean → 5% rate</span>`;
+      reserveEl.innerHTML = `<span style="font-size:0.78rem;color:#6b7280">
+        £${held} in reserve (${rate}%)${releaseDate ? ` · next release ${releaseDate}` : ''} · ${trustedText}
+      </span>`;
+      reserveEl.style.display = 'block';
     }
 
     if (btn && noteEl) {
@@ -455,7 +485,7 @@ document.addEventListener('click', async (e) => {
   const btn = document.getElementById('btn-request-payout');
   if (!btn || btn.disabled) return;
 
-  if (!confirm('Request a payout for your full available balance?\n\nWe will process it via bank transfer within 3–5 business days.')) return;
+  if (!await showConfirm('Request a payout for your full available balance?\n\nWe will process it via bank transfer within 3–5 business days.')) return;
 
   btn.disabled = true;
   btn.textContent = 'Sending…';
@@ -464,14 +494,14 @@ document.addEventListener('click', async (e) => {
     const res = await authFetch(`${API_BASE}/vendor/payouts/request`, { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || 'Payout request failed.');
+      showToast(data.error || 'Payout request failed.', 'error');
       btn.disabled = false;
       btn.textContent = 'Request Payout';
       return;
     }
     loadPayouts();
   } catch (err) {
-    alert('Network error. Please try again.');
+    showToast('Network error. Please try again.', 'error');
     btn.disabled = false;
     btn.textContent = 'Request Payout';
   }

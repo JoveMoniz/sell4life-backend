@@ -170,10 +170,22 @@
 
     // ── Scroll-linked reveal ──────────────────────────────────
     function initVisibility() {
-      // Mobile: always show the bar immediately
+      // Mobile: show only when header has scrolled off screen
       if (window.innerWidth <= 1280) {
-        bar.style.transform = 'none';
-        bar.style.pointerEvents = 'auto';
+        const mobileHeader = document.querySelector('.s4l-header-mobile');
+        let footerVisible = false;
+
+        function setBar(show) {
+          bar.style.transform    = show ? 'none' : 'translateY(110%)';
+          bar.style.pointerEvents = show ? 'auto' : 'none';
+        }
+
+        if (mobileHeader) {
+          new IntersectionObserver(([e]) => {
+            if (!footerVisible) setBar(!e.isIntersecting);
+          }, { threshold: 0 }).observe(mobileHeader);
+        }
+
         let footerObserved = false;
         function tryObserveFooterMobile() {
           if (footerObserved) return;
@@ -181,8 +193,8 @@
           if (!btn) return;
           footerObserved = true;
           new IntersectionObserver(([e]) => {
-            bar.style.transform    = e.isIntersecting ? 'translateY(110%)' : 'none';
-            bar.style.pointerEvents = e.isIntersecting ? 'none' : 'auto';
+            footerVisible = e.isIntersecting;
+            setBar(!e.isIntersecting && window.scrollY > (mobileHeader ? mobileHeader.offsetHeight : 0));
           }, { threshold: 0 }).observe(btn);
         }
         setTimeout(tryObserveFooterMobile, 1000);
@@ -274,7 +286,74 @@
     // ── Actions ───────────────────────────────────────────────
     bar.querySelector('.s4l-top-btn').addEventListener('click',    () => window.scrollTo({ top: 0, behavior: 'smooth' }));
     bar.querySelector('.s4l-account-btn').addEventListener('click', () => { window.location.href = localStorage.getItem('s4l_token') ? '/account/orders.html' : '/account/signin.html'; });
-    bar.querySelector('.s4l-cart-btn').addEventListener('click',    () => { window.location.href = '/cart/cart.html'; });
+    // Cart button: tap/click → go to cart. Hold 600ms → clear basket popup
+    (function() {
+      const cartBtn = bar.querySelector('.s4l-cart-btn');
+      let holdTimer = null;
+      let held = false;
+
+      function startHold() {
+        held = false;
+        holdTimer = setTimeout(() => {
+          held = true;
+          showClearPopup();
+        }, 600);
+      }
+      function cancelHold() { clearTimeout(holdTimer); }
+
+      function showClearPopup() {
+        // Remove any existing popup
+        document.getElementById('s4l-clear-popup')?.remove();
+
+        const pop = document.createElement('div');
+        pop.id = 's4l-clear-popup';
+        pop.style.cssText = `
+          position:fixed;bottom:72px;left:50%;transform:translateX(-50%);
+          background:#fff;border:1px solid #e5e7eb;border-radius:12px;
+          padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);
+          display:flex;flex-direction:column;align-items:center;gap:10px;
+          z-index:9999;min-width:180px;text-align:center;
+        `;
+        pop.innerHTML = `
+          <span style="font-size:0.85rem;font-weight:600;color:#111827">Clear basket?</span>
+          <div style="display:flex;gap:8px;width:100%">
+            <button id="s4l-clear-confirm" style="flex:1;padding:8px;background:#dc2626;color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:700;cursor:pointer">Clear</button>
+            <button id="s4l-clear-cancel"  style="flex:1;padding:8px;background:#f3f4f6;color:#374151;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer">Cancel</button>
+          </div>
+        `;
+        document.body.appendChild(pop);
+
+        document.getElementById('s4l-clear-confirm').addEventListener('click', () => {
+          localStorage.removeItem('cart');
+          document.dispatchEvent(new Event('cartUpdated'));
+          pop.remove();
+        });
+        document.getElementById('s4l-clear-cancel').addEventListener('click', () => pop.remove());
+
+        // Close if tapping anywhere else
+        setTimeout(() => {
+          document.addEventListener('click', function outsideClick(e) {
+            if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', outsideClick); }
+          });
+        }, 10);
+      }
+
+      // Touch events (mobile)
+      cartBtn.addEventListener('touchstart',  () => startHold(), { passive: true });
+      cartBtn.addEventListener('touchend',    () => { cancelHold(); if (!held) window.location.href = '/cart/cart.html'; held = false; });
+      cartBtn.addEventListener('touchcancel', () => { cancelHold(); held = false; });
+
+      // Mouse events (desktop)
+      cartBtn.addEventListener('mousedown',  () => startHold());
+      cartBtn.addEventListener('mouseup',    () => { cancelHold(); if (!held) window.location.href = '/cart/cart.html'; });
+      cartBtn.addEventListener('mouseleave', () => { cancelHold(); held = false; });
+
+      // Swallow the click event that fires after a hold — prevents it from closing the popup
+      cartBtn.addEventListener('click', (e) => { if (held) { e.stopImmediatePropagation(); held = false; } });
+
+      // Desktop hover hint
+      cartBtn.title = 'Go to basket (hold to clear)';
+    })();
     bar.querySelector('.s4l-pill-vendor').addEventListener('click', () => { window.location.href = '/account/vendor/orders.html'; });
     bar.querySelector('.s4l-pill-buyer').addEventListener('click',  () => { window.location.href = '/account/orders.html'; });
   }

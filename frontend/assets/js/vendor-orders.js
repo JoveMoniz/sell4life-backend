@@ -303,7 +303,7 @@ document.addEventListener('click', async (e) => {
       loadVendorOrders(currentStatus, currentQuery);
     }, 400);
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
     btn.disabled = false;
     btn.textContent = label;
   }
