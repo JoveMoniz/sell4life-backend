@@ -290,11 +290,12 @@ router.get('/:id/products', async (req, res) => {
 
 router.get('/counts', async (req, res) => {
   try {
-    const [pendingVendors, pendingPayouts] = await Promise.all([
+    const [pendingVendors, pendingPayouts, pendingUpgrades] = await Promise.all([
       Vendor.countDocuments({ status: 'pending' }),
       Payout.countDocuments({ status: 'requested' }),
+      Vendor.countDocuments({ 'upgradeRequest.status': 'pending' }),
     ]);
-    res.json({ pendingVendors, pendingPayouts });
+    res.json({ pendingVendors, pendingPayouts, pendingUpgrades });
   } catch (err) {
     console.error('Admin counts error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -830,7 +831,7 @@ router.post('/disputes/:disputeId/respond', authMiddleware, adminMiddleware, asy
    UPGRADE REQUESTS
 ====================================================== */
 
-router.get('/upgrade-requests', async (req, res) => {
+router.get('/upgrade-requests', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const vendors = await Vendor.find({ 'upgradeRequest.status': 'pending' })
       .populate('userId', 'email')
