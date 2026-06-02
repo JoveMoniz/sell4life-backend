@@ -546,10 +546,32 @@ const COMMISSION_RATE_PAYOUT = 0.08;
 const MIN_PAYOUT = 20;
 const HOLD_DAYS = 30;
 const RESERVE_DAYS = 90;
-const RESERVE_RATE = 0.10;
+const RESERVE_RATE_STANDARD = 0.10;
+const RESERVE_RATE_TRUSTED  = 0.05;
+const TRUSTED_MONTHS = 6;
+
+function resolveReserveRate(vendor, ordersRaw) {
+  const approvedAt = vendor.approvedAt ? new Date(vendor.approvedAt).getTime() : Date.now();
+  const monthsApproved = (Date.now() - approvedAt) / (30 * 24 * 60 * 60 * 1000);
+  if (monthsApproved < TRUSTED_MONTHS) return { rate: RESERVE_RATE_STANDARD, trusted: false };
+
+  const cutoff = Date.now() - TRUSTED_MONTHS * 30 * 24 * 60 * 60 * 1000;
+  const hasRecentLostDispute = ordersRaw.some(order =>
+    (order.disputes || []).some(d =>
+      d.status === 'lost' && new Date(d.createdAt || 0).getTime() > cutoff
+    )
+  );
+  return hasRecentLostDispute
+    ? { rate: RESERVE_RATE_STANDARD, trusted: false }
+    : { rate: RESERVE_RATE_TRUSTED,  trusted: true  };
+}
 
 async function computeVendorBalance(vendorId) {
-  const ordersRaw = await Order.find({ 'vendorOrders.vendorId': vendorId });
+  const [ordersRaw, vendor] = await Promise.all([
+    Order.find({ 'vendorOrders.vendorId': vendorId }),
+    Vendor.findById(vendorId).select('approvedAt').lean(),
+  ]);
+  const { rate: RESERVE_RATE, trusted } = resolveReserveRate(vendor || {}, ordersRaw);
 
   let totalGross = 0;
   let totalReserved = 0;
@@ -647,7 +669,8 @@ async function computeVendorBalance(vendorId) {
     holdDays: HOLD_DAYS,
     reserveDays: RESERVE_DAYS,
     reserveRate: RESERVE_RATE,
-    nextClearanceDate:     nextClearanceMs     ? new Date(nextClearanceMs).toISOString()     : null,
+    trustedSeller: trusted,
+    nextClearanceDate:      nextClearanceMs      ? new Date(nextClearanceMs).toISOString()      : null,
     nextReserveReleaseDate: nextReserveReleaseMs ? new Date(nextReserveReleaseMs).toISOString() : null,
   };
 }
