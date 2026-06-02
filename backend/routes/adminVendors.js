@@ -649,7 +649,7 @@ router.get('/financials', async (req, res) => {
       .populate('userId', 'email')
       .select('storeName storeSlug status vatRegistered type');
 
-    const vendorRows = vendors.map(v => {
+    const vendorRowsBase = vendors.map(v => {
       const m = vendorMap[String(v._id)] || {};
       const gross = m.gross || 0;
       const refunds = m.refunds || 0;
@@ -670,6 +670,17 @@ router.get('/financials', async (req, res) => {
       };
     }).sort((a, b) => b.gross - a.gross);
 
+    // Compute per-vendor balance (reserve + available) in parallel
+    const balances = await Promise.all(
+      vendorRowsBase.map(v => computeVendorBalance(v._id).catch(() => null))
+    );
+    const vendorRows = vendorRowsBase.map((v, i) => ({
+      ...v,
+      reservedBalance: Math.round((balances[i]?.reservedBalance || 0) * 100) / 100,
+      pendingBalance:  Math.round((balances[i]?.pendingBalance  || 0) * 100) / 100,
+    }));
+    const totalReserved = vendorRows.reduce((s, v) => s + v.reservedBalance, 0);
+
     res.json({
       summary: {
         totalGross:        Math.round(totalGross * 100) / 100,
@@ -682,6 +693,7 @@ router.get('/financials', async (req, res) => {
         pendingCount,
         orderCount:        orders.length,
         vendorCount:       vendorIds.length,
+        totalReserved:     Math.round(totalReserved * 100) / 100,
       },
       vendors: vendorRows,
     });
