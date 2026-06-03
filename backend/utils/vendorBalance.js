@@ -3,8 +3,8 @@ import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 
 export const COMMISSION_RATE   = 0.08;
-export const HOLD_DAYS         = 30;
-export const RESERVE_DAYS      = 90;
+export const HOLD_DAYS         = 1 / (24 * 60);      // TEST: 1 minute (restore to 30)
+export const RESERVE_DAYS      = 5 / (24 * 60);      // TEST: 5 minutes (restore to 90)
 export const RESERVE_STANDARD  = 0.10;
 export const RESERVE_TRUSTED   = 0.05;
 export const TRUSTED_MONTHS    = 6;
