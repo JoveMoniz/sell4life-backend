@@ -79,18 +79,22 @@ export async function computeVendorBalance(vendorId) {
       // Always count toward all-time gross (for commission display)
       totalGrossAllTime += itemValue;
 
-      if (now < clearsAt) {
-        // Still in delivery hold — track when it clears
-        if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
-        return;
-      }
       if (now >= reserveReleasesAt) {
+        // After 90 days: fully available, reserve released
         totalGross += itemValue;
       } else {
-        totalGross    += itemValue * (1 - RESERVE_RATE);
+        // Reserve is tracked from delivery (day 0) until 90 days
         totalReserved += itemValue * RESERVE_RATE;
         if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs)
           nextReserveReleaseMs = reserveReleasesAt;
+
+        if (now < clearsAt) {
+          // Still in 30-day hold — 90% not yet available either
+          if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
+        } else {
+          // Hold cleared: 90% is now available to pay out
+          totalGross += itemValue * (1 - RESERVE_RATE);
+        }
       }
     });
 
