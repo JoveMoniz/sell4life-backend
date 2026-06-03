@@ -36,7 +36,7 @@ import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
-import { computeVendorBalance, MIN_PAYOUT } from '../utils/vendorBalance.js';
+import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 
 const router = express.Router();
 
@@ -513,6 +513,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     // Sort chronologically (newest first)
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    const { rate: reserveRate } = resolveReserveRate(vendor, ordersRaw);
     const net = Number((totalSales - totalRefunds).toFixed(2));
     res.json({
       transactions,
@@ -525,6 +526,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         net,
         netAfterFees:     Number((net - totalCommission).toFixed(2)),
         commissionRate:   COMMISSION_RATE,
+        reserveRate,
         vatRegistered:    isVatRegistered,
         vatNumber:        vendor.vatNumber || '',
       },
