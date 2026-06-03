@@ -3,12 +3,12 @@ import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 
 export const COMMISSION_RATE   = 0.08;
-export const HOLD_DAYS         = 1 / (24 * 60);      // TEST: 1 minute (restore to 30)
-export const RESERVE_DAYS      = 5 / (24 * 60);      // TEST: 5 minutes (restore to 90)
+export const HOLD_DAYS         = 30;
+export const RESERVE_DAYS      = 90;
 export const RESERVE_STANDARD  = 0.10;
 export const RESERVE_TRUSTED   = 0.05;
 export const TRUSTED_MONTHS    = 6;
-export const MIN_PAYOUT        = 1;  // TEST: £1 minimum (restore to 20)
+export const MIN_PAYOUT        = 20;
 const STRIPE_PCT   = 0.014;
 const STRIPE_FIXED = 0.20;
 
@@ -40,14 +40,15 @@ export async function computeVendorBalance(vendorId) {
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross        = 0;  // cleared items only (hold passed)
-  let totalReserved     = 0;  // in reserve window
-  let totalGrossAllTime = 0;  // delivered items (for hold/reserve math)
-  let totalGrossAllPaid = 0;  // ALL paid items regardless of status (for commission display)
+  let totalGross        = 0;
+  let totalReserved     = 0;
+  let totalGrossAllTime = 0;
+  let totalGrossAllPaid = 0;
   let totalRefunds      = 0;
   let totalStripeFees   = 0;
   let nextClearanceMs      = null;
   let nextReserveReleaseMs = null;
+  const reserveByDate   = {}; // YYYY-MM-DD → gross amount still in reserve
 
   ordersRaw.forEach(order => {
     const vendorItems = (order.items || []).filter(
@@ -83,16 +84,18 @@ export async function computeVendorBalance(vendorId) {
         // After 90 days: fully available, reserve released
         totalGross += itemValue;
       } else {
-        // Reserve is tracked from delivery (day 0) until 90 days
+        // Reserve tracked from delivery day 0 until 90 days
         totalReserved += itemValue * RESERVE_RATE;
         if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs)
           nextReserveReleaseMs = reserveReleasesAt;
 
+        // Group by release date for the schedule
+        const releaseDateKey = new Date(reserveReleasesAt).toISOString().slice(0, 10);
+        reserveByDate[releaseDateKey] = (reserveByDate[releaseDateKey] || 0) + itemValue * RESERVE_RATE;
+
         if (now < clearsAt) {
-          // Still in 30-day hold — 90% not yet available either
           if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         } else {
-          // Hold cleared: 90% is now available to pay out
           totalGross += itemValue * (1 - RESERVE_RATE);
         }
       }
@@ -167,5 +170,12 @@ export async function computeVendorBalance(vendorId) {
     holdDays: HOLD_DAYS, reserveDays: RESERVE_DAYS,
     nextClearanceDate:      nextClearanceMs      ? new Date(nextClearanceMs).toISOString()      : null,
     nextReserveReleaseDate: nextReserveReleaseMs ? new Date(nextReserveReleaseMs).toISOString() : null,
+    // Upcoming reserve releases: [{ date: 'YYYY-MM-DD', amount: £ after commission }]
+    reserveSchedule: Object.entries(reserveByDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, gross]) => ({
+        date,
+        amount: Number((gross * (1 - COMMISSION_RATE)).toFixed(2)),
+      })),
   };
 }
