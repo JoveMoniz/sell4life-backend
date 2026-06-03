@@ -41,6 +41,7 @@ async function loadTransactions() {
     const data = await res.json();
     const txns = data.transactions || [];
     const summary = data.summary || {};
+    const reserveRate = Number(summary.reserveRate || 0.10);
 
     lastTransactions = txns;
 
@@ -143,6 +144,18 @@ async function loadTransactions() {
   <td class="txn-order"></td>
   <td class="txn-desc txn-commission-label" colspan="3">Platform fee (8%)</td>
   <td class="txn-amount txn-commission-amount">-£${Number(t.commission).toFixed(2)}</td>
+</tr>`);
+      }
+
+      if (isSale && Number(t.amount) > 0) {
+        const reserveAmt = Number((Math.abs(t.amount) * reserveRate).toFixed(2));
+        const reservePct = Math.round(reserveRate * 100);
+        txnRows.push(`
+<tr class="txn-row txn-row-reserve">
+  <td class="txn-date"></td>
+  <td class="txn-order"></td>
+  <td class="txn-desc txn-reserve-label" colspan="3">Reserve held (${reservePct}%) <span class="txn-reserve-note">releases at 90 days</span></td>
+  <td class="txn-amount txn-reserve-amount">-£${reserveAmt.toFixed(2)}</td>
 </tr>`);
       }
 

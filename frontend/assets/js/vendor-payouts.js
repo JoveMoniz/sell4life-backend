@@ -26,22 +26,43 @@ async function load() {
   }
 }
 
+function buildScheduleSection(schedule) {
+  if (!schedule || !schedule.length) return '';
+  const rows = schedule.map(r => {
+    const label = new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return '<div class="reserve-schedule-row">'
+      + '<span class="reserve-schedule-date">' + label + '</span>'
+      + '<span class="reserve-schedule-amount">+' + fmt(r.amount) + '</span>'
+      + '</div>';
+  }).join('');
+  return '<div class="reserve-schedule">'
+    + '<div class="reserve-schedule-title">Upcoming Reserve Releases</div>'
+    + '<p class="reserve-schedule-note">Your 10% reserve releases automatically — here\'s exactly when each amount becomes available:</p>'
+    + '<div class="reserve-schedule-list">' + rows + '</div>'
+    + '</div>';
+}
+
 function render(data, wrap) {
   const b = data;
   const payouts = data.payouts || [];
 
   const holdDays = data.holdDays || 30;
+  const holdLabel = holdDays < 1/24
+    ? `${Math.round(holdDays * 24 * 60)} minute${Math.round(holdDays * 24 * 60) !== 1 ? 's' : ''}`
+    : holdDays < 1
+    ? `${Math.round(holdDays * 24)} hour${Math.round(holdDays * 24) !== 1 ? 's' : ''}`
+    : `${holdDays} day${holdDays !== 1 ? 's' : ''}`;
   const nextDate = data.nextClearanceDate
     ? new Date(data.nextClearanceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : null;
 
   const holdNote = b.pendingBalance === 0 && nextDate
     ? `<p style="font-size:12px;color:#6b7280;margin:8px 0 0">
-        Funds are held for ${holdDays} days after delivery. Next release: <strong>${nextDate}</strong>.
+        Funds are held for ${holdLabel} after delivery. Next release: <strong>${nextDate}</strong>.
        </p>`
     : b.pendingBalance === 0
     ? `<p style="font-size:12px;color:#6b7280;margin:8px 0 0">
-        No delivered orders yet. Funds are released ${holdDays} days after delivery.
+        No delivered orders yet. Funds are released ${holdLabel} after delivery.
        </p>`
     : '';
 
@@ -114,6 +135,8 @@ function render(data, wrap) {
     </div>
 
     ${requestSection}
+
+    ${buildScheduleSection(b.reserveSchedule)}
 
     <div class="payout-history-title">Payout History</div>
     <table class="payout-table">
