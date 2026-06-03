@@ -8,7 +8,7 @@ export const RESERVE_DAYS      = 5 / (24 * 60);      // TEST: 5 minutes (restore
 export const RESERVE_STANDARD  = 0.10;
 export const RESERVE_TRUSTED   = 0.05;
 export const TRUSTED_MONTHS    = 6;
-export const MIN_PAYOUT        = 20;
+export const MIN_PAYOUT        = 1;  // TEST: £1 minimum (restore to 20)
 const STRIPE_PCT   = 0.014;
 const STRIPE_FIXED = 0.20;
 
