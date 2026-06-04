@@ -91,11 +91,17 @@ export async function computeVendorBalance(vendorId) {
       // Always count toward all-time gross (for commission display)
       totalGrossAllTime += grossValue;
 
-      if (itemValue === 0) return; // fully refunded — no reserve or cleared balance
+      // Shipping is non-refundable — vendor keeps it after hold regardless of returns
+      if (now >= clearsAt) {
+        totalShippingCleared += shippingValue;
+      } else {
+        if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
+      }
+
+      if (itemValue === 0) return; // product fully refunded — skip product gross & reserve
 
       if (now >= reserveReleasesAt) {
         totalGross += itemValue;
-        totalShippingCleared += shippingValue;
       } else {
         totalReserved += itemValue * RESERVE_RATE;
         if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs)
@@ -108,7 +114,6 @@ export async function computeVendorBalance(vendorId) {
           if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         } else {
           totalGross += itemValue * (1 - RESERVE_RATE);
-          totalShippingCleared += shippingValue; // shipping clears after hold, no reserve
         }
       }
     });

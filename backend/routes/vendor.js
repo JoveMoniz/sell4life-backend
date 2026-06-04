@@ -383,9 +383,6 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
 
         if (refundQty > 0) {
           const moneyMoved = refundType !== 'return_pending';
-
-          // Only deduct from net calculations when money has actually moved.
-          // return_pending = approved but item not yet received back → excluded.
           if (moneyMoved) orderRefundTotal += refundAmount;
 
           refundEntries.push({
