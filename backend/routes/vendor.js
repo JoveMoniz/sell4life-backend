@@ -412,6 +412,19 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
       const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
       const stripeIsEstimated = rawStripeFee === 0;
 
+      // Item label for sale rows
+      const activeItems = vendorItems.filter(i => i.status !== 'Cancelled');
+      const saleItemName = activeItems.length === 1
+        ? (activeItems[0].name || null)
+        : activeItems.length > 1
+          ? `${activeItems[0].name || 'Item'} (+${activeItems.length - 1} more)`
+          : null;
+      const saleQty = activeItems.length === 1
+        ? Number(activeItems[0].quantity || 1)
+        : activeItems.length > 1
+          ? activeItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
+          : null;
+
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
         const netAmount = itemsTotal - orderRefundTotal;
@@ -424,8 +437,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             displayId,
             type:        'sale',
             description: 'Order received',
-            itemName:    null,
-            qty:         null,
+            itemName:    saleItemName,
+            qty:         saleQty,
             amount:      netAmount,
             commission,
             vatAmount,
@@ -455,8 +468,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             displayId,
             type:        'sale',
             description: 'Order received',
-            itemName:    null,
-            qty:         null,
+            itemName:    saleItemName,
+            qty:         saleQty,
             amount:      itemsTotal,
             commission,
             vatAmount,
