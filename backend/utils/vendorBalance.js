@@ -75,10 +75,21 @@ export async function computeVendorBalance(vendorId) {
 
       const clearsAt          = deliveredAt + holdMs;
       const reserveReleasesAt = deliveredAt + reserveMs;
-      const itemValue         = Number(item.price || 0) * Number(item.quantity || 0);
+      const grossValue        = Number(item.price || 0) * Number(item.quantity || 0);
+
+      // Deduct any refunded amount so returned items don't stay in reserve
+      let refunded = 0;
+      if (Number(item.refundedQuantity) > 0) {
+        refunded = Number(item.refundedAmount) || Number(item.price || 0) * Number(item.refundedQuantity);
+      } else if (Number(item.returnQuantity) > 0) {
+        refunded = Number(item.price || 0) * Number(item.returnQuantity);
+      }
+      const itemValue = Math.max(0, grossValue - refunded);
 
       // Always count toward all-time gross (for commission display)
-      totalGrossAllTime += itemValue;
+      totalGrossAllTime += grossValue;
+
+      if (itemValue === 0) return; // fully refunded — no reserve or cleared balance
 
       if (now >= reserveReleasesAt) {
         // After 90 days: fully available, reserve released
