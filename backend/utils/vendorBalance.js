@@ -40,15 +40,16 @@ export async function computeVendorBalance(vendorId) {
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross        = 0;
-  let totalReserved     = 0;
-  let totalGrossAllTime = 0;
-  let totalGrossAllPaid = 0;
-  let totalRefunds      = 0;
-  let totalStripeFees   = 0;
+  let totalGross           = 0;
+  let totalReserved        = 0;
+  let totalGrossAllTime    = 0;
+  let totalGrossAllPaid    = 0;
+  let totalRefunds         = 0;
+  let totalStripeFees      = 0;
+  let totalShippingCleared = 0; // shipping cleared after hold (no commission, no reserve)
   let nextClearanceMs      = null;
   let nextReserveReleaseMs = null;
-  const reserveByDate   = {}; // YYYY-MM-DD → gross amount still in reserve
+  const reserveByDate      = {};
 
   ordersRaw.forEach(order => {
     const vendorItems = (order.items || []).filter(
@@ -76,6 +77,7 @@ export async function computeVendorBalance(vendorId) {
       const clearsAt          = deliveredAt + holdMs;
       const reserveReleasesAt = deliveredAt + reserveMs;
       const grossValue        = Number(item.price || 0) * Number(item.quantity || 0);
+      const shippingValue     = Number(item.shippingCost || 0);
 
       // Deduct any refunded amount so returned items don't stay in reserve
       let refunded = 0;
@@ -92,15 +94,13 @@ export async function computeVendorBalance(vendorId) {
       if (itemValue === 0) return; // fully refunded — no reserve or cleared balance
 
       if (now >= reserveReleasesAt) {
-        // After 90 days: fully available, reserve released
         totalGross += itemValue;
+        totalShippingCleared += shippingValue;
       } else {
-        // Reserve tracked from delivery day 0 until 90 days
         totalReserved += itemValue * RESERVE_RATE;
         if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs)
           nextReserveReleaseMs = reserveReleasesAt;
 
-        // Group by release date for the schedule
         const releaseDateKey = new Date(reserveReleasesAt).toISOString().slice(0, 10);
         reserveByDate[releaseDateKey] = (reserveByDate[releaseDateKey] || 0) + itemValue * RESERVE_RATE;
 
@@ -108,6 +108,7 @@ export async function computeVendorBalance(vendorId) {
           if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         } else {
           totalGross += itemValue * (1 - RESERVE_RATE);
+          totalShippingCleared += shippingValue; // shipping clears after hold, no reserve
         }
       }
     });
@@ -162,7 +163,8 @@ export async function computeVendorBalance(vendorId) {
   const paidPayouts  = await Payout.find({ vendorId, status: 'paid' });
   const totalPaidOut = Number(paidPayouts.reduce((s, p) => s + p.amount, 0).toFixed(2));
 
-  const pendingBalance  = Number(Math.max(0, netAfterFees - totalChargebacks - totalPaidOut).toFixed(2));
+  const shippingCleared = Number(totalShippingCleared.toFixed(2));
+  const pendingBalance  = Number(Math.max(0, netAfterFees + shippingCleared - totalChargebacks - totalPaidOut).toFixed(2));
   const reservedBalance = Number((totalReserved * (1 - COMMISSION_RATE)).toFixed(2));
 
   return {
@@ -171,6 +173,7 @@ export async function computeVendorBalance(vendorId) {
     grossRevenue: Number(totalGross.toFixed(2)),
     totalRefunds: Number(totalRefunds.toFixed(2)),
     commission, netAfterFees, totalChargebacks, totalPaidOut,
+    shippingCleared,
     // All-time figures (for display — matches transactions page)
     grossRevenueAllTime:  Number(totalGrossAllTime.toFixed(2)),
     commissionAllTime,

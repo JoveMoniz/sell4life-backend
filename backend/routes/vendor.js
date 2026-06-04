@@ -325,6 +325,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     let totalRefunds = 0;
     let totalCommission = 0;
     let totalVat = 0;
+    let totalShipping = 0;
     let totalStripeFees = 0;
 
     ordersRaw.forEach((order) => {
@@ -403,6 +404,9 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         }
       });
 
+      // Shipping collected for this vendor's items
+      const orderShipping = vendorItems.reduce((s, i) => s + Number(i.shippingCost || 0), 0);
+
       // Vendor's proportional share of the Stripe fee for this order
       const orderTotal = Number(order.total || 0);
       const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
@@ -442,6 +446,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             amount:      netAmount,
             commission,
             vatAmount,
+            shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
             stripeIsEstimated,
           });
@@ -449,6 +454,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
+          totalShipping   += orderShipping;
         }
       } else if (type === 'refunds') {
         // Refunds tab: individual refund items only (no commission rows)
@@ -473,6 +479,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             amount:      itemsTotal,
             commission,
             vatAmount,
+            shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
             stripeIsEstimated,
           });
@@ -480,6 +487,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
+          totalShipping   += orderShipping;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -536,6 +544,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         totalCommission:  Number(totalCommission.toFixed(2)),
         totalVat:         Number(totalVat.toFixed(2)),
         totalStripeFees:  Number(totalStripeFees.toFixed(2)),
+        totalShipping:    Number(totalShipping.toFixed(2)),
         net,
         netAfterFees:     Number((net - totalCommission).toFixed(2)),
         commissionRate:   COMMISSION_RATE,
