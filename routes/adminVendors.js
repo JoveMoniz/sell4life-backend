@@ -1,6 +1,7 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 import { computeVendorBalance } from '../utils/vendorBalance.js';
+import { resolveCommissionRate, getFeeConfig } from '../utils/feeConfig.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -369,6 +370,7 @@ router.get('/:id/transactions', async (req, res) => {
     let totalCommission = 0;
     let totalVat = 0;
     let totalStripeFees = 0;
+    let totalShipping = 0;
 
     ordersRaw.forEach(order => {
       const vendorOrder = order.vendorOrders.find(
@@ -388,6 +390,10 @@ router.get('/:id/transactions', async (req, res) => {
       const itemsTotal = vendorItems.reduce(
         (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
       );
+      const orderShipping = vendorItems.reduce(
+        (sum, item) => sum + Number(item.shippingCost || 0), 0
+      );
+      if (isPaid) totalShipping += orderShipping;
 
       let orderRefundTotal = 0;
       const refundEntries = [];
@@ -459,6 +465,7 @@ router.get('/:id/transactions', async (req, res) => {
             buyerEmail: order.user?.email || '—',
             type: 'sale', description: 'Order received', itemName: null, qty: null,
             amount: netAmount, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            shippingAmount: Number(orderShipping.toFixed(2)),
           });
           totalSales      += netAmount;
           totalCommission += commission;
@@ -479,6 +486,7 @@ router.get('/:id/transactions', async (req, res) => {
             buyerEmail: order.user?.email || '—',
             type: 'sale', description: 'Order received', itemName: null, qty: null,
             amount: itemsTotal, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            shippingAmount: Number(orderShipping.toFixed(2)),
           });
           totalSales      += itemsTotal;
           totalCommission += commission;
@@ -533,6 +541,7 @@ router.get('/:id/transactions', async (req, res) => {
       transactions,
       summary: {
         totalSales:      Number(totalSales.toFixed(2)),
+        totalShipping:   Number(totalShipping.toFixed(2)),
         totalRefunds:    Number(totalRefunds.toFixed(2)),
         totalCommission: Number(totalCommission.toFixed(2)),
         totalVat:        Number(totalVat.toFixed(2)),
@@ -597,15 +606,11 @@ router.get('/financials', async (req, res) => {
     let totalShipping = 0;
     const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds }
 
-    let shippingItemCount = 0;
     for (const order of orders) {
       const orderShipping = (order.items || []).reduce(
         (s, i) => s + Number(i.shippingCost || 0), 0
       );
-      shippingItemCount += (order.items || []).filter(i => Number(i.shippingCost || 0) > 0).length;
       totalShipping += orderShipping;
-      if (orderShipping > 0) console.log('[FIN] order', order._id, 'shipping', orderShipping, 'items', JSON.stringify((order.items||[]).map(i=>({sc:i.shippingCost}))));
-
 
       // Stripe fee is once per order (platform cost) — charged on full amount incl. shipping
       const orderGross = (order.items || []).reduce(
@@ -691,13 +696,10 @@ router.get('/financials', async (req, res) => {
     }));
     const totalReserved = vendorRows.reduce((s, v) => s + v.reservedBalance, 0);
 
-    console.log('[FIN] orders:', orders.length, 'shippingItemCount:', shippingItemCount, 'totalShipping:', totalShipping);
-
     res.json({
       summary: {
         totalGross:        Math.round(totalGross * 100) / 100,
         totalShipping:     Math.round(totalShipping * 100) / 100,
-        shippingItemCount,
         totalRefunds:      Math.round(totalRefunds * 100) / 100,
         totalCommission:   Math.round(totalCommission * 100) / 100,
         totalStripe:       Math.round(totalStripe * 100) / 100,

@@ -385,7 +385,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           const moneyMoved = refundType !== 'return_pending';
           if (moneyMoved) orderRefundTotal += refundAmount;
 
-          // Shipping is non-refundable — vendor keeps it even on returns
+          // Shipping is non-refundable — vendor keeps it on full returns
           const isFullReturn = refundQty >= Number(item.quantity || 0);
           const shippingKept = (moneyMoved && isFullReturn)
             ? Number(item.shippingCost || 0) : 0;
@@ -432,6 +432,9 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           ? activeItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
           : null;
 
+      // Shipping is always kept by vendor — count it for all paid orders regardless of tab or returns
+      if (isPaid) totalShipping += orderShipping;
+
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
         const netAmount = itemsTotal - orderRefundTotal;
@@ -457,7 +460,6 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
-          totalShipping   += orderShipping;
         }
       } else if (type === 'refunds') {
         // Refunds tab: individual refund items only (no commission rows)
@@ -467,10 +469,11 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       } else {
-        // All tab: gross sale entry + individual refund entries (standard ledger)
-        if (isPaid && itemsTotal > 0) {
-          const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
-          const vatAmount  = isVatRegistered ? Number((itemsTotal * VAT_RATE).toFixed(2)) : 0;
+        // All tab: only show "Order received" if not fully returned
+        const netAmount = itemsTotal - orderRefundTotal;
+        if (isPaid && netAmount > 0) {
+          const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -479,18 +482,17 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             description: 'Order received',
             itemName:    saleItemName,
             qty:         saleQty,
-            amount:      itemsTotal,
+            amount:      netAmount,
             commission,
             vatAmount,
             shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
             stripeIsEstimated,
           });
-          totalSales      += itemsTotal;
+          totalSales      += netAmount;
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
-          totalShipping   += orderShipping;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -538,7 +540,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const { rate: reserveRate } = resolveReserveRate(vendor, ordersRaw);
-    const net = Number((totalSales - totalRefunds).toFixed(2));
+    // totalSales is already net (returns deducted via netAmount) so don't subtract totalRefunds again
+    const net = Number(totalSales.toFixed(2));
     res.json({
       transactions,
       summary: {
