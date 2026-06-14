@@ -1,6 +1,7 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 import { computeVendorBalance } from '../utils/vendorBalance.js';
+import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -66,6 +67,8 @@ router.get('/', async (req, res) => {
     /* ===============================
        ADD STATS (ORDERS / REVENUE)
     =============================== */
+    const feeCfg = await getFeeConfig();
+
     const vendors = await Promise.all(
       vendorsRaw.map(async (v) => {
         const ordersRaw = await Order.find({
@@ -73,10 +76,20 @@ router.get('/', async (req, res) => {
         });
 
         const metrics = calculateVendorMetrics(ordersRaw, v._id);
+        const vObj = v.toObject();
+
+        let commissionRate;
+        if (vObj.commissionOverride != null) {
+          commissionRate = Number(vObj.commissionOverride);
+        } else {
+          const tierRate = feeCfg.commissionByTier?.[vObj.type];
+          commissionRate = tierRate != null ? Number(tierRate) : Number(feeCfg.commissionDefault ?? 0.08);
+        }
 
         return {
-          ...v.toObject(),
+          ...vObj,
           ...metrics,
+          commissionRate,
         };
       })
     );
@@ -130,6 +143,38 @@ router.patch('/:id/approve', async (req, res) => {
   } catch (error) {
     console.error('❌ Approve vendor error:', error);
     res.status(500).json({ message: 'Failed to approve vendor' });
+  }
+});
+
+/* ======================================================
+   REJECT (pending → rejected)
+====================================================== */
+router.patch('/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
+
+    const vendor = await Vendor.findOneAndUpdate(
+      { _id: id, status: 'pending' },
+      { status: 'rejected' },
+      { new: true }
+    ).populate('userId', 'email');
+
+    if (!vendor) {
+      return res.status(400).json({ message: 'Vendor not found or not in pending state' });
+    }
+
+    if (vendor.userId?.email) {
+      mailVendorStatusChange({ to: vendor.userId.email, storeName: vendor.storeName, status: 'rejected' }).catch(() => {});
+    }
+
+    res.json({ message: 'Vendor rejected', vendor });
+  } catch (error) {
+    console.error('❌ Reject vendor error:', error);
+    res.status(500).json({ message: 'Failed to reject vendor' });
   }
 });
 
@@ -349,7 +394,6 @@ router.get('/:id/transactions', async (req, res) => {
     if (periodStart) orderFilter.createdAt = { $gte: periodStart };
 
     const LIMIT = 500;
-    const COMMISSION_RATE = 0.08;
     const VAT_RATE = 20 / 120;
     const STRIPE_PCT = 0.014;
     const STRIPE_FIXED = 0.20;
@@ -369,12 +413,14 @@ router.get('/:id/transactions', async (req, res) => {
     let totalCommission = 0;
     let totalVat = 0;
     let totalStripeFees = 0;
+    let totalShipping = 0;
 
-    ordersRaw.forEach(order => {
+    for (const order of ordersRaw) {
+      const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
         vo => String(vo.vendorId) === String(vendor._id)
       );
-      if (!vendorOrder) return;
+      if (!vendorOrder) continue;
 
       const vendorItems = (order.items || []).filter(
         item => String(item.vendorId) === String(vendor._id)
@@ -388,6 +434,10 @@ router.get('/:id/transactions', async (req, res) => {
       const itemsTotal = vendorItems.reduce(
         (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
       );
+      const orderShipping = vendorItems.reduce(
+        (sum, item) => sum + Number(item.shippingCost || 0), 0
+      );
+      if (isPaid) totalShipping += orderShipping;
 
       let orderRefundTotal = 0;
       const refundEntries = [];
@@ -458,7 +508,8 @@ router.get('/:id/transactions', async (req, res) => {
             date: order.createdAt, orderId: order._id, displayId,
             buyerEmail: order.user?.email || '—',
             type: 'sale', description: 'Order received', itemName: null, qty: null,
-            amount: netAmount, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            amount: netAmount, commission, commissionRate: COMMISSION_RATE, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            shippingAmount: Number(orderShipping.toFixed(2)),
           });
           totalSales      += netAmount;
           totalCommission += commission;
@@ -478,7 +529,8 @@ router.get('/:id/transactions', async (req, res) => {
             date: order.createdAt, orderId: order._id, displayId,
             buyerEmail: order.user?.email || '—',
             type: 'sale', description: 'Order received', itemName: null, qty: null,
-            amount: itemsTotal, commission, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            amount: itemsTotal, commission, commissionRate: COMMISSION_RATE, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+            shippingAmount: Number(orderShipping.toFixed(2)),
           });
           totalSales      += itemsTotal;
           totalCommission += commission;
@@ -513,10 +565,11 @@ router.get('/:id/transactions', async (req, res) => {
           if (isLost) totalRefunds += disputeShare;
         });
       }
-    });
+    }
 
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    const currentCommissionRate = await resolveCommissionRateForOrder(vendor, new Date());
     const net = Number((totalSales - totalRefunds).toFixed(2));
     const balance = await computeVendorBalance(vendor._id);
     res.json({
@@ -533,14 +586,16 @@ router.get('/:id/transactions', async (req, res) => {
       transactions,
       summary: {
         totalSales:      Number(totalSales.toFixed(2)),
+        totalShipping:   Number(totalShipping.toFixed(2)),
         totalRefunds:    Number(totalRefunds.toFixed(2)),
         totalCommission: Number(totalCommission.toFixed(2)),
         totalVat:        Number(totalVat.toFixed(2)),
         totalStripeFees: Number(totalStripeFees.toFixed(2)),
         net,
         netAfterFees:    Number((net - totalCommission).toFixed(2)),
-        commissionRate:  COMMISSION_RATE,
-        vatRegistered:   isVatRegistered,
+        commissionRate:    currentCommissionRate,
+        commissionOverride: vendor.commissionOverride,
+        vatRegistered:     isVatRegistered,
       },
       period:      period || 'all',
       truncated,
@@ -584,10 +639,49 @@ router.get('/financials', async (req, res) => {
 
     const PAID = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled'];
 
-    const orders = await Order.find({
-      paymentStatus: { $in: PAID },
-      ...dateFilter,
-    }).select('items vendorOrders paymentStatus stripeFeeAmount createdAt');
+    const [orders, feeConfig, allVendorDocs] = await Promise.all([
+      Order.find({ paymentStatus: { $in: PAID }, ...dateFilter })
+        .select('items vendorOrders paymentStatus stripeFeeAmount createdAt'),
+      getFeeConfig(),
+      Vendor.find({}).select('type commissionOverride commissionOverrideSetAt').lean(),
+    ]);
+
+    // Build vendor lookup (date-aware commission resolution happens per item)
+    const vendorDataMap = {};
+    for (const v of allVendorDocs) {
+      vendorDataMap[String(v._id)] = {
+        type: v.type,
+        override: v.commissionOverride,
+        overrideSetAt: v.commissionOverrideSetAt,
+      };
+    }
+
+    function getItemCommissionRate(vid, orderCreatedAt) {
+      const v = vendorDataMap[vid];
+      const type = v?.type;
+      const { override, overrideSetAt } = v || {};
+
+      if (override != null) {
+        if (!overrideSetAt) return Number(override);
+        if (new Date(orderCreatedAt) >= new Date(overrideSetAt)) return Number(override);
+        // order predates this override — fall through
+      }
+
+      const tierRate  = feeConfig.commissionByTier?.[type];
+      const tierSetAt = feeConfig.commissionByTierSetAt?.[type];
+      if (tierRate != null) {
+        if (!tierSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(tierSetAt)) {
+          return Number(tierRate);
+        }
+        // order predates this tier rate — fall through to default
+      }
+
+      const defaultSetAt = feeConfig.commissionDefaultSetAt;
+      if (!defaultSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(defaultSetAt)) {
+        return Number(feeConfig.commissionDefault ?? 0.08);
+      }
+      return 0.08; // order predates any configured default — use hardcoded baseline
+    }
 
     // One-pass aggregation across all orders
     let totalGross = 0;
@@ -597,15 +691,11 @@ router.get('/financials', async (req, res) => {
     let totalShipping = 0;
     const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds }
 
-    let shippingItemCount = 0;
     for (const order of orders) {
       const orderShipping = (order.items || []).reduce(
         (s, i) => s + Number(i.shippingCost || 0), 0
       );
-      shippingItemCount += (order.items || []).filter(i => Number(i.shippingCost || 0) > 0).length;
       totalShipping += orderShipping;
-      if (orderShipping > 0) console.log('[FIN] order', order._id, 'shipping', orderShipping, 'items', JSON.stringify((order.items||[]).map(i=>({sc:i.shippingCost}))));
-
 
       // Stripe fee is once per order (platform cost) — charged on full amount incl. shipping
       const orderGross = (order.items || []).reduce(
@@ -615,9 +705,28 @@ router.get('/financials', async (req, res) => {
         Math.round(((orderGross + orderShipping) * 0.014 + 0.20) * 100) / 100;
       totalStripe += stripeFee;
 
+      // Use commission stored at purchase time — immune to rate changes
+      // Each entry is consumed on first use so multi-item vendors aren't double-counted
+      const storedCommission = {};
+      for (const vo of order.vendorOrders || []) {
+        if (vo.commissionAmount != null) {
+          storedCommission[String(vo.vendorId)] = Number(vo.commissionAmount);
+        }
+      }
+
       for (const item of order.items || []) {
         const gross = Number(item.price || 0) * Number(item.quantity || 0);
-        const commission = Math.round(gross * 0.08 * 100) / 100;
+        const vid = String(item.vendorId || '');
+
+        // Prefer stored commission; fall back to rate calculation for legacy orders
+        let commission;
+        if (storedCommission[vid] != null) {
+          commission = storedCommission[vid];
+          delete storedCommission[vid]; // consume — only count once per vendor per order
+        } else {
+          const rate = getItemCommissionRate(vid, order.createdAt);
+          commission = Math.round(gross * rate * 100) / 100;
+        }
 
         // Refund = actual money moved (mirrors vendorMetrics logic)
         let refunded = 0;
@@ -634,7 +743,6 @@ router.get('/financials', async (req, res) => {
         totalRefunds += refunded;
         totalCommission += commission;
 
-        const vid = String(item.vendorId || '');
         if (vid && mongoose.Types.ObjectId.isValid(vid)) {
           if (!vendorMap[vid]) vendorMap[vid] = { gross: 0, refunds: 0, commission: 0, orderIds: new Set() };
           vendorMap[vid].gross += gross;
@@ -691,13 +799,10 @@ router.get('/financials', async (req, res) => {
     }));
     const totalReserved = vendorRows.reduce((s, v) => s + v.reservedBalance, 0);
 
-    console.log('[FIN] orders:', orders.length, 'shippingItemCount:', shippingItemCount, 'totalShipping:', totalShipping);
-
     res.json({
       summary: {
         totalGross:        Math.round(totalGross * 100) / 100,
         totalShipping:     Math.round(totalShipping * 100) / 100,
-        shippingItemCount,
         totalRefunds:      Math.round(totalRefunds * 100) / 100,
         totalCommission:   Math.round(totalCommission * 100) / 100,
         totalStripe:       Math.round(totalStripe * 100) / 100,

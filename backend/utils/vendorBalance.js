@@ -1,8 +1,9 @@
 import Order  from '../models/order.js';
 import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
+import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from './feeConfig.js';
 
-export const COMMISSION_RATE   = 0.08;
+export const VENDOR_COMMISSION   = 0.08; // kept for external imports; runtime uses resolveCommissionRate
 export const HOLD_DAYS         = 30;
 export const RESERVE_DAYS      = 90;
 export const RESERVE_STANDARD  = 0.10;
@@ -31,44 +32,56 @@ export function resolveReserveRate(vendor, ordersRaw) {
 export async function computeVendorBalance(vendorId) {
   const [ordersRaw, vendor] = await Promise.all([
     Order.find({ 'vendorOrders.vendorId': vendorId }),
-    Vendor.findById(vendorId).select('approvedAt').lean(),
+    Vendor.findById(vendorId).select('approvedAt type commissionOverride commissionOverrideSetAt').lean(),
   ]);
 
-  const { rate: RESERVE_RATE, trusted } = resolveReserveRate(vendor || {}, ordersRaw);
+  const { trusted } = resolveReserveRate(vendor || {}, ordersRaw);
+  // Commission for payout math uses current effective rate
+  const VENDOR_COMMISSION = await resolveCommissionRateForOrder(vendor || {}, new Date());
+  // Platform config needed for per-order reserve rate resolution + display rate
+  const cfg = await getFeeConfig();
+  const RESERVE_RATE = resolveReserveRateAtTime(vendor || {}, cfg, new Date());
 
   const now       = Date.now();
   const holdMs    = HOLD_DAYS    * 24 * 60 * 60 * 1000;
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
-  let totalGross           = 0;
-  let totalReserved        = 0;
-  let totalGrossAllTime    = 0;
-  let totalGrossAllPaid    = 0;
-  let totalRefunds         = 0;
-  let totalStripeFees      = 0;
-  let totalShippingCleared = 0; // shipping cleared after hold (no commission, no reserve)
-  let nextClearanceMs      = null;
-  let nextReserveReleaseMs = null;
-  const reserveByDate      = {};
+  let totalGross              = 0;
+  let totalReserved           = 0;
+  let totalReservedNet        = 0; // reserved gross minus per-order commission — for reservedBalance
+  let totalGrossAllTime       = 0;
+  let totalGrossAllPaid       = 0;
+  let totalCommissionAllPaid  = 0; // per-order accumulated commission (respects rate-at-time)
+  let totalRefunds            = 0;
+  let totalStripeFees         = 0;
+  let totalShippingCleared    = 0;
+  let nextClearanceMs         = null;
+  let nextReserveReleaseMs    = null;
+  const reserveByDate         = {}; // stores net-of-commission amount per release date
 
-  ordersRaw.forEach(order => {
+  for (const order of ordersRaw) {
     const vendorItems = (order.items || []).filter(
       item => String(item.vendorId) === String(vendorId)
     );
     const ps     = (order.paymentStatus || '').toLowerCase();
     const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
-    if (!isPaid) return;
+    if (!isPaid) continue;
 
-    // Count ALL paid items for all-time commission (matches transactions page)
+    // Per-order commission and reserve rates (date-aware)
+    const ORDER_COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+    const ORDER_RESERVE_RATE    = resolveReserveRateAtTime(vendor, cfg, order.createdAt);
+
+    // Count ALL paid items for all-time commission (per-order rate — respects timestamp gates)
     vendorItems.forEach(item => {
       if (['Cancelled'].includes(item.status)) return;
-      totalGrossAllPaid += Number(item.price || 0) * Number(item.quantity || 0);
+      const itemGross = Number(item.price || 0) * Number(item.quantity || 0);
+      totalGrossAllPaid       += itemGross;
+      totalCommissionAllPaid  += itemGross * ORDER_COMMISSION_RATE;
     });
 
     vendorItems.forEach(item => {
       if (item.status !== 'Delivered') return;
 
-      // Fall back to order creation date if deliveredAt not recorded
       const deliveredAt = item.deliveredAt
         ? new Date(item.deliveredAt).getTime()
         : new Date(order.createdAt || 0).getTime();
@@ -79,7 +92,6 @@ export async function computeVendorBalance(vendorId) {
       const grossValue        = Number(item.price || 0) * Number(item.quantity || 0);
       const shippingValue     = Number(item.shippingCost || 0);
 
-      // Deduct any refunded amount so returned items don't stay in reserve
       let refunded = 0;
       if (Number(item.refundedQuantity) > 0) {
         refunded = Number(item.refundedAmount) || Number(item.price || 0) * Number(item.refundedQuantity);
@@ -88,32 +100,34 @@ export async function computeVendorBalance(vendorId) {
       }
       const itemValue = Math.max(0, grossValue - refunded);
 
-      // Always count toward all-time gross (for commission display)
       totalGrossAllTime += grossValue;
 
-      // Shipping is non-refundable — vendor keeps it after hold regardless of returns
       if (now >= clearsAt) {
         totalShippingCleared += shippingValue;
       } else {
         if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
       }
 
-      if (itemValue === 0) return; // product fully refunded — skip product gross & reserve
+      if (itemValue === 0) return;
 
       if (now >= reserveReleasesAt) {
         totalGross += itemValue;
       } else {
-        totalReserved += itemValue * RESERVE_RATE;
+        const reserveHeld    = itemValue * ORDER_RESERVE_RATE;
+        const reserveHeldNet = reserveHeld * (1 - ORDER_COMMISSION_RATE);
+        totalReserved    += reserveHeld;
+        totalReservedNet += reserveHeldNet;
+
         if (!nextReserveReleaseMs || reserveReleasesAt < nextReserveReleaseMs)
           nextReserveReleaseMs = reserveReleasesAt;
 
         const releaseDateKey = new Date(reserveReleasesAt).toISOString().slice(0, 10);
-        reserveByDate[releaseDateKey] = (reserveByDate[releaseDateKey] || 0) + itemValue * RESERVE_RATE;
+        reserveByDate[releaseDateKey] = (reserveByDate[releaseDateKey] || 0) + reserveHeldNet;
 
         if (now < clearsAt) {
           if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         } else {
-          totalGross += itemValue * (1 - RESERVE_RATE);
+          totalGross += itemValue * (1 - ORDER_RESERVE_RATE);
         }
       }
     });
@@ -129,7 +143,6 @@ export async function computeVendorBalance(vendorId) {
       }
     });
 
-    // Vendor's proportional share of the Stripe fee for this order
     const itemsTotal      = vendorItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
     const orderTotal      = Number(order.total || 0);
     const vendorFraction  = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 0;
@@ -137,17 +150,18 @@ export async function computeVendorBalance(vendorId) {
     const estimatedFee    = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
     const orderFee        = rawFee > 0 ? rawFee : estimatedFee;
     totalStripeFees      += Number((orderFee * vendorFraction).toFixed(2));
-  });
+  }
 
   // Cleared balance (payout-eligible)
   const netSales     = Math.max(0, totalGross - totalRefunds);
-  const commission   = Number((netSales * COMMISSION_RATE).toFixed(2));
+  const commission   = Number((netSales * VENDOR_COMMISSION).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
-  // All-time commission (for display — matches transactions page, counts all paid items)
-  const netSalesAllTime      = Math.max(0, totalGrossAllPaid - totalRefunds);
-  const commissionAllTime    = Number((netSalesAllTime * COMMISSION_RATE).toFixed(2));
-  const netAfterFeesAllTime  = Number((netSalesAllTime - commissionAllTime).toFixed(2));
+  // All-time commission: per-order rates summed, scaled proportionally to remove refund impact
+  const netSalesAllTime     = Math.max(0, totalGrossAllPaid - totalRefunds);
+  const refundCommAdj       = totalGrossAllPaid > 0 ? totalRefunds * (totalCommissionAllPaid / totalGrossAllPaid) : 0;
+  const commissionAllTime   = Number(Math.max(0, totalCommissionAllPaid - refundCommAdj).toFixed(2));
+  const netAfterFeesAllTime = Number((netSalesAllTime - commissionAllTime).toFixed(2));
 
   let totalChargebacks = 0;
   ordersRaw.forEach(order => {
@@ -170,7 +184,7 @@ export async function computeVendorBalance(vendorId) {
 
   const shippingCleared = Number(totalShippingCleared.toFixed(2));
   const pendingBalance  = Number(Math.max(0, netAfterFees + shippingCleared - totalChargebacks - totalPaidOut).toFixed(2));
-  const reservedBalance = Number((totalReserved * (1 - COMMISSION_RATE)).toFixed(2));
+  const reservedBalance = Number(totalReservedNet.toFixed(2)); // per-order rate already applied
 
   return {
     pendingBalance, reservedBalance,
@@ -184,17 +198,19 @@ export async function computeVendorBalance(vendorId) {
     commissionAllTime,
     netAfterFeesAllTime,
     totalStripeFees: Number(totalStripeFees.toFixed(2)),
+    // Current effective rate for display on payouts page
+    commissionRate: VENDOR_COMMISSION,
     // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
     holdDays: HOLD_DAYS, reserveDays: RESERVE_DAYS,
     nextClearanceDate:      nextClearanceMs      ? new Date(nextClearanceMs).toISOString()      : null,
     nextReserveReleaseDate: nextReserveReleaseMs ? new Date(nextReserveReleaseMs).toISOString() : null,
-    // Upcoming reserve releases: [{ date: 'YYYY-MM-DD', amount: £ after commission }]
+    // Upcoming reserve releases: [{ date, amount }] — amount already net of per-order commission
     reserveSchedule: Object.entries(reserveByDate)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, gross]) => ({
+      .map(([date, amount]) => ({
         date,
-        amount: Number((gross * (1 - COMMISSION_RATE)).toFixed(2)),
+        amount: Number(amount.toFixed(2)),
       })),
   };
 }

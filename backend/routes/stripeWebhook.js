@@ -2,7 +2,7 @@
 // SELL4LIFE – STRIPE WEBHOOK (HARDENED VERSION)
 // ======================================================
 import { pushUniqueHistory } from '../utils/historyLogic.js';
-import { mailOrderConfirmation, mailNewOrderVendor } from '../utils/email.js';
+import { mailOrderConfirmation, mailNewOrderVendor, mailRefundConfirmed } from '../utils/email.js';
 import express from 'express';
 import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
@@ -350,6 +350,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       order.stripeRefundId = refund.id;
 
       await order.save();
+
+      // Email buyer refund confirmation
+      try {
+        const buyer = await order.populate('user', 'email').then(o => o.user);
+        if (buyer?.email) {
+          await mailRefundConfirmed({ to: buyer.email, orderRef: order.shortId || order._id, amount: refundedAmount });
+        }
+      } catch (emailErr) {
+        console.warn('[email] Refund email failed:', emailErr.message);
+      }
 
       console.log('↩ Order refunded:', order._id);
     }

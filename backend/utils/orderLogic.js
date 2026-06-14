@@ -700,7 +700,7 @@ export function buildVendorAllowedActions(order, vendorId) {
   );
 
   vendorItems.forEach((item) => {
-    const itemId = item._id;
+    const itemId = item.productId || item._id;
     const s = item.status || 'Pending';
 
     // ====================================================

@@ -37,6 +37,7 @@ import Payout from '../models/payout.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
+import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 
 const router = express.Router();
 
@@ -306,10 +307,9 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     if (periodStart) orderFilter.createdAt = { $gte: periodStart };
 
     const LIMIT = 500;
-    const COMMISSION_RATE = 0.08;
-    const VAT_RATE = 20 / 120; // prices are VAT-inclusive; VAT portion = 20/120
-    const STRIPE_PCT = 0.014;  // 1.4% for UK cards
-    const STRIPE_FIXED = 0.20; // + 20p per transaction
+    const VAT_RATE = 20 / 120;
+    const STRIPE_PCT = 0.014;
+    const STRIPE_FIXED = 0.20;
 
     const totalMatchingOrders = await Order.countDocuments(orderFilter);
     const truncated = totalMatchingOrders > LIMIT;
@@ -328,7 +328,11 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     let totalShipping = 0;
     let totalStripeFees = 0;
 
-    ordersRaw.forEach((order) => {
+    const feeCfg = await getFeeConfig();
+
+    for (const order of ordersRaw) {
+      const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+      const RESERVE_RATE    = resolveReserveRateAtTime(vendor, feeCfg, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
         (vo) => String(vo.vendorId) === String(vendorId)
       );
@@ -385,7 +389,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           const moneyMoved = refundType !== 'return_pending';
           if (moneyMoved) orderRefundTotal += refundAmount;
 
-          // Shipping is non-refundable — vendor keeps it even on returns
+          // Shipping is non-refundable — vendor keeps it on full returns
           const isFullReturn = refundQty >= Number(item.quantity || 0);
           const shippingKept = (moneyMoved && isFullReturn)
             ? Number(item.shippingCost || 0) : 0;
@@ -410,13 +414,14 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
       // Shipping collected for this vendor's items
       const orderShipping = vendorItems.reduce((s, i) => s + Number(i.shippingCost || 0), 0);
 
-      // Vendor's proportional share of the Stripe fee for this order
+      // Vendor's proportional share of the Stripe fee, adjusted for any returns
       const orderTotal = Number(order.total || 0);
       const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
       const rawStripeFee = Number(order.stripeFeeAmount || 0);
       const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
       const orderStripeFee = rawStripeFee > 0 ? rawStripeFee : estimatedFee;
-      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
+      const returnRatio = itemsTotal > 0 ? Math.max(0, (itemsTotal - orderRefundTotal) / itemsTotal) : 1;
+      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction * returnRatio).toFixed(2));
       const stripeIsEstimated = rawStripeFee === 0;
 
       // Item label for sale rows
@@ -431,6 +436,9 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         : activeItems.length > 1
           ? activeItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
           : null;
+
+      // Shipping is always kept by vendor — count it for all paid orders regardless of tab or returns
+      if (isPaid) totalShipping += orderShipping;
 
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
@@ -448,6 +456,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             qty:         saleQty,
             amount:      netAmount,
             commission,
+            commissionRate: COMMISSION_RATE,
+            reserveRate:    RESERVE_RATE,
             vatAmount,
             shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
@@ -457,7 +467,6 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
-          totalShipping   += orderShipping;
         }
       } else if (type === 'refunds') {
         // Refunds tab: individual refund items only (no commission rows)
@@ -467,10 +476,11 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       } else {
-        // All tab: gross sale entry + individual refund entries (standard ledger)
-        if (isPaid && itemsTotal > 0) {
-          const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
-          const vatAmount  = isVatRegistered ? Number((itemsTotal * VAT_RATE).toFixed(2)) : 0;
+        // All tab: only show "Order received" if not fully returned
+        const netAmount = itemsTotal - orderRefundTotal;
+        if (isPaid && netAmount > 0) {
+          const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+          const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
           transactions.push({
             date:        order.createdAt,
             orderId:     order._id,
@@ -479,18 +489,19 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             description: 'Order received',
             itemName:    saleItemName,
             qty:         saleQty,
-            amount:      itemsTotal,
+            amount:      netAmount,
             commission,
+            commissionRate: COMMISSION_RATE,
+            reserveRate:    RESERVE_RATE,
             vatAmount,
             shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
             stripeIsEstimated,
           });
-          totalSales      += itemsTotal;
+          totalSales      += netAmount;
           totalCommission += commission;
           totalVat        += vatAmount;
           totalStripeFees += vendorStripeFee;
-          totalShipping   += orderShipping;
         }
         refundEntries.forEach(e => {
           transactions.push(e);
@@ -532,13 +543,18 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           if (isLost) totalRefunds += disputeShare;
         });
       }
-    });
+    }
 
     // Sort chronologically (newest first)
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const { rate: reserveRate } = resolveReserveRate(vendor, ordersRaw);
-    const net = Number((totalSales - totalRefunds).toFixed(2));
+    const currentCommissionRate = await resolveCommissionRateForOrder(vendor, new Date());
+    const currentReserveRate    = resolveReserveRateAtTime(vendor, feeCfg, new Date());
+    console.log('[rates] vendor=%s type=%s commission=%s reserve=%s cfg.reserveStandard=%s cfg.reserveSetAt=%s',
+      vendor._id, vendor.type, currentCommissionRate, currentReserveRate,
+      feeCfg?.reserveRateStandard, feeCfg?.reserveRateStandardSetAt);
+    // totalSales is already net (returns deducted via netAmount) so don't subtract totalRefunds again
+    const net = Number(totalSales.toFixed(2));
     res.json({
       transactions,
       summary: {
@@ -550,8 +566,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         totalShipping:    Number(totalShipping.toFixed(2)),
         net,
         netAfterFees:     Number((net - totalCommission).toFixed(2)),
-        commissionRate:   COMMISSION_RATE,
-        reserveRate,
+        commissionRate:   currentCommissionRate,
+        reserveRate:      currentReserveRate,
         vatRegistered:    isVatRegistered,
         vatNumber:        vendor.vatNumber || '',
       },
@@ -573,7 +589,14 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
 
 router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    const vendor = req.vendor;
+    const vendorId = vendor._id;
+
+    const VALID_PERIODS = ['today', 'week', 'month', 'quarter', 'rolling12', 'year'];
+    const period = req.query.period;
+    if (period && !VALID_PERIODS.includes(period)) {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
 
     const [balance, payouts, pendingRequest] = await Promise.all([
       computeVendorBalance(vendorId),
@@ -581,10 +604,69 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       Payout.findOne({ vendorId, status: 'requested' }),
     ]);
 
+    const commissionRate = await resolveCommissionRateForOrder(vendor, new Date());
+
+    // Period-filtered summary stats
+    let periodStats = null;
+    if (period) {
+      const periodStart = getPeriodStart(period);
+      if (periodStart) {
+        const RESERVE_RATE = balance.reserveRate || 0.10;
+        const STRIPE_PCT   = 0.014;
+        const STRIPE_FIXED = 0.20;
+
+        const periodOrders = await Order.find({
+          'vendorOrders.vendorId': vendorId,
+          createdAt: { $gte: periodStart },
+        });
+        let gross = 0, commission = 0, stripeFees = 0, reserve = 0;
+        for (const order of periodOrders) {
+          const paymentStatus = (order.paymentStatus || '').toLowerCase();
+          const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
+          if (!isPaid) continue;
+          const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+          const vendorItems = (order.items || []).filter(i => String(i.vendorId) === String(vendorId));
+
+          // Stripe fee: vendor's proportional share of the order's Stripe fee
+          const allItemsGross = vendorItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+          if (allItemsGross > 0) {
+            const orderTotal = Number(order.total || 0);
+            const fraction   = orderTotal > 0 ? allItemsGross / orderTotal : 1;
+            const rawFee     = Number(order.stripeFeeAmount || 0);
+            const estFee     = orderTotal * STRIPE_PCT + STRIPE_FIXED;
+            stripeFees += (rawFee > 0 ? rawFee : estFee) * fraction;
+          }
+
+          vendorItems.forEach(item => {
+            if (item.status === 'Cancelled') return;
+            const itemGross = Number(item.price || 0) * Number(item.quantity || 0);
+            const refundAmt = Number(item.refundedQuantity) > 0
+              ? (Number(item.refundedAmount) || Number(item.price || 0) * Number(item.refundedQuantity))
+              : 0;
+            const net = itemGross - refundAmt;
+            gross     += net;
+            commission += net * COMMISSION_RATE;
+            reserve   += net * RESERVE_RATE;
+          });
+        }
+        periodStats = {
+          grossRevenue:   Number(gross.toFixed(2)),
+          netAfterFees:   Number((gross - commission).toFixed(2)),
+          commissionPaid: Number(commission.toFixed(2)),
+          stripeFees:     Number(stripeFees.toFixed(2)),
+          reserve:        Number(reserve.toFixed(2)),
+        };
+      }
+    }
+
     res.json({
       ...balance,
+      commissionRate,
+      vendorType: vendor.type || 'casual',
       minimumPayout: MIN_PAYOUT,
       hasPendingRequest: !!pendingRequest,
+      period: period || 'all',
+      periodStats,
       payouts: payouts.map(p => ({
         _id: p._id,
         amount: p.amount,
@@ -1264,7 +1346,7 @@ router.patch(
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
       const vendor = req.vendor;
-      const item = findOrderItem(order, itemId);
+const item = findOrderItem(order, itemId);
       if (!item) return res.status(404).json({ error: 'Item not found' });
       if (String(item.vendorId) !== String(vendor._id)) {
         return res.status(403).json({ error: 'Not your item' });

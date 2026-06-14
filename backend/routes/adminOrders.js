@@ -1,4 +1,5 @@
 import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
+import { mailReturnStatusChange } from '../utils/email.js';
 import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
@@ -611,6 +612,12 @@ router.patch('/:id/items/:itemId/approve-return', authMiddleware, adminMiddlewar
     applyReturnApproval(order, item, quantity, req.user._id);
     await order.save();
 
+    // Email buyer
+    const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+    if (buyer?.email) {
+      mailReturnStatusChange({ to: buyer.email, orderRef: order.shortId || order._id, itemName: item.name, approved: true }).catch(() => {});
+    }
+
     res.json({ success: true, returnStatus: item.returnStatus });
   } catch (err) {
     console.error('Admin approve return error:', err);
@@ -640,6 +647,12 @@ router.patch('/:id/items/:itemId/reject-return', authMiddleware, adminMiddleware
 
     applyReturnRejection(order, item, reason, req.user._id);
     await order.save();
+
+    // Email buyer
+    const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+    if (buyer?.email) {
+      mailReturnStatusChange({ to: buyer.email, orderRef: order.shortId || order._id, itemName: item.name, approved: false, reason }).catch(() => {});
+    }
 
     res.json({ success: true, returnStatus: item.returnStatus });
   } catch (err) {

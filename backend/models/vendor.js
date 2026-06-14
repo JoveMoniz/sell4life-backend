@@ -84,6 +84,18 @@ const vendorSchema = new mongoose.Schema(
       default: '',
     },
 
+    // null = use platform/tier default; set to override commission for this vendor only
+    commissionOverride: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 1,
+    },
+    commissionOverrideSetAt: {
+      type: Date,
+      default: null,
+    },
+
     upgradeRequest: {
       requestedAt: Date,
       requestedTier: String,

@@ -13,7 +13,10 @@ import { getDerivedOrderStatus } from './orderLogic.js';
 export function findOrderItem(order, itemId) {
   if (!order || !Array.isArray(order.items)) return null;
 
-  return order.items.find((item) => String(item._id) === String(itemId));
+  return (
+    order.items.find((item) => String(item._id) === String(itemId)) ||
+    order.items.find((item) => String(item.productId) === String(itemId))
+  );
 }
 
 export function findVendorItems(order, vendorId) {

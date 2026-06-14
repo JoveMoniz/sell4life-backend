@@ -600,6 +600,7 @@ orderSchema.index({ 'items.returnStatus': 1 });
 orderSchema.index({ 'items.refundStatus': 1 });
 orderSchema.index({ 'vendorOrders.vendorId': 1 });
 orderSchema.index({ status: 1, paymentStatus: 1 });
+orderSchema.index({ paymentStatus: 1, createdAt: -1 });
 orderSchema.index({ paymentIntentId: 1 });
 
 /* ==============================

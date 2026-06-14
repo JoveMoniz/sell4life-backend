@@ -31,6 +31,7 @@ import cartRoutes from './routes/cart.js';
 import adminOrdersRoute from './routes/adminOrders.js';
 import adminUsersRoute from './routes/adminUsers.js';
 import adminVendorsRoutes from './routes/adminVendors.js';
+import adminConfigRoute from './routes/adminConfig.js';
 import storesRoute from './routes/stores.js';
 import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
@@ -88,6 +89,7 @@ app.post('/api/auth/resend-verification', authLimiter);
 const allowedOrigins = [
   'https://sell4life.com',
   'https://www.sell4life.com',
+  'https://staging.sell4life.com',
   'http://127.0.0.1:8080',
   'http://localhost:8080',
 ];
@@ -205,6 +207,7 @@ app.use('/api/cart', cartRoutes);
 
 app.use('/api/admin/orders', adminOrdersRoute);
 app.use('/api/admin/users', adminUsersRoute);
+app.use('/api/admin/config', adminConfigRoute);
 
 app.use('/api/admin/vendors', adminVendorsRoutes);
 app.use('/api/stores', storesRoute);

@@ -164,9 +164,10 @@ export function mailEmailVerification({ to, name, verifyUrl }) {
 
 export function mailVendorStatusChange({ to, storeName, status }) {
   const messages = {
-    approved:    { heading: `Welcome, ${storeName}!`, body: 'Your vendor account has been approved. You can now list products and start selling.' },
-    suspended:   { heading: 'Account suspended',      body: 'Your vendor account has been suspended. Please contact support if you believe this is an error.' },
-    reactivated: { heading: 'Account reactivated',    body: 'Your vendor account has been reactivated. You can now list products again.' },
+    approved:    { heading: `Welcome, ${storeName}!`,       body: 'Your vendor account has been approved. You can now list products and start selling.' },
+    suspended:   { heading: 'Account suspended',             body: 'Your vendor account has been suspended. Please contact support if you believe this is an error.' },
+    reactivated: { heading: 'Account reactivated',           body: 'Your vendor account has been reactivated. You can now list products again.' },
+    rejected:    { heading: 'Application not approved',      body: 'Unfortunately your vendor application was not approved at this time. If you believe this is an error or would like more information, please contact support.' },
   };
   const { heading, body } = messages[status] || { heading: `Account status: ${status}`, body: '' };
 
@@ -178,6 +179,45 @@ export function mailVendorStatusChange({ to, storeName, status }) {
       <p>${body}</p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
       <p style="font-size:12px;color:#9ca3af">Sell4Life</p>
+    </div>`,
+  });
+}
+
+export function mailReturnStatusChange({ to, orderRef, itemName, approved, reason }) {
+  const heading = approved ? 'Return approved' : 'Return request update';
+  const intro   = approved
+    ? `Good news — your return request for <strong>${itemName}</strong> on order <strong>${orderRef}</strong> has been approved.`
+    : `We've reviewed your return request for <strong>${itemName}</strong> on order <strong>${orderRef}</strong>.`;
+  const detail  = approved
+    ? `<p style="margin:10px 0;color:#374151">Please send the item back using a tracked service. A refund will be processed once the item is received and inspected.</p>`
+    : `<p style="margin:10px 0;color:#374151">Unfortunately your return request was not approved.</p>${reason ? `<p style="margin:6px 0;color:#6b7280;font-size:13px">Reason: ${reason}</p>` : ''}`;
+
+  return sendMail({
+    to,
+    subject: `${heading} – ${orderRef}`,
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">${heading}</p>
+      <p style="margin:0 0 10px;color:#374151">${intro}</p>
+      ${detail}
+      <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/account/orders.html" style="background:#0b6b6a;color:#fff;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:13px">View My Orders</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
+    </div>`,
+  });
+}
+
+export function mailRefundConfirmed({ to, orderRef, amount }) {
+  return sendMail({
+    to,
+    subject: `Refund confirmed – ${orderRef}`,
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Refund on its way</p>
+      <p style="margin:0 0 10px;color:#374151">Your refund of <strong>£${Number(amount).toFixed(2)}</strong> for order <strong>${orderRef}</strong> has been confirmed by Stripe and is on its way back to your original payment method.</p>
+      <p style="margin:0;color:#6b7280;font-size:12px">Refunds typically take 5–10 business days to appear depending on your bank.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
     </div>`,
   });
 }
