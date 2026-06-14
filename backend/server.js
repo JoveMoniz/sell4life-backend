@@ -32,6 +32,7 @@ import adminOrdersRoute from './routes/adminOrders.js';
 import adminUsersRoute from './routes/adminUsers.js';
 import adminVendorsRoutes from './routes/adminVendors.js';
 import adminConfigRoute from './routes/adminConfig.js';
+import reviewsRoute from './routes/reviews.js';
 import storesRoute from './routes/stores.js';
 import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
@@ -210,6 +211,7 @@ app.use('/api/admin/users', adminUsersRoute);
 app.use('/api/admin/config', adminConfigRoute);
 
 app.use('/api/admin/vendors', adminVendorsRoutes);
+app.use('/api/reviews', reviewsRoute);
 app.use('/api/stores', storesRoute);
 app.use('/api/account', accountRoute);
 

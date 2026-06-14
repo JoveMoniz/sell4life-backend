@@ -167,4 +167,49 @@ router.get('/vendors', async (req, res) => {
   }
 });
 
+/* ======================================================
+   GET /api/admin/config/reviews
+====================================================== */
+router.get('/reviews', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    res.json({
+      reviewsEnabled:  cfg.reviewsEnabled ?? false,
+      reviewsMinCount: cfg.reviewsMinCount ?? 3,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/reviews
+   Body: { reviewsEnabled, reviewsMinCount }
+====================================================== */
+router.put('/reviews', async (req, res) => {
+  try {
+    const { reviewsEnabled, reviewsMinCount } = req.body;
+    const update = {};
+
+    if (reviewsEnabled !== undefined) update.reviewsEnabled = Boolean(reviewsEnabled);
+
+    if (reviewsMinCount !== undefined) {
+      const v = Number(reviewsMinCount);
+      if (isNaN(v) || v < 1) return res.status(400).json({ error: 'reviewsMinCount must be >= 1' });
+      update.reviewsMinCount = v;
+    }
+
+    const cfg = await PlatformConfig.findOneAndUpdate(
+      { _key: 'global' },
+      { $set: update },
+      { upsert: true, new: true }
+    );
+
+    res.json({ ok: true, reviewsEnabled: cfg.reviewsEnabled, reviewsMinCount: cfg.reviewsMinCount });
+  } catch (err) {
+    console.error('Reviews config PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

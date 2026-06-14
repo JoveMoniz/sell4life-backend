@@ -24,6 +24,10 @@ const platformConfigSchema = new mongoose.Schema(
       enterprise:   { type: Date, default: null },
     },
 
+    // Reviews & ratings
+    reviewsEnabled:   { type: Boolean, default: false },
+    reviewsMinCount:  { type: Number, default: 3, min: 1 },
+
     // Reserve rates
     reserveRateStandard:    { type: Number, default: 0.10, min: 0, max: 1 },
     reserveRateStandardSetAt: { type: Date, default: null },
