@@ -159,6 +159,49 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 /* ======================================================
+   GET /api/reviews/my/:productId  — auth, user's review for one product
+====================================================== */
+router.get('/my/:productId', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+    const review = await Review.findOne({ productId, userId: req.user._id }).lean();
+    res.json({ review: review || null });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/reviews/:id  — user updates own review
+====================================================== */
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const review = await Review.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+
+    const ratingNum = Number(req.body.rating);
+    if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
+      return res.status(400).json({ error: 'Rating must be 1–5' });
+    }
+
+    review.rating = ratingNum;
+    review.title  = (req.body.title  || '').trim().slice(0, 120);
+    review.body   = (req.body.body   || '').trim().slice(0, 2000);
+    review.status = 'pending';
+    await review.save();
+    await syncProductRating(review.productId);
+
+    res.json({ ok: true, review });
+  } catch (err) {
+    console.error('PUT review error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    DELETE /api/reviews/:id  — user deletes own review
 ====================================================== */
 router.delete('/:id', authMiddleware, async (req, res) => {
