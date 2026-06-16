@@ -845,13 +845,25 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
       while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
 
       // Build variants when multiple rows share the same product name
-      const makeVariants = entries.length > 1 || entries.some(e => col(e.row, 'variant'));
+      const hasAttrValue = (r) =>
+        col(r, 'variant') || col(r, 'attr1value') || col(r, 'attr2value');
+      const makeVariants = entries.length > 1 || entries.some(e => hasAttrValue(e.row));
       const variants = makeVariants ? entries.map(e => {
         const r = e.row;
         const vPrice = parseFloat(col(r, 'price'));
-        const variantVal = col(r, 'variant');
+
+        const attributes = {};
+        const legacyVariant = col(r, 'variant');
+        if (legacyVariant) attributes.Variant = legacyVariant;
+        const attr1Name  = col(r, 'attr1name');
+        const attr1Value = col(r, 'attr1value');
+        if (attr1Name && attr1Value) attributes[attr1Name] = attr1Value;
+        const attr2Name  = col(r, 'attr2name');
+        const attr2Value = col(r, 'attr2value');
+        if (attr2Name && attr2Value) attributes[attr2Name] = attr2Value;
+
         return {
-          attributes: variantVal ? { Variant: variantVal } : {},
+          attributes,
           price:  Number.isFinite(vPrice) ? vPrice : price,
           stock:  parseInt(col(r, 'stock'), 10) || 0,
           sku:    col(r, 'sku'),
