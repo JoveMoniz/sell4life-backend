@@ -173,10 +173,16 @@ router.get('/', async (req, res) => {
 
     /* 🔥 FIXED SEARCH (q + search support) */
     if (searchTerm) {
+      // Treat straight and curly quotes as equivalent — product names sometimes
+      // pick up smart quotes (’ “ ”) from autocorrect, which would otherwise
+      // silently fail to match a customer typing a plain ' or ".
+      const normalizedTerm = searchTerm
+        .replace(/['‘’]/g, "['‘’]")
+        .replace(/["“”]/g, '["“”]');
       query.$or = [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { category: { $regex: searchTerm, $options: 'i' } },
-        { subcategory: { $regex: searchTerm, $options: 'i' } },
+        { name: { $regex: normalizedTerm, $options: 'i' } },
+        { category: { $regex: normalizedTerm, $options: 'i' } },
+        { subcategory: { $regex: normalizedTerm, $options: 'i' } },
       ];
     }
 
