@@ -4,6 +4,7 @@ import Review, { syncProductRating } from '../models/review.js';
 import Product from '../models/product.js';
 import Order from '../models/order.js';
 import User from '../models/user.js';
+import Vendor from '../models/vendor.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
@@ -117,6 +118,12 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const product = await Product.findById(productId).lean();
     if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    // Vendors cannot review their own products
+    const ownVendor = await Vendor.findOne({ _id: product.vendor, userId: req.user._id }).lean();
+    if (ownVendor) {
+      return res.status(403).json({ error: 'You cannot review your own product.' });
+    }
 
     // Only customers who have actually received the product may review it
     const deliveredOrder = await Order.findOne({
