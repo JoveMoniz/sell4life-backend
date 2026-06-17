@@ -118,17 +118,23 @@ router.post('/', authMiddleware, async (req, res) => {
     const product = await Product.findById(productId).lean();
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    // Check for verified purchase
-    let verified = false;
-    let orderId  = null;
+    // Only customers who have actually received the product may review it
     const deliveredOrder = await Order.findOne({
       userId: req.user._id,
-      'items.productId': new mongoose.Types.ObjectId(productId),
+      items: {
+        $elemMatch: {
+          productId: new mongoose.Types.ObjectId(productId),
+          status: 'Delivered',
+        },
+      },
     }).lean();
-    if (deliveredOrder) {
-      verified = true;
-      orderId  = deliveredOrder._id;
+
+    if (!deliveredOrder) {
+      return res.status(403).json({ error: 'You can only review products after they have been delivered to you.' });
     }
+
+    const verified = true;
+    const orderId  = deliveredOrder._id;
 
     const user = await User.findById(req.user._id).select('username firstName lastName').lean();
     const buyerName = user?.username || user?.firstName || 'Buyer';
