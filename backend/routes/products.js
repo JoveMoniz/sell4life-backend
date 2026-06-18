@@ -36,13 +36,16 @@ const tierFieldGuard = stripTierFields({
   warrantyPeriod:     'refurbished',
   testedStatus:       'refurbished',
   refurbishmentNotes: 'refurbished',
+  videoUrl3:          'refurbished',
+  videoUrl4:          'professional',
+  videoUrl5:          'enterprise',
 });
 
 router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (req, res) => {
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2 } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5 } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -88,6 +91,9 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       shippingCost: Number(shippingCost) >= 0 ? Number(shippingCost) : 0,
       videoUrl:  videoUrl  || '',
       videoUrl2: videoUrl2 || '',
+      videoUrl3: videoUrl3 || '',
+      videoUrl4: videoUrl4 || '',
+      videoUrl5: videoUrl5 || '',
     });
 
     res.status(201).json(product);
@@ -339,6 +345,9 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'addOns',
       'videoUrl',
       'videoUrl2',
+      'videoUrl3',
+      'videoUrl4',
+      'videoUrl5',
       'variantDisplay',
       'comingSoon',
     ];

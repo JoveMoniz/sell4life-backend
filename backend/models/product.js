@@ -122,6 +122,21 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
 
+    videoUrl3: {
+      type: String,
+      default: '',
+    },
+
+    videoUrl4: {
+      type: String,
+      default: '',
+    },
+
+    videoUrl5: {
+      type: String,
+      default: '',
+    },
+
     variantDisplay: {
       type: String,
       enum: ['color', 'image'],
