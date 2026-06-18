@@ -892,7 +892,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           sku:          col(firstRow, 'sku'),
           images,
           variants,
-          active: true,
+          active: false,
         });
 
         await product.save();
