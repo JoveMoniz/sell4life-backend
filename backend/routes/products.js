@@ -355,6 +355,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'comingSoon',
       'estDeliveryMinDays',
       'estDeliveryMaxDays',
+      'active',
     ];
 
     allowedFields.forEach((field) => {
