@@ -297,6 +297,18 @@ const productSchema = new mongoose.Schema(
       length: Number,
     },
 
+    estDeliveryMinDays: {
+      type: Number,
+      default: 3,
+      min: 0,
+    },
+
+    estDeliveryMaxDays: {
+      type: Number,
+      default: 7,
+      min: 0,
+    },
+
     /* ==============================
        ANALYTICS
     ============================== */
