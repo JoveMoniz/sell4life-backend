@@ -470,9 +470,9 @@ router.patch('/:id/archive', authMiddleware, requireApprovedVendor, async (req, 
       });
     }
 
-    // ✅ Correct archive behavior
+    // Archive hides the product regardless of its Active/Draft state;
+    // that state is preserved so unarchiving restores it correctly.
     product.archived = true;
-    product.active = false;
 
     await product.save();
 
@@ -505,8 +505,8 @@ router.patch('/:id/unarchive', authMiddleware, requireApprovedVendor, async (req
       return res.status(403).json({ error: 'Not allowed' });
     }
 
+    // Restore visibility only — keep whatever Active/Draft state it had before archiving
     product.archived = false;
-    product.active   = true;
     await product.save();
 
     res.json({ success: true });
