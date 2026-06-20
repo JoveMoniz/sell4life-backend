@@ -251,6 +251,14 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Soft delete — set when a vendor "deletes" a product so it can be restored
+    // from the Trash tab. Only a permanent-delete action actually removes the document.
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     /* ==============================
        REFURBISHED FIELDS
     ============================== */

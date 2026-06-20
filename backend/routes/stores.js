@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
     try {
       const Product = (await import('../models/product.js')).default;
       const counts = await Product.aggregate([
-        { $match: { archived: { $ne: true }, active: true } },
+        { $match: { archived: { $ne: true }, active: true, deletedAt: null } },
         { $group: { _id: '$vendor', count: { $sum: 1 } } },
       ]);
       counts.forEach(c => { countMap[String(c._id)] = c.count; });

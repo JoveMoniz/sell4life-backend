@@ -124,7 +124,7 @@ router.get('/slug/:slug', async (req, res) => {
       },
     });
 
-    if (!product || !product.active || product.archived) {
+    if (!product || !product.active || product.archived || product.deletedAt) {
       return res.status(404).json({
         error: 'Product not found',
       });
@@ -171,6 +171,7 @@ router.get('/', async (req, res) => {
     const query = {
       active: true,
       archived: { $ne: true },
+      deletedAt: null,
     };
 
     if (category) query.category = category;
@@ -265,7 +266,7 @@ router.get('/:id', async (req, res) => {
       },
     });
 
-    if (!product || !product.active || product.archived) {
+    if (!product || !product.active || product.archived || product.deletedAt) {
       return res.status(404).json({
         error: 'Product not found',
       });
@@ -520,6 +521,7 @@ router.patch('/:id/unarchive', authMiddleware, requireApprovedVendor, async (req
 
 /* ======================================================
    DELETE PRODUCT (VENDOR — own products only, no orders)
+   Soft delete: moves to Trash. Use /:id/permanent to actually remove it.
 ====================================================== */
 
 router.delete('/:id', authMiddleware, requireApprovedVendor, async (req, res) => {
@@ -540,11 +542,74 @@ router.delete('/:id', authMiddleware, requireApprovedVendor, async (req, res) =>
       return res.status(400).json({ error: 'Cannot delete a product that has orders — archive it instead' });
     }
 
-    await Product.deleteOne({ _id: product._id });
+    product.deletedAt = new Date();
+    await product.save();
     res.json({ success: true });
   } catch (err) {
     console.error('VENDOR DELETE PRODUCT ERROR:', err);
     res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
+/* ======================================================
+   RESTORE PRODUCT FROM TRASH (VENDOR)
+====================================================== */
+
+router.patch('/:id/restore', authMiddleware, requireApprovedVendor, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const vendor  = req.vendor;
+    const product = await Product.findById(req.params.id);
+
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (product.vendor.toString() !== vendor._id.toString()) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    if (!product.deletedAt) {
+      return res.status(400).json({ error: 'Product is not in Trash' });
+    }
+
+    product.deletedAt = null;
+    await product.save();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('RESTORE PRODUCT ERROR:', err);
+    res.status(500).json({ error: 'Failed to restore product' });
+  }
+});
+
+/* ======================================================
+   PERMANENTLY DELETE FROM TRASH (VENDOR — must already be trashed)
+====================================================== */
+
+router.delete('/:id/permanent', authMiddleware, requireApprovedVendor, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const vendor  = req.vendor;
+    const product = await Product.findById(req.params.id);
+
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (product.vendor.toString() !== vendor._id.toString()) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    if (!product.deletedAt) {
+      return res.status(400).json({ error: 'Move to Trash first before permanently deleting' });
+    }
+
+    const hasOrders = await Order.exists({ 'items.productId': product._id });
+    if (hasOrders) {
+      return res.status(400).json({ error: 'Cannot delete a product that has orders' });
+    }
+
+    await Product.deleteOne({ _id: product._id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('PERMANENT DELETE PRODUCT ERROR:', err);
+    res.status(500).json({ error: 'Failed to permanently delete product' });
   }
 });
 

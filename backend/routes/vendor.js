@@ -715,11 +715,13 @@ router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (re
 router.get('/products', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
+    const wantTrash = req.query.trashed === 'true';
 
-    // Return ALL vendor products (active + draft + archived)
-    // Frontend splits them into the correct tabs
+    // Default: ALL non-trashed vendor products (active + draft + archived).
+    // Frontend splits them into the correct tabs. ?trashed=true returns only Trash.
     const products = await Product.find({
       vendor: vendor._id,
+      deletedAt: wantTrash ? { $ne: null } : null,
     }).sort({
       createdAt: -1,
     });
