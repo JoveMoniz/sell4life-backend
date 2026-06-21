@@ -590,6 +590,128 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
 });
 
 /* ======================================================
+   GOODWILL REFUND (ADMIN) — no physical return required.
+   Defaults to platform-paid (doesn't hit vendor payout) but admin can
+   choose to charge it to the vendor instead. Scheduled 24h out, same
+   as the vendor-initiated version, processed by the same refundWorker.
+====================================================== */
+
+router.post('/:id/items/:itemId/goodwill-refund', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, itemId } = req.params;
+  const { amount, reason, paidBy } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(itemId)) {
+    return res.status(400).json({ error: 'Invalid item id' });
+  }
+  if (!String(reason || '').trim()) {
+    return res.status(400).json({ error: 'Please explain why this goodwill refund is being issued' });
+  }
+  const payer = paidBy === 'vendor' ? 'vendor' : 'platform';
+
+  try {
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (!['paid', 'partially_refunded'].includes(order.paymentStatus)) {
+      return res.status(400).json({ error: 'Only paid orders can be refunded' });
+    }
+    if (['requested', 'processing', 'processed', 'scheduled'].includes(item.refundStatus)) {
+      return res.status(400).json({ error: 'A refund is already requested, scheduled, or processed for this item' });
+    }
+
+    const maxRefundable = calculateItemRefundAmount(item, item.quantity).total - Number(item.refundedAmount || 0);
+    const refundAmount = Number(amount);
+
+    if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid refund amount' });
+    }
+    if (refundAmount > maxRefundable + 0.001) {
+      return res.status(400).json({ error: `Refund amount cannot exceed £${maxRefundable.toFixed(2)}` });
+    }
+
+    const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    item.goodwillRefund = true;
+    item.goodwillRefundAmount = refundAmount;
+    item.goodwillPaidBy = payer;
+    item.refundReason = String(reason).trim();
+    item.refundStatus = 'scheduled';
+    item.refundRequestedAt = new Date();
+    item.refundScheduledAt = scheduledAt;
+
+    pushItemHistory(item, {
+      type: 'goodwill_refund_scheduled',
+      status: 'scheduled',
+      amount: refundAmount,
+      note: `Goodwill refund scheduled by admin, paid by ${payer} (executes in 24h unless cancelled): ${item.refundReason}`,
+      by: req.user._id,
+    });
+
+    pushUniqueHistory(order, 'Goodwill Refund Scheduled', `Goodwill refund of £${refundAmount.toFixed(2)} scheduled for ${item.name} (paid by ${payer})`);
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({ success: true, scheduledAt, amount: refundAmount, paidBy: payer });
+  } catch (err) {
+    console.error('Admin goodwill refund schedule error:', err);
+    res.status(500).json({ error: 'Failed to schedule goodwill refund' });
+  }
+});
+
+router.patch('/:id/items/:itemId/goodwill-refund/cancel', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, itemId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(itemId)) {
+    return res.status(400).json({ error: 'Invalid item id' });
+  }
+
+  try {
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (!item.goodwillRefund || item.refundStatus !== 'scheduled') {
+      return res.status(400).json({ error: 'No scheduled goodwill refund to cancel' });
+    }
+
+    item.goodwillRefund = false;
+    item.goodwillRefundAmount = 0;
+    item.refundStatus = 'none';
+    item.refundScheduledAt = null;
+
+    pushItemHistory(item, {
+      type: 'goodwill_refund_cancelled',
+      status: 'none',
+      amount: 0,
+      note: 'Goodwill refund cancelled by admin before it was processed',
+      by: req.user._id,
+    });
+
+    pushUniqueHistory(order, 'Goodwill Refund Cancelled', `Goodwill refund cancelled for ${item.name}`);
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin goodwill refund cancel error:', err);
+    res.status(500).json({ error: 'Failed to cancel goodwill refund' });
+  }
+});
+
+/* ======================================================
    APPROVE ITEM RETURN (ADMIN)
 ====================================================== */
 router.patch('/:id/items/:itemId/approve-return', authMiddleware, adminMiddleware, async (req, res) => {

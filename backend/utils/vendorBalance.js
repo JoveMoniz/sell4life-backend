@@ -92,11 +92,17 @@ export async function computeVendorBalance(vendorId) {
       const grossValue        = Number(item.price || 0) * Number(item.quantity || 0);
       const shippingValue     = Number(item.shippingCost || 0);
 
+      // Platform-paid goodwill refunds are absorbed by Sell4Life, not the vendor —
+      // exclude them so the vendor's payout isn't reduced for a refund they didn't pay.
+      const isPlatformPaidGoodwill = item.goodwillRefund && item.goodwillPaidBy === 'platform';
+
       let refunded = 0;
-      if (Number(item.refundedQuantity) > 0) {
-        refunded = Number(item.refundedAmount) || Number(item.price || 0) * Number(item.refundedQuantity);
-      } else if (Number(item.returnQuantity) > 0) {
-        refunded = Number(item.price || 0) * Number(item.returnQuantity);
+      if (!isPlatformPaidGoodwill) {
+        if (Number(item.refundedQuantity) > 0) {
+          refunded = Number(item.refundedAmount) || Number(item.price || 0) * Number(item.refundedQuantity);
+        } else if (Number(item.returnQuantity) > 0) {
+          refunded = Number(item.price || 0) * Number(item.returnQuantity);
+        }
       }
       const itemValue = Math.max(0, grossValue - refunded);
 
@@ -133,6 +139,7 @@ export async function computeVendorBalance(vendorId) {
     });
 
     vendorItems.forEach(item => {
+      if (item.goodwillRefund && item.goodwillPaidBy === 'platform') return;
       const price = Number(item.price || 0);
       if (item.status === 'Cancelled') {
         totalRefunds += price * Number(item.quantity || 0);

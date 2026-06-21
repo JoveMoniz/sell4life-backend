@@ -134,11 +134,14 @@ const orderItemSchema = new mongoose.Schema({
   refundReason: { type: String, default: '' },
   refundAttempts: { type: Number, default: 0 },
 
-  // Vendor-initiated refund with no physical return required (e.g. low-value
-  // item where return postage isn't worth it). Scheduled 24h out for review/
-  // cancellation before the refundWorker actually executes it.
+  // Refund with no physical return required (e.g. low-value item where
+  // return postage isn't worth it). Scheduled 24h out for review/cancellation
+  // before the refundWorker actually executes it. goodwillPaidBy determines
+  // whether it counts against the vendor's payout (vendor) or is absorbed
+  // by Sell4Life itself (platform) — see computeVendorBalance.
   goodwillRefund: { type: Boolean, default: false },
   goodwillRefundAmount: { type: Number, default: 0, min: 0 },
+  goodwillPaidBy: { type: String, enum: ['vendor', 'platform'], default: 'vendor' },
 
   refundRequestedAt: Date,
   refundScheduledAt: Date,

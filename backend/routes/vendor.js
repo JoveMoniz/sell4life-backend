@@ -1388,6 +1388,7 @@ router.post('/orders/:id/items/:itemId/goodwill-refund', authMiddleware, require
 
     item.goodwillRefund = true;
     item.goodwillRefundAmount = refundAmount;
+    item.goodwillPaidBy = 'vendor';
     item.refundReason = String(reason).trim();
     item.refundStatus = 'scheduled';
     item.refundRequestedAt = new Date();
