@@ -689,6 +689,8 @@ router.get('/financials', async (req, res) => {
     let totalCommission = 0;
     let totalStripe = 0;
     let totalShipping = 0;
+    let totalGoodwillPlatform = 0;
+    let totalGoodwillVendor = 0;
     const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds }
 
     for (const order of orders) {
@@ -742,6 +744,13 @@ router.get('/financials', async (req, res) => {
         totalGross += gross;
         totalRefunds += refunded;
         totalCommission += commission;
+
+        // Goodwill refunds already executed (refundedAmount populated by the worker) —
+        // split out by who actually absorbed the cost.
+        if (item.goodwillRefund && Number(item.refundedAmount) > 0) {
+          if (item.goodwillPaidBy === 'platform') totalGoodwillPlatform += Number(item.refundedAmount);
+          else totalGoodwillVendor += Number(item.refundedAmount);
+        }
 
         if (vid && mongoose.Types.ObjectId.isValid(vid)) {
           if (!vendorMap[vid]) vendorMap[vid] = { gross: 0, refunds: 0, commission: 0, orderIds: new Set() };
@@ -806,7 +815,9 @@ router.get('/financials', async (req, res) => {
         totalRefunds:      Math.round(totalRefunds * 100) / 100,
         totalCommission:   Math.round(totalCommission * 100) / 100,
         totalStripe:       Math.round(totalStripe * 100) / 100,
-        netProfit:         Math.round((totalCommission - totalStripe) * 100) / 100,
+        totalGoodwillPlatform: Math.round(totalGoodwillPlatform * 100) / 100,
+        totalGoodwillVendor:   Math.round(totalGoodwillVendor * 100) / 100,
+        netProfit:         Math.round((totalCommission - totalStripe - totalGoodwillPlatform) * 100) / 100,
         pendingPayouts:    Math.round(pendingPayouts * 100) / 100,
         paidPayouts:       Math.round(paidPayouts * 100) / 100,
         pendingCount,
