@@ -73,6 +73,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       }
 
       const items = [];
+      const vendorFreeReturnsCache = {};
 
       // -----------------------------
       // BUILD ITEMS FROM DATABASE
@@ -96,6 +97,19 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const shippingCost = Number(product.shippingCost || 0);
         const subtotal = price * quantity;
 
+        // Resolve free-returns: product-level override wins, else the vendor's store default
+        let freeReturns;
+        if (typeof product.freeReturns === 'boolean') {
+          freeReturns = product.freeReturns;
+        } else {
+          const vendorIdStr = String(product.vendor);
+          if (!(vendorIdStr in vendorFreeReturnsCache)) {
+            const v = await Vendor.findById(product.vendor).select('freeReturns');
+            vendorFreeReturnsCache[vendorIdStr] = !!v?.freeReturns;
+          }
+          freeReturns = vendorFreeReturnsCache[vendorIdStr];
+        }
+
         items.push({
           productId: product._id,
           vendorId: product.vendor,
@@ -104,6 +118,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           quantity,
           subtotal,
           shippingCost,
+          freeReturns,
           image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
         });
       }

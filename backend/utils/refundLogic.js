@@ -1,5 +1,6 @@
 import stripe from '../config/stripe.js';
 import { pushUniqueHistory, pushItemHistory } from './historyLogic.js';
+import { calculateItemRefundAmount } from './returnLogic.js';
 
 const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 15000);
 
@@ -48,15 +49,8 @@ export function scheduleRefund(order) {
 // ======================================================
 export async function triggerItemRefund(order, item, refundQty, actorId) {
   try {
-    const qty   = Number(refundQty);
-    const price = Number(item.price || 0);
-    const refundTotal = Math.max(
-      0,
-      qty * price
-        + Number(item.taxAmount      || 0)
-        + Number(item.shippingAmount || 0)
-        - Number(item.discountAmount || 0)
-    );
+    const qty = Number(refundQty);
+    const refundTotal = calculateItemRefundAmount(item, qty).total;
 
     let stripeRefundId = null;
 

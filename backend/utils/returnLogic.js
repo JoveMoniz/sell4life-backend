@@ -89,7 +89,7 @@ export function validateReturnRequest(order, item, quantity) {
 // APPLY RETURN REQUEST
 // ======================================================
 
-export function applyReturnRequest(order, item, quantity, reason, userId) {
+export function applyReturnRequest(order, item, quantity, reason, userId, reasonCategory) {
   const requestedQty = Number(quantity);
 
   item.returnStatus = 'requested';
@@ -97,6 +97,9 @@ export function applyReturnRequest(order, item, quantity, reason, userId) {
   item.returnRequestedQuantity = Number(item.returnRequestedQuantity || 0) + requestedQty;
 
   item.returnReason = reason || '';
+  item.returnReasonCategory = ['change_of_mind', 'faulty_damaged_wrong_misdescribed'].includes(reasonCategory)
+    ? reasonCategory
+    : '';
   item.returnRequestedAt = new Date();
 
   pushItemHistory(item, {
@@ -331,13 +334,22 @@ export function calculateItemRefundAmount(item, quantity) {
   const discount = Number(item.discountAmount || 0);
   const platformFee = Number(item.platformFeeAmount || 0);
 
+  // Return postage is deducted only for change-of-mind returns where the
+  // vendor/product didn't offer free returns. Faulty, damaged, wrong, or
+  // misdescribed items are always refunded in full — never deducted.
+  const isChangeOfMind = item.returnReasonCategory === 'change_of_mind';
+  const postageDeduction = (isChangeOfMind && !item.freeReturns)
+    ? Number(item.shippingCost || 0)
+    : 0;
+
   return {
     subtotal: itemSubtotal,
     tax,
     shipping,
     discount,
     platformFee,
-    total: Math.max(0, itemSubtotal + tax + shipping - discount),
+    postageDeduction,
+    total: Math.max(0, itemSubtotal + tax + shipping - discount - postageDeduction),
   };
 }
 

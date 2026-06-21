@@ -48,6 +48,10 @@ const orderItemSchema = new mongoose.Schema({
   discountAmount: { type: Number, default: 0, min: 0 },
   platformFeeAmount: { type: Number, default: 0, min: 0 },
 
+  // Snapshot of the vendor/product free-returns setting at the time of purchase,
+  // so a later settings change doesn't retroactively affect this order's refund.
+  freeReturns: { type: Boolean, default: false },
+
   status: {
     type: String,
     enum: [
@@ -72,6 +76,11 @@ const orderItemSchema = new mongoose.Schema({
   },
 
   returnReason: { type: String, trim: true, default: '' },
+  returnReasonCategory: {
+    type: String,
+    enum: ['', 'change_of_mind', 'faulty_damaged_wrong_misdescribed'],
+    default: '',
+  },
   customerReturnNote: { type: String, default: '' },
   vendorReturnNote: { type: String, default: '' },
   adminReturnNote: { type: String, default: '' },

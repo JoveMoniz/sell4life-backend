@@ -343,7 +343,7 @@ router.patch('/:id/items/:itemId/cancel-request', authMiddleware, async (req, re
 
 router.post('/:id/items/:itemId/return-request', authMiddleware, async (req, res) => {
   const { id, itemId } = req.params;
-  const { quantity, reason } = req.body;
+  const { quantity, reason, reasonCategory } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: 'Invalid order id' });
@@ -351,6 +351,10 @@ router.post('/:id/items/:itemId/return-request', authMiddleware, async (req, res
 
   if (!mongoose.Types.ObjectId.isValid(itemId)) {
     return res.status(400).json({ error: 'Invalid item id' });
+  }
+
+  if (!['change_of_mind', 'faulty_damaged_wrong_misdescribed'].includes(reasonCategory)) {
+    return res.status(400).json({ error: 'Please select a return reason category' });
   }
 
   try {
@@ -380,7 +384,7 @@ router.post('/:id/items/:itemId/return-request', authMiddleware, async (req, res
       return res.status(400).json({ error: check.error });
     }
 
-    applyReturnRequest(order, item, quantity, reason, req.user._id);
+    applyReturnRequest(order, item, quantity, reason, req.user._id, reasonCategory);
 
     // =====================================================
     // RECALCULATE VENDOR STATUS
