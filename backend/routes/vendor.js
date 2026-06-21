@@ -755,7 +755,7 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    res.json(product);
+    res.json({ ...product.toObject(), vendorFreeReturns: !!vendor.freeReturns });
   } catch (err) {
     console.error('VENDOR GET PRODUCT ERROR:', err);
     res.status(500).json({ error: 'Server error' });

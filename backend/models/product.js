@@ -317,6 +317,13 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Per-product override of the vendor's free-returns setting.
+    // null/unset = inherit the vendor's store-wide default.
+    freeReturns: {
+      type: Boolean,
+      default: null,
+    },
+
     /* ==============================
        ANALYTICS
     ============================== */

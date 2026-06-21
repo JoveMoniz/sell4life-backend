@@ -45,7 +45,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -97,6 +97,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       estDeliveryMinDays: Number(estDeliveryMinDays) >= 0 ? Number(estDeliveryMinDays) : 3,
       estDeliveryMaxDays: Number(estDeliveryMaxDays) >= 0 ? Number(estDeliveryMaxDays) : 7,
       active: active !== undefined ? !!active : true,
+      freeReturns: freeReturns !== undefined ? !!freeReturns : null,
     });
 
     res.status(201).json(product);
@@ -357,6 +358,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'estDeliveryMinDays',
       'estDeliveryMaxDays',
       'active',
+      'freeReturns',
     ];
 
     allowedFields.forEach((field) => {
