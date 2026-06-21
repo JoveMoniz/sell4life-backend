@@ -117,7 +117,7 @@ router.get('/slug/:slug', async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.slug }).populate({
       path: 'vendor',
-      select: 'storeName storeLogo storeSlug type refurbishedBadge',
+      select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
       populate: {
         path: 'userId',
         select: 'username email',
@@ -259,7 +259,7 @@ router.get('/:id', async (req, res) => {
 
     const product = await Product.findById(id).populate({
       path: 'vendor',
-      select: 'storeName storeLogo storeSlug type refurbishedBadge',
+      select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
       populate: {
         path: 'userId',
         select: 'username email',

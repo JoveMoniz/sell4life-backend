@@ -47,6 +47,12 @@ const vendorSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Vendor opts in to covering return postage for change-of-mind returns
+    freeReturns: {
+      type: Boolean,
+      default: false,
+    },
+
     // Tier 4 — Enterprise (foundation only)
     staffAccounts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     apiKey: { type: String, default: null },

@@ -1149,7 +1149,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
-    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, type } = req.body;
+    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, type, freeReturns } = req.body;
 
     const update = {};
 
@@ -1176,6 +1176,7 @@ router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
       }
       update.type = type;
     }
+    if (freeReturns !== undefined) update.freeReturns = !!freeReturns;
 
     if (!Object.keys(update).length) {
       return res.status(400).json({ error: 'No fields to update' });
