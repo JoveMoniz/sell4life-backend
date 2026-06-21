@@ -733,12 +733,16 @@ export function buildVendorAllowedActions(order, vendorId) {
     // RETURN HANDLING
     // ====================================================
 
-    if (item.returnStatus === 'requested') {
+    // Skip approve/reject once a refund is already scheduled or done for this item
+    // (e.g. a goodwill refund issued separately from the normal return flow).
+    const alreadyRefunded = ['scheduled', 'processing', 'partially_refunded', 'processed'].includes(item.refundStatus);
+
+    if (item.returnStatus === 'requested' && !alreadyRefunded) {
       actions.push({ type: 'Return Approved', itemId });
       actions.push({ type: 'Return Rejected', itemId });
     }
 
-    if (item.returnStatus === 'approved') {
+    if (item.returnStatus === 'approved' && !alreadyRefunded) {
       actions.push({ type: 'Returned', itemId });
     }
   });
