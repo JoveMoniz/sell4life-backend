@@ -134,6 +134,12 @@ const orderItemSchema = new mongoose.Schema({
   refundReason: { type: String, default: '' },
   refundAttempts: { type: Number, default: 0 },
 
+  // Vendor-initiated refund with no physical return required (e.g. low-value
+  // item where return postage isn't worth it). Scheduled 24h out for review/
+  // cancellation before the refundWorker actually executes it.
+  goodwillRefund: { type: Boolean, default: false },
+  goodwillRefundAmount: { type: Number, default: 0, min: 0 },
+
   refundRequestedAt: Date,
   refundScheduledAt: Date,
   refundedAt: Date,

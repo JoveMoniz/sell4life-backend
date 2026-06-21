@@ -1,11 +1,87 @@
 // ======================================================
 // REFUND WORKER (FINAL CLEAN VERSION)
 // ======================================================
-import { pushUniqueHistory } from '../utils/historyLogic.js';
+import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
 import { getDerivedOrderStatus } from '../utils/orderLogic.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
+
+// ======================================================
+// GOODWILL REFUNDS — vendor-scheduled, item-level, 24h delay
+// ======================================================
+async function processGoodwillRefunds(now) {
+  const orders = await Order.find({
+    'items.goodwillRefund': true,
+    'items.refundStatus': 'scheduled',
+    'items.refundScheduledAt': { $lte: now },
+  });
+
+  for (const order of orders) {
+    let changed = false;
+
+    for (const item of order.items) {
+      if (!item.goodwillRefund || item.refundStatus !== 'scheduled') continue;
+      if (!item.refundScheduledAt || item.refundScheduledAt > now) continue;
+
+      changed = true;
+
+      try {
+        const amount = Number(item.goodwillRefundAmount || 0);
+
+        if (amount <= 0 || !order.paymentIntentId) {
+          throw new Error('Invalid goodwill refund amount or missing payment intent');
+        }
+
+        console.log('🎁 Processing goodwill refund:', item._id, amount);
+
+        const stripeRefund = await stripe.refunds.create({
+          payment_intent: order.paymentIntentId,
+          amount: Math.round(amount * 100),
+          metadata: {
+            orderId: String(order._id),
+            itemId: String(item._id),
+            type: 'goodwill',
+          },
+        });
+
+        item.refundedQuantity = item.quantity;
+        item.refundedAmount = Number(item.refundedAmount || 0) + amount;
+        item.refundedAt = new Date();
+        item.refundStatus = 'processed';
+        item.refundScheduledAt = null;
+
+        pushItemHistory(item, {
+          type: 'goodwill_refund_processed',
+          stripeRefundId: stripeRefund.id,
+          status: 'processed',
+          amount,
+          note: 'Goodwill refund processed (24h review window elapsed)',
+        });
+
+        pushUniqueHistory(order, 'Goodwill Refund Processed', `Goodwill refund of £${amount.toFixed(2)} processed for ${item.name}`);
+      } catch (err) {
+        console.error('💥 Goodwill refund error:', err.message);
+        item.refundStatus = 'failed';
+        item.refundScheduledAt = null;
+        pushUniqueHistory(order, 'Goodwill Refund Failed', `Goodwill refund failed for ${item.name}: ${err.message}`);
+      }
+    }
+
+    if (changed) {
+      order.paymentStatus = order.items.every((i) => i.refundStatus === 'processed')
+        ? 'refunded'
+        : order.items.some((i) => ['processed', 'partially_refunded'].includes(i.refundStatus))
+          ? 'partially_refunded'
+          : order.paymentStatus;
+
+      order.status = getDerivedOrderStatus(order);
+
+      order.markModified('items');
+      await order.save();
+    }
+  }
+}
 
 export function startRefundWorker() {
   const START_TIME = new Date('2026-04-25T21:00:00Z');
@@ -14,6 +90,12 @@ export function startRefundWorker() {
     const now = new Date();
 
     console.log('⏱ Worker tick:', now.toISOString());
+
+    try {
+      await processGoodwillRefunds(now);
+    } catch (err) {
+      console.error('💥 GOODWILL REFUND WORKER ERROR:', err.message);
+    }
 
     try {
       const orders = await Order.find({
