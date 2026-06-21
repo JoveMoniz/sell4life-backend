@@ -180,6 +180,10 @@ const orderItemSchema = new mongoose.Schema({
           'partial_refund',
           'refund_failed',
           'refund_cancelled',
+
+          'goodwill_refund_scheduled',
+          'goodwill_refund_processed',
+          'goodwill_refund_cancelled',
         ],
       },
 
