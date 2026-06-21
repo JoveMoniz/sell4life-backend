@@ -652,7 +652,21 @@ export function getAllowedAdminActions(order) {
     'Partially Refunded': [],
   };
 
-  return map[status] || [];
+  let actions = map[status] || [];
+
+  // Don't offer to approve/reject a return once a refund is already
+  // scheduled or processed for any item (e.g. a goodwill refund issued
+  // separately from the normal return flow) — it's moot at that point.
+  if (status === 'Return Requested') {
+    const hasRefundedItem = (order.items || []).some((i) =>
+      ['scheduled', 'processing', 'partially_refunded', 'processed'].includes(i.refundStatus)
+    );
+    if (hasRefundedItem) {
+      actions = actions.filter((a) => !['Return Approved', 'Return Rejected'].includes(a));
+    }
+  }
+
+  return actions;
 }
 
 // ======================================================
