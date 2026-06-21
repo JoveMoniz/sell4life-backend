@@ -143,7 +143,10 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
     /* ===============================
        STATUS FILTER (CORRECT WAY)
     =============================== */
-    if (status && status !== 'all') {
+    if (status === 'Refunded') {
+      // Payment-level status, not the fulfillment-derived "status" field
+      orders = orders.filter((o) => ['refunded', 'partially_refunded'].includes(o.paymentStatus));
+    } else if (status && status !== 'all') {
       orders = orders.filter((o) => o.status === status);
     }
 
