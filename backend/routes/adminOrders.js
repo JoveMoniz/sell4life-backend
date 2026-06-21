@@ -144,8 +144,14 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
        STATUS FILTER (CORRECT WAY)
     =============================== */
     if (status === 'Refunded') {
-      // Payment-level status, not the fulfillment-derived "status" field
-      orders = orders.filter((o) => ['refunded', 'partially_refunded'].includes(o.paymentStatus));
+      // Payment-level status, not the fulfillment-derived "status" field.
+      // Includes scheduled refunds (money committed but not yet executed)
+      // alongside fully/partially processed ones, including item-level
+      // goodwill refunds still in their 24h window.
+      orders = orders.filter((o) =>
+        ['refunded', 'partially_refunded', 'refund_scheduled'].includes(o.paymentStatus)
+        || (o.items || []).some((i) => i.goodwillRefund && i.refundStatus === 'scheduled')
+      );
     } else if (status && status !== 'all') {
       orders = orders.filter((o) => o.status === status);
     }
