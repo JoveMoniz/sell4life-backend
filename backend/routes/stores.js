@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const vendors = await Vendor.find({ status: 'approved' })
-      .select('storeName storeSlug storeLogo storeDescription type createdAt')
+      .select('storeName storeSlug storeLogo storeBanner storeDescription type createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -30,6 +30,7 @@ router.get('/', async (req, res) => {
       storeName:       v.storeName,
       storeSlug:       v.storeSlug,
       storeLogo:       v.storeLogo || null,
+      storeBanner:     v.storeBanner || null,
       storeDescription:v.storeDescription || '',
       type:            v.type || 'casual',
       productCount:    countMap[String(v._id)] || 0,
