@@ -45,7 +45,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -98,6 +98,8 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       estDeliveryMaxDays: Number(estDeliveryMaxDays) >= 0 ? Number(estDeliveryMaxDays) : 7,
       active: active !== undefined ? !!active : true,
       freeReturns: freeReturns !== undefined ? !!freeReturns : null,
+      supplier: supplier || '',
+      supplierUrl: supplierUrl || '',
     });
 
     res.status(201).json(product);
@@ -116,14 +118,16 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
 
 router.get('/slug/:slug', async (req, res) => {
   try {
-    const product = await Product.findOne({ slug: req.params.slug }).populate({
-      path: 'vendor',
-      select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
-      populate: {
-        path: 'userId',
-        select: 'username email',
-      },
-    });
+    const product = await Product.findOne({ slug: req.params.slug })
+      .select('-costPrice -supplier -supplierUrl')
+      .populate({
+        path: 'vendor',
+        select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
+        populate: {
+          path: 'userId',
+          select: 'username email',
+        },
+      });
 
     if (!product || !product.active || product.archived || product.deletedAt) {
       return res.status(404).json({
@@ -200,6 +204,7 @@ router.get('/', async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const rawProducts = await Product.find(query)
+      .select('-costPrice -supplier -supplierUrl')
       .populate({
         path: 'vendor',
         select: 'storeName storeLogo',
@@ -258,14 +263,16 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    const product = await Product.findById(id).populate({
-      path: 'vendor',
-      select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
-      populate: {
-        path: 'userId',
-        select: 'username email',
-      },
-    });
+    const product = await Product.findById(id)
+      .select('-costPrice -supplier -supplierUrl')
+      .populate({
+        path: 'vendor',
+        select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
+        populate: {
+          path: 'userId',
+          select: 'username email',
+        },
+      });
 
     if (!product || !product.active || product.archived || product.deletedAt) {
       return res.status(404).json({
@@ -359,6 +366,8 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'estDeliveryMaxDays',
       'active',
       'freeReturns',
+      'supplier',
+      'supplierUrl',
     ];
 
     allowedFields.forEach((field) => {

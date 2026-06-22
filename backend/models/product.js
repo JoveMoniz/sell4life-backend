@@ -169,6 +169,22 @@ const productSchema = new mongoose.Schema(
     },
 
     /* ==============================
+       SUPPLIER (private — dropshipping sourcing, never shown to buyers)
+    ============================== */
+
+    supplier: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    supplierUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    /* ==============================
        VARIANTS
     ============================== */
 
