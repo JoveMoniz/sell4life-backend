@@ -43,6 +43,11 @@ const orderItemSchema = new mongoose.Schema({
   subtotal: { type: Number, min: 0 },
   shippingCost: { type: Number, default: 0, min: 0 },
 
+  // Snapshot of the product's supplier info at purchase time — lets the vendor
+  // jump straight to the supplier listing when fulfilling a dropshipped order.
+  supplier: { type: String, default: '' },
+  supplierUrl: { type: String, default: '' },
+
   taxAmount: { type: Number, default: 0, min: 0 },
   shippingAmount: { type: Number, default: 0, min: 0 },
   discountAmount: { type: Number, default: 0, min: 0 },
