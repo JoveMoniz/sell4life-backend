@@ -31,6 +31,15 @@ const router = express.Router();
    NORMALIZE ORDER
 ====================================================== */
 
+// Strip vendor-internal/private fields before an item ever reaches the buyer
+// (supplier sourcing info must never leak to the customer who bought it).
+function sanitizeItemForBuyer(item) {
+  const obj = typeof item.toObject === 'function' ? item.toObject() : { ...item };
+  delete obj.supplier;
+  delete obj.supplierUrl;
+  return obj;
+}
+
 function normalizeOrder(order) {
   return {
     id: order._id.toString(),
@@ -39,7 +48,7 @@ function normalizeOrder(order) {
     user: order.user,
     email: order.email,
 
-    items: order.items,
+    items: (order.items || []).map(sanitizeItemForBuyer),
     vendorOrders: order.vendorOrders,
 
     subtotal: order.subtotal,
