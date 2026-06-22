@@ -42,4 +42,45 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/:slug', async (req, res) => {
+  try {
+    const vendor = await Vendor.findOne({ storeSlug: req.params.slug, status: 'approved' })
+      .select('storeName storeSlug storeLogo storeBanner storeDescription type createdAt')
+      .lean();
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+
+    const Product = (await import('../models/product.js')).default;
+    const products = await Product.find({
+      vendor: vendor._id,
+      active: true,
+      archived: { $ne: true },
+      deletedAt: null,
+    })
+      .select('-costPrice -supplier -supplierUrl')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      store: {
+        _id:              vendor._id,
+        storeName:        vendor.storeName,
+        storeSlug:        vendor.storeSlug,
+        storeLogo:        vendor.storeLogo || null,
+        storeBanner:      vendor.storeBanner || null,
+        storeDescription: vendor.storeDescription || '',
+        type:             vendor.type || 'casual',
+        createdAt:        vendor.createdAt,
+        productCount:     products.length,
+      },
+      products,
+    });
+  } catch (err) {
+    console.error('Public store detail error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
