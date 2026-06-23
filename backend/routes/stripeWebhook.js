@@ -22,16 +22,17 @@ if (!WEBHOOK_SECRET) {
 ====================================================== */
 
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!WEBHOOK_SECRET) {
+    console.error('❌ Refusing webhook: STRIPE_WEBHOOK_SECRET is not configured');
+    return res.status(503).send('Webhook not configured');
+  }
+
   const signature = req.headers['stripe-signature'];
 
   let event;
 
   try {
-    if (WEBHOOK_SECRET) {
-      event = stripe.webhooks.constructEvent(req.body, signature, WEBHOOK_SECRET);
-    } else {
-      event = JSON.parse(req.body.toString());
-    }
+    event = stripe.webhooks.constructEvent(req.body, signature, WEBHOOK_SECRET);
   } catch (err) {
     console.error('❌ Webhook verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);

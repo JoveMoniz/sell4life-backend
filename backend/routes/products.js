@@ -125,7 +125,7 @@ router.get('/slug/:slug', async (req, res) => {
         select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
         populate: {
           path: 'userId',
-          select: 'username email',
+          select: 'username',
         },
       });
 
@@ -210,7 +210,7 @@ router.get('/', async (req, res) => {
         select: 'storeName storeLogo',
         populate: {
           path: 'userId',
-          select: 'username email',
+          select: 'username',
         },
       })
       /* 🔥 SMART SORT (text relevance OR newest) */
@@ -270,7 +270,7 @@ router.get('/:id', async (req, res) => {
         select: 'storeName storeLogo storeSlug type refurbishedBadge freeReturns',
         populate: {
           path: 'userId',
-          select: 'username email',
+          select: 'username',
         },
       });
 
