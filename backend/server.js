@@ -37,6 +37,7 @@ import storesRoute from './routes/stores.js';
 import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
 import passwordResetRoute from './routes/passwordReset.js';
+import messagesRoute from './routes/messages.js';
 
 // ======================================================
 // APP INITIALIZATION
@@ -214,6 +215,7 @@ app.use('/api/admin/vendors', adminVendorsRoutes);
 app.use('/api/reviews', reviewsRoute);
 app.use('/api/stores', storesRoute);
 app.use('/api/account', accountRoute);
+app.use('/api/messages', messagesRoute);
 
 // ======================================================
 // 404 HANDLER
