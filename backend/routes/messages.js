@@ -166,6 +166,24 @@ router.post('/:id/reply', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Unread count for current user ────────────────────────────
+// GET /api/messages/unread-count
+router.get('/unread-count', authMiddleware, async (req, res) => {
+  try {
+    const myVendor = await getMyVendor(req.user._id);
+    let unread = 0;
+    if (myVendor) {
+      unread = await Conversation.countDocuments({ vendor: myVendor._id, unreadVendor: { $gt: 0 } });
+    } else {
+      unread = await Conversation.countDocuments({ buyer: req.user._id, unreadBuyer: { $gt: 0 } });
+    }
+    res.json({ unread });
+  } catch (err) {
+    console.error('[messages] unread-count error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 // ── List conversations for current user ───────────────────────
 // GET /api/messages
 router.get('/', authMiddleware, async (req, res) => {
