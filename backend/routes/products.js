@@ -163,6 +163,21 @@ router.get('/category/list', async (req, res) => {
   }
 });
 
+router.get('/category/counts', async (req, res) => {
+  try {
+    const result = await Product.aggregate([
+      { $match: { active: true, archived: { $ne: true }, deletedAt: null } },
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+    ]);
+    const counts = {};
+    result.forEach(({ _id, count }) => { if (_id) counts[_id] = count; });
+    res.json(counts);
+  } catch (err) {
+    console.error('CATEGORY COUNTS ERROR:', err);
+    res.status(500).json({ error: 'Failed to fetch category counts' });
+  }
+});
+
 /* ======================================================
    GET ALL PRODUCTS
 ====================================================== */
