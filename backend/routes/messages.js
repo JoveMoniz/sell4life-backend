@@ -167,10 +167,11 @@ router.post('/:id/reply', authMiddleware, async (req, res) => {
 });
 
 // ── Unread count for current user ────────────────────────────
-// GET /api/messages/unread-count
+// GET /api/messages/unread-count?view=buyer|vendor
 router.get('/unread-count', authMiddleware, async (req, res) => {
   try {
-    const myVendor = await getMyVendor(req.user._id);
+    const wantBuyer = req.query.view === 'buyer';
+    const myVendor = wantBuyer ? null : await getMyVendor(req.user._id);
     let unread = 0;
     if (myVendor) {
       unread = await Conversation.countDocuments({ vendor: myVendor._id, unreadVendor: { $gt: 0 } });
@@ -185,16 +186,18 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
 });
 
 // ── List conversations for current user ───────────────────────
-// GET /api/messages
+// GET /api/messages?view=buyer|vendor
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const myVendor = await getMyVendor(req.user._id);
+    const wantBuyer = req.query.view === 'buyer';
+    const myVendor = wantBuyer ? null : await getMyVendor(req.user._id);
 
     let filter;
     if (myVendor) {
-      // Vendors see all their store's conversations (most recent first)
+      // Vendor view: show this store's conversations
       filter = { vendor: myVendor._id };
     } else {
+      // Buyer view (default, or explicitly requested)
       filter = { buyer: req.user._id };
     }
 
