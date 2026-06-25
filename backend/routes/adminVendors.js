@@ -86,10 +86,15 @@ router.get('/', async (req, res) => {
           commissionRate = tierRate != null ? Number(tierRate) : Number(feeCfg.commissionDefault ?? 0.08);
         }
 
+        const netRevenue = metrics.grossRevenue - metrics.refunds;
+        const commission = Number((netRevenue * commissionRate).toFixed(2));
+        const netAfterCommission = Number((netRevenue - commission).toFixed(2));
         return {
           ...vObj,
           ...metrics,
           commissionRate,
+          commission,
+          netAfterCommission,
         };
       })
     );
