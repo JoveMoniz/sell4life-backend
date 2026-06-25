@@ -1150,7 +1150,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
-    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, type, freeReturns } = req.body;
+    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, freeReturns } = req.body;
 
     const update = {};
 
@@ -1171,12 +1171,10 @@ router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
     if (storeDescription !== undefined) update.storeDescription = String(storeDescription).trim();
     if (storeLogo !== undefined)        update.storeLogo = String(storeLogo).trim();
     if (storeBanner !== undefined)      update.storeBanner = String(storeBanner).trim();
-    if (type !== undefined) {
-      if (!['casual', 'professional'].includes(type)) {
-        return res.status(400).json({ error: 'Invalid store type' });
-      }
-      update.type = type;
-    }
+    // NOTE: vendor tier ("type") is intentionally NOT settable here. It must only
+    // change via admin approval (PATCH /api/admin/vendors/:id/tier) or the
+    // request-upgrade flow — never directly by the vendor, since it gates
+    // tier-restricted features and determines the commission rate.
     if (freeReturns !== undefined) update.freeReturns = !!freeReturns;
 
     if (!Object.keys(update).length) {

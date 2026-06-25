@@ -208,7 +208,7 @@ export function mailReturnStatusChange({ to, orderRef, itemName, approved, reaso
 }
 
 export function mailNewMessage({ to, senderName, productName, role, convoId }) {
-  const base = process.env.FRONTEND_URL || 'https://sell4life.com';
+  const base = process.env.FRONTEND_URL || 'https://staging.sell4life.com';
   const link = role === 'vendor'
     ? `${base}/account/vendor/messages.html?id=${convoId}`
     : `${base}/account/messages.html?id=${convoId}`;
