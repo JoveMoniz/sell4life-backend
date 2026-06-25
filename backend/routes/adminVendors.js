@@ -69,6 +69,30 @@ router.get('/', async (req, res) => {
     =============================== */
     const feeCfg = await getFeeConfig();
 
+    // Sync rate resolver — mirrors resolveCommissionRateForOrder but uses pre-loaded feeCfg
+    function rateForOrder(vObj, orderCreatedAt) {
+      if (vObj.commissionOverride != null) {
+        if (!vObj.commissionOverrideSetAt) return Number(vObj.commissionOverride);
+        if (orderCreatedAt && new Date(orderCreatedAt) >= new Date(vObj.commissionOverrideSetAt)) {
+          return Number(vObj.commissionOverride);
+        }
+      }
+      const tierRate  = feeCfg.commissionByTier?.[vObj.type];
+      const tierSetAt = feeCfg.commissionByTierSetAt?.[vObj.type];
+      if (tierRate != null) {
+        if (!tierSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(tierSetAt)) {
+          return Number(tierRate);
+        }
+      }
+      const defaultSetAt = feeCfg.commissionDefaultSetAt;
+      if (!defaultSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(defaultSetAt)) {
+        return Number(feeCfg.commissionDefault ?? 0.08);
+      }
+      return 0.08;
+    }
+
+    const PAID_STATUSES = new Set(['paid', 'refunded', 'refund_scheduled', 'partially_refunded']);
+
     const vendors = await Promise.all(
       vendorsRaw.map(async (v) => {
         const ordersRaw = await Order.find({
@@ -78,6 +102,7 @@ router.get('/', async (req, res) => {
         const metrics = calculateVendorMetrics(ordersRaw, v._id);
         const vObj = v.toObject();
 
+        // Current rate — for display and new orders
         let commissionRate;
         if (vObj.commissionOverride != null) {
           commissionRate = Number(vObj.commissionOverride);
@@ -86,9 +111,23 @@ router.get('/', async (req, res) => {
           commissionRate = tierRate != null ? Number(tierRate) : Number(feeCfg.commissionDefault ?? 0.08);
         }
 
-        const netRevenue = metrics.grossRevenue - metrics.refunds;
-        const commission = Number((netRevenue * commissionRate).toFixed(2));
-        const netAfterCommission = Number((netRevenue - commission).toFixed(2));
+        // Actual commission charged — rate at time of each order
+        let totalCommission = 0;
+        for (const order of ordersRaw) {
+          if (!PAID_STATUSES.has((order.paymentStatus || '').toLowerCase())) continue;
+          const vendorItems = (order.items || []).filter(
+            item => String(item.vendorId) === String(v._id)
+          );
+          const itemsTotal = vendorItems.reduce(
+            (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
+          );
+          if (itemsTotal > 0) {
+            totalCommission += itemsTotal * rateForOrder(vObj, order.createdAt);
+          }
+        }
+        const commission = Number(totalCommission.toFixed(2));
+        const netAfterCommission = Number((metrics.grossRevenue - metrics.refunds - commission).toFixed(2));
+
         return {
           ...vObj,
           ...metrics,
