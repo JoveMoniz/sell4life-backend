@@ -152,9 +152,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
         items: JSON.stringify(
           normalizedItems.map((item) => ({
             productId: String(item.productId),
-            vendorId: String(item.vendorId),
             quantity: item.quantity,
-            price: item.price,
           }))
         ),
       },
