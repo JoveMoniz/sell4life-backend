@@ -666,6 +666,8 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       vendorType: vendor.type || 'casual',
       minimumPayout: MIN_PAYOUT,
       hasPendingRequest: !!pendingRequest,
+      reportingStatus: vendor.reportingStatus || 'none',
+      taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
       period: period || 'all',
       periodStats,
       payouts: payouts.map(p => ({
@@ -686,7 +688,16 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
 
 router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    const vendor = req.vendor;
+    const vendorId = vendor._id;
+
+    // HMRC: block new payout requests if reporting is required but tax info not submitted
+    if (vendor.reportingStatus === 'required' && !vendor.taxInfoCompletedAt) {
+      return res.status(403).json({
+        error: 'Payout requests are paused until you submit your tax information for HMRC reporting. Please complete the Tax Information section in Settings.',
+        hmrcBlocked: true,
+      });
+    }
 
     const existing = await Payout.findOne({ vendorId, status: 'requested' });
     if (existing) {
