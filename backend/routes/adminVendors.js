@@ -1117,4 +1117,136 @@ router.patch('/:id/upgrade', async (req, res) => {
   }
 });
 
+/* ======================================================
+   HMRC REPORT — table view (masked)
+====================================================== */
+
+router.get('/hmrc-report', async (req, res) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+
+    const vendors = await Vendor.find({ reportingStatus: 'required' })
+      .populate('userId', 'email')
+      .lean();
+
+    let { decrypt, maskTaxId } = await import('../utils/taxInfoCrypto.js').catch(() => ({
+      decrypt: () => null, maskTaxId: () => '••••',
+    }));
+
+    const rows = vendors.map(v => {
+      const ti = v.taxInfo;
+      const taxInfoCompleted = !!v.taxInfoCompletedAt;
+      let maskedTaxId = null;
+      let taxIdType   = null;
+
+      if (taxInfoCompleted && ti?.taxIdValue) {
+        try {
+          maskedTaxId = maskTaxId(decrypt(ti.taxIdValue));
+          taxIdType   = ti.taxIdType || null;
+        } catch (_) {}
+      }
+
+      return {
+        _id:                 v._id,
+        storeName:           v.storeName,
+        storeSlug:           v.storeSlug,
+        email:               v.userId?.email || null,
+        transactionCount:    v.hmrcReporting?.transactionCount || 0,
+        grossPayoutTotal:    v.hmrcReporting?.grossPayoutTotal || 0,
+        hmrcYear:            v.hmrcReporting?.year || year,
+        taxInfoCompleted,
+        taxInfoCompletedAt:  v.taxInfoCompletedAt || null,
+        maskedTaxId,
+        taxIdType,
+      };
+    });
+
+    const completed  = rows.filter(r => r.taxInfoCompleted).length;
+    const incomplete = rows.length - completed;
+
+    res.json({
+      year,
+      vendors: rows,
+      summary: { total: rows.length, completed, incomplete },
+    });
+  } catch (err) {
+    console.error('HMRC report error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   HMRC EXPORT — decrypted CSV for HMRC submission
+====================================================== */
+
+router.get('/hmrc-export', async (req, res) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+
+    console.log(`[hmrc-export] Admin ${req.user.email} exported HMRC report for ${year} at ${new Date().toISOString()}`);
+
+    const vendors = await Vendor.find({ reportingStatus: 'required' })
+      .populate('userId', 'email')
+      .lean();
+
+    let decrypt;
+    try {
+      decrypt = (await import('../utils/taxInfoCrypto.js')).decrypt;
+    } catch (_) {
+      return res.status(500).json({ error: 'Encryption module unavailable — check HMRC_ENCRYPTION_KEY env var' });
+    }
+
+    function safe(v) {
+      if (v == null) return '';
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    }
+
+    function dec(ciphertext) {
+      if (!ciphertext) return '';
+      try { return decrypt(ciphertext); } catch (_) { return '[decrypt error]'; }
+    }
+
+    const headers = [
+      'Store Name', 'Store Slug', 'Email',
+      'Transaction Count', 'Gross Payout (GBP)', 'HMRC Year',
+      'Tax Info Submitted', 'Tax Info Date',
+      'Legal Name', 'Date of Birth',
+      'Address Line 1', 'Address Line 2', 'City', 'Postcode', 'Country',
+      'Tax ID Type', 'Tax ID Value',
+    ];
+
+    const rows = vendors.map(v => {
+      const ti = v.taxInfo || {};
+      return [
+        safe(v.storeName),
+        safe(v.storeSlug),
+        safe(v.userId?.email),
+        safe(v.hmrcReporting?.transactionCount || 0),
+        safe((v.hmrcReporting?.grossPayoutTotal || 0).toFixed(2)),
+        safe(v.hmrcReporting?.year || year),
+        safe(v.taxInfoCompletedAt ? 'Yes' : 'No'),
+        safe(v.taxInfoCompletedAt ? new Date(v.taxInfoCompletedAt).toISOString().split('T')[0] : ''),
+        safe(dec(ti.legalName)),
+        safe(dec(ti.dateOfBirth)),
+        safe(dec(ti.addrLine1)),
+        safe(dec(ti.addrLine2)),
+        safe(dec(ti.addrCity)),
+        safe(dec(ti.addrPostcode)),
+        safe(dec(ti.addrCountry)),
+        safe(ti.taxIdType || ''),
+        safe(dec(ti.taxIdValue)),
+      ].join(',');
+    });
+
+    const csv = [headers.map(h => safe(h)).join(','), ...rows].join('\r\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="hmrc-report-${year}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('HMRC export error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
