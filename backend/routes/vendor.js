@@ -1124,11 +1124,9 @@ router.post('/api-key/generate', authMiddleware, requireApprovedVendor, requireT
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const vendor = await Vendor.findOne({
-      userId: req.user._id,
-    }).sort({
-      createdAt: -1,
-    });
+    const vendor = await Vendor.findOne({ userId: req.user._id })
+      .select('-taxInfo')
+      .sort({ createdAt: -1 });
 
     res.json({
       isVendor: !!vendor,
@@ -1136,10 +1134,96 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Vendor /me error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-    res.status(500).json({
-      error: 'Server error',
+/* ======================================================
+   GET TAX INFO (masked)
+====================================================== */
+
+router.get('/tax-info', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.vendor._id);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const taxInfoCompleted = !!vendor.taxInfoCompletedAt;
+    let taxInfoSummary = null;
+
+    if (taxInfoCompleted && vendor.taxInfo?.taxIdValue) {
+      try {
+        const { decrypt, maskTaxId } = await import('../utils/taxInfoCrypto.js');
+        taxInfoSummary = {
+          maskedTaxId:  maskTaxId(decrypt(vendor.taxInfo.taxIdValue)),
+          taxIdType:    vendor.taxInfo.taxIdType || null,
+          confirmedAt:  vendor.taxInfo.confirmedAt || null,
+        };
+      } catch (cryptoErr) {
+        console.warn('[hmrc] tax-info decrypt failed:', cryptoErr.message);
+      }
+    }
+
+    res.json({
+      reportingStatus:  vendor.reportingStatus || 'none',
+      hmrcReporting:    vendor.hmrcReporting || {},
+      taxInfoCompleted,
+      taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
+      taxInfo: taxInfoSummary,
     });
+  } catch (err) {
+    console.error('Tax info GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   POST TAX INFO (encrypt and save)
+====================================================== */
+
+router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const {
+      legalName, dateOfBirth,
+      addrLine1, addrLine2, addrCity, addrPostcode, addrCountry,
+      taxIdType, taxIdValue,
+    } = req.body;
+
+    const REQUIRED = { legalName, addrLine1, addrCity, addrPostcode, addrCountry, taxIdType, taxIdValue };
+    const missing = Object.entries(REQUIRED)
+      .filter(([, v]) => !String(v || '').trim())
+      .map(([k]) => k);
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+    }
+
+    const VALID_TYPES = ['ni', 'utr', 'other'];
+    if (!VALID_TYPES.includes(String(taxIdType).trim().toLowerCase())) {
+      return res.status(400).json({ error: 'taxIdType must be ni, utr, or other' });
+    }
+
+    const { encrypt } = await import('../utils/taxInfoCrypto.js');
+
+    const now = new Date();
+    await Vendor.findByIdAndUpdate(req.vendor._id, {
+      taxInfo: {
+        legalName:    encrypt(String(legalName).trim()),
+        dateOfBirth:  dateOfBirth ? encrypt(String(dateOfBirth).trim()) : null,
+        addrLine1:    encrypt(String(addrLine1).trim()),
+        addrLine2:    addrLine2 ? encrypt(String(addrLine2).trim()) : null,
+        addrCity:     encrypt(String(addrCity).trim()),
+        addrPostcode: encrypt(String(addrPostcode).trim()),
+        addrCountry:  encrypt(String(addrCountry).trim()),
+        taxIdType:    String(taxIdType).trim().toLowerCase(),
+        taxIdValue:   encrypt(String(taxIdValue).trim()),
+        confirmedAt:  now,
+      },
+      taxInfoCompletedAt: now,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Tax info POST error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

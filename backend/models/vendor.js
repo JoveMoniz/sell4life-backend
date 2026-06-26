@@ -126,6 +126,19 @@ const vendorSchema = new mongoose.Schema(
     },
 
     taxInfoCompletedAt: { type: Date, default: null },
+
+    taxInfo: {
+      legalName:    { type: String, default: null },
+      dateOfBirth:  { type: String, default: null },
+      addrLine1:    { type: String, default: null },
+      addrLine2:    { type: String, default: null },
+      addrCity:     { type: String, default: null },
+      addrPostcode: { type: String, default: null },
+      addrCountry:  { type: String, default: null },
+      taxIdType:    { type: String, default: null },
+      taxIdValue:   { type: String, default: null },
+      confirmedAt:  { type: Date,   default: null },
+    },
   },
   { timestamps: true }
 );
