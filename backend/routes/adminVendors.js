@@ -1125,7 +1125,7 @@ router.get('/hmrc-report', async (req, res) => {
   try {
     const year = Number(req.query.year) || new Date().getFullYear();
 
-    const vendors = await Vendor.find({ reportingStatus: 'required' })
+    const vendors = await Vendor.find({ reportingStatus: 'required', 'hmrcReporting.year': year })
       .populate('userId', 'email')
       .lean();
 
@@ -1185,7 +1185,7 @@ router.get('/hmrc-export', async (req, res) => {
 
     console.log(`[hmrc-export] Admin ${req.user.email} exported HMRC report for ${year} at ${new Date().toISOString()}`);
 
-    const vendors = await Vendor.find({ reportingStatus: 'required' })
+    const vendors = await Vendor.find({ reportingStatus: 'required', 'hmrcReporting.year': year })
       .populate('userId', 'email')
       .lean();
 
