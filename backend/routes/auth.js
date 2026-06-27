@@ -287,6 +287,7 @@ router.post('/login', async (req, res) => {
           email:         user.email,
           role:          user.role,
           emailVerified: user.emailVerified,
+          createdAt:     user.createdAt,
         },
       });
   } catch (err) {
@@ -321,6 +322,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         email:         user.email,
         role:          user.role,
         emailVerified: user.emailVerified,
+        createdAt:     user.createdAt,
       },
     });
   } catch (err) {

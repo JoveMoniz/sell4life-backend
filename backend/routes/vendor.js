@@ -50,7 +50,9 @@ router.post('/create', authMiddleware, async (req, res) => {
   try {
     const { storeName, storeSlug } = req.body;
 
-    if (!req.user.emailVerified) {
+    const VERIFY_ENFORCED_FROM = new Date('2026-06-27T00:00:00Z');
+    const accountCreatedAt = req.user.createdAt ? new Date(req.user.createdAt) : new Date();
+    if (!req.user.emailVerified && accountCreatedAt >= VERIFY_ENFORCED_FROM) {
       return res.status(403).json({ error: 'Please verify your email address before creating a store.' });
     }
 
