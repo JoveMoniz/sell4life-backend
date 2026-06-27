@@ -49,7 +49,13 @@ function normalizeOrder(order) {
     email: order.email,
 
     items: (order.items || []).map(sanitizeItemForBuyer),
-    vendorOrders: order.vendorOrders,
+    vendorOrders: (order.vendorOrders || []).map((vo) => ({
+      vendorId:       String(vo.vendorId),
+      vendorStoreName: vo.vendorStoreName || vo.vendorName || '',
+      status:         vo.status,
+      trackingNumber: vo.trackingNumber || '',
+      carrier:        vo.carrier || '',
+    })),
 
     subtotal: order.subtotal,
     shipping: order.shipping,

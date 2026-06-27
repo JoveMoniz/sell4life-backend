@@ -1957,13 +1957,15 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    const vendorOwnsItems = order.items.some(
-      (i) => String(i.vendorId) === String(vendor._id)
+    const vendorOrder = order.vendorOrders.find(
+      (vo) => String(vo.vendorId) === String(vendor._id)
     );
-    if (!vendorOwnsItems) return res.status(403).json({ error: 'Not allowed' });
+    if (!vendorOrder) return res.status(403).json({ error: 'Not allowed' });
 
-    order.trackingNumber = String(trackingNumber).trim();
-    if (carrier) order.carrier = String(carrier).trim();
+    const trackNum   = String(trackingNumber).trim();
+    const carrierStr = carrier ? String(carrier).trim() : '';
+    vendorOrder.trackingNumber = trackNum;
+    if (carrierStr) vendorOrder.carrier = carrierStr;
     await order.save();
 
     // Fire shipped email to buyer (non-blocking)
@@ -1974,8 +1976,8 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
           await mailOrderShipped({
             to: buyer.email,
             orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
-            trackingNumber: order.trackingNumber,
-            carrier: order.carrier,
+            trackingNumber: trackNum,
+            carrier: carrierStr,
             storeName: vendor.storeName,
           });
         }
@@ -1984,7 +1986,7 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
       }
     })();
 
-    res.json({ ok: true, trackingNumber: order.trackingNumber, carrier: order.carrier });
+    res.json({ ok: true, trackingNumber: trackNum, carrier: carrierStr });
   } catch (err) {
     console.error('TRACKING ERROR:', err);
     res.status(500).json({ error: 'Failed to save tracking number' });
