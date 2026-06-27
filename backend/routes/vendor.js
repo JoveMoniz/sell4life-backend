@@ -666,6 +666,8 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       vendorType: vendor.type || 'casual',
       minimumPayout: MIN_PAYOUT,
       hasPendingRequest: !!pendingRequest,
+      reportingStatus: vendor.reportingStatus || 'none',
+      taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
       period: period || 'all',
       periodStats,
       payouts: payouts.map(p => ({
@@ -686,7 +688,16 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
 
 router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    const vendor = req.vendor;
+    const vendorId = vendor._id;
+
+    // HMRC: block new payout requests if reporting is required but tax info not submitted
+    if (vendor.reportingStatus === 'required' && !vendor.taxInfoCompletedAt) {
+      return res.status(403).json({
+        error: 'Payout requests are paused until you submit your tax information for HMRC reporting. Please complete the Tax Information section in Settings.',
+        hmrcBlocked: true,
+      });
+    }
 
     const existing = await Payout.findOne({ vendorId, status: 'requested' });
     if (existing) {
@@ -1124,11 +1135,9 @@ router.post('/api-key/generate', authMiddleware, requireApprovedVendor, requireT
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const vendor = await Vendor.findOne({
-      userId: req.user._id,
-    }).sort({
-      createdAt: -1,
-    });
+    const vendor = await Vendor.findOne({ userId: req.user._id })
+      .select('-taxInfo')
+      .sort({ createdAt: -1 });
 
     res.json({
       isVendor: !!vendor,
@@ -1136,10 +1145,96 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Vendor /me error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-    res.status(500).json({
-      error: 'Server error',
+/* ======================================================
+   GET TAX INFO (masked)
+====================================================== */
+
+router.get('/tax-info', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.vendor._id);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const taxInfoCompleted = !!vendor.taxInfoCompletedAt;
+    let taxInfoSummary = null;
+
+    if (taxInfoCompleted && vendor.taxInfo?.taxIdValue) {
+      try {
+        const { decrypt, maskTaxId } = await import('../utils/taxInfoCrypto.js');
+        taxInfoSummary = {
+          maskedTaxId:  maskTaxId(decrypt(vendor.taxInfo.taxIdValue)),
+          taxIdType:    vendor.taxInfo.taxIdType || null,
+          confirmedAt:  vendor.taxInfo.confirmedAt || null,
+        };
+      } catch (cryptoErr) {
+        console.warn('[hmrc] tax-info decrypt failed:', cryptoErr.message);
+      }
+    }
+
+    res.json({
+      reportingStatus:  vendor.reportingStatus || 'none',
+      hmrcReporting:    vendor.hmrcReporting || {},
+      taxInfoCompleted,
+      taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
+      taxInfo: taxInfoSummary,
     });
+  } catch (err) {
+    console.error('Tax info GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   POST TAX INFO (encrypt and save)
+====================================================== */
+
+router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
+  try {
+    const {
+      legalName, dateOfBirth,
+      addrLine1, addrLine2, addrCity, addrPostcode, addrCountry,
+      taxIdType, taxIdValue,
+    } = req.body;
+
+    const REQUIRED = { legalName, addrLine1, addrCity, addrPostcode, addrCountry, taxIdType, taxIdValue };
+    const missing = Object.entries(REQUIRED)
+      .filter(([, v]) => !String(v || '').trim())
+      .map(([k]) => k);
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+    }
+
+    const VALID_TYPES = ['ni', 'utr', 'other'];
+    if (!VALID_TYPES.includes(String(taxIdType).trim().toLowerCase())) {
+      return res.status(400).json({ error: 'taxIdType must be ni, utr, or other' });
+    }
+
+    const { encrypt } = await import('../utils/taxInfoCrypto.js');
+
+    const now = new Date();
+    await Vendor.findByIdAndUpdate(req.vendor._id, {
+      taxInfo: {
+        legalName:    encrypt(String(legalName).trim()),
+        dateOfBirth:  dateOfBirth ? encrypt(String(dateOfBirth).trim()) : null,
+        addrLine1:    encrypt(String(addrLine1).trim()),
+        addrLine2:    addrLine2 ? encrypt(String(addrLine2).trim()) : null,
+        addrCity:     encrypt(String(addrCity).trim()),
+        addrPostcode: encrypt(String(addrPostcode).trim()),
+        addrCountry:  encrypt(String(addrCountry).trim()),
+        taxIdType:    String(taxIdType).trim().toLowerCase(),
+        taxIdValue:   encrypt(String(taxIdValue).trim()),
+        confirmedAt:  now,
+      },
+      taxInfoCompletedAt: now,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Tax info POST error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -1847,10 +1942,10 @@ router.patch(
 );
 
 /* ======================================================
-   ADD / UPDATE TRACKING NUMBER
+   ADD / UPDATE TRACKING NUMBER (per item — dropshipping)
 ====================================================== */
 
-router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, async (req, res) => {
+router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
     const { trackingNumber, carrier } = req.body;
@@ -1862,13 +1957,15 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    const vendorOwnsItems = order.items.some(
-      (i) => String(i.vendorId) === String(vendor._id)
-    );
-    if (!vendorOwnsItems) return res.status(403).json({ error: 'Not allowed' });
+    const item = order.items.id(req.params.itemId);
+    if (!item || String(item.vendorId) !== String(vendor._id)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
 
-    order.trackingNumber = String(trackingNumber).trim();
-    if (carrier) order.carrier = String(carrier).trim();
+    const trackNum   = String(trackingNumber).trim();
+    const carrierStr = carrier ? String(carrier).trim() : '';
+    item.trackingNumber = trackNum;
+    if (carrierStr) item.carrier = carrierStr;
     await order.save();
 
     // Fire shipped email to buyer (non-blocking)
@@ -1879,8 +1976,8 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
           await mailOrderShipped({
             to: buyer.email,
             orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
-            trackingNumber: order.trackingNumber,
-            carrier: order.carrier,
+            trackingNumber: trackNum,
+            carrier: carrierStr,
             storeName: vendor.storeName,
           });
         }
@@ -1889,7 +1986,7 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
       }
     })();
 
-    res.json({ ok: true, trackingNumber: order.trackingNumber, carrier: order.carrier });
+    res.json({ ok: true, trackingNumber: trackNum, carrier: carrierStr });
   } catch (err) {
     console.error('TRACKING ERROR:', err);
     res.status(500).json({ error: 'Failed to save tracking number' });

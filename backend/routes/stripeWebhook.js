@@ -222,6 +222,19 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       console.log('🎉 Order created:', order._id);
 
+      // Recalculate HMRC threshold for each vendor in this order (non-blocking)
+      (async () => {
+        try {
+          const { recalcHmrcStatus } = await import('../utils/hmrcThreshold.js');
+          const vendorIds = [...new Set(items.map(i => String(i.vendorId)))];
+          for (const vid of vendorIds) {
+            await recalcHmrcStatus(vid);
+          }
+        } catch (err) {
+          console.warn('[hmrc] Threshold recalc failed:', err.message);
+        }
+      })();
+
       // Fire emails (non-blocking)
       (async () => {
         try {

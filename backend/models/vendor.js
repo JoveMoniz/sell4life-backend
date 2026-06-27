@@ -111,6 +111,34 @@ const vendorSchema = new mongoose.Schema(
         enum: ['pending', 'approved', 'rejected'],
       },
     },
+
+    // ── HMRC Digital Platform Reporting ──
+    reportingStatus: {
+      type: String,
+      enum: ['none', 'approaching', 'required'],
+      default: 'none',
+    },
+
+    hmrcReporting: {
+      year:             { type: Number, default: null },
+      transactionCount: { type: Number, default: 0 },
+      grossPayoutTotal: { type: Number, default: 0 },
+    },
+
+    taxInfoCompletedAt: { type: Date, default: null },
+
+    taxInfo: {
+      legalName:    { type: String, default: null },
+      dateOfBirth:  { type: String, default: null },
+      addrLine1:    { type: String, default: null },
+      addrLine2:    { type: String, default: null },
+      addrCity:     { type: String, default: null },
+      addrPostcode: { type: String, default: null },
+      addrCountry:  { type: String, default: null },
+      taxIdType:    { type: String, default: null },
+      taxIdValue:   { type: String, default: null },
+      confirmedAt:  { type: Date,   default: null },
+    },
   },
   { timestamps: true }
 );
