@@ -1942,10 +1942,10 @@ router.patch(
 );
 
 /* ======================================================
-   ADD / UPDATE TRACKING NUMBER
+   ADD / UPDATE TRACKING NUMBER (per item — dropshipping)
 ====================================================== */
 
-router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, async (req, res) => {
+router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
     const { trackingNumber, carrier } = req.body;
@@ -1957,15 +1957,15 @@ router.patch('/orders/:id/tracking', authMiddleware, requireApprovedVendor, asyn
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    const vendorOrder = order.vendorOrders.find(
-      (vo) => String(vo.vendorId) === String(vendor._id)
-    );
-    if (!vendorOrder) return res.status(403).json({ error: 'Not allowed' });
+    const item = order.items.id(req.params.itemId);
+    if (!item || String(item.vendorId) !== String(vendor._id)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
 
     const trackNum   = String(trackingNumber).trim();
     const carrierStr = carrier ? String(carrier).trim() : '';
-    vendorOrder.trackingNumber = trackNum;
-    if (carrierStr) vendorOrder.carrier = carrierStr;
+    item.trackingNumber = trackNum;
+    if (carrierStr) item.carrier = carrierStr;
     await order.save();
 
     // Fire shipped email to buyer (non-blocking)
