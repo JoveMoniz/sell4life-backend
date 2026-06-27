@@ -50,6 +50,10 @@ router.post('/create', authMiddleware, async (req, res) => {
   try {
     const { storeName, storeSlug } = req.body;
 
+    if (!req.user.emailVerified) {
+      return res.status(403).json({ error: 'Please verify your email address before creating a store.' });
+    }
+
     if (!storeName || !storeSlug) {
       return res.status(400).json({
         error: 'Missing fields',
