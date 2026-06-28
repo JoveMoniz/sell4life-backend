@@ -37,6 +37,10 @@ import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
+
+// Shipping cost providers (registers CJ at import time)
+import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
+import '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 
@@ -897,6 +901,10 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         : (parseInt(col(firstRow, 'stock'), 10) || 0);
 
       try {
+        const supplierRef = col(firstRow, 'suppliervariantref');
+        const costPrice   = parseFloat(col(firstRow, 'costprice'));
+        const supplierName = col(firstRow, 'suppliername');
+
         const product = new Product({
           vendor:       vendor._id,
           name,
@@ -905,6 +913,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           price,
           comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
           shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+          costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
           stock:        totalStock,
           trackInventory: totalStock > 0,
           category:     col(firstRow, 'category').toLowerCase(),
@@ -913,6 +922,8 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           images,
           variants,
           active: false,
+          supplier:     supplierName || undefined,
+          ...(supplierRef ? { metadata: { supplierVariantRef: supplierRef } } : {}),
         });
 
         await product.save();
@@ -923,13 +934,115 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     }
 
     res.json({
-      created: created.length,
-      skipped: skipped.length,
-      skippedDetails: skipped,
+      created:          created.length,
+      skipped:          skipped.length,
+      skippedDetails:   skipped,
+      shippingFetched:  created.shippingFetched ?? 0,
+      shippingMissing:  created.shippingMissing  ?? 0,
     });
   } catch (err) {
     console.error('CSV IMPORT ERROR:', err);
     res.status(500).json({ error: 'Import failed' });
+  }
+});
+
+/* ======================================================
+   SUPPLIER CREDENTIAL MANAGEMENT
+====================================================== */
+
+// GET /supplier/providers — list all registered providers + configured status
+router.get('/supplier/providers', authMiddleware, requireApprovedVendor, async (req, res) => {
+  const creds = req.vendor.supplierCredentials || {};
+  const providers = listProviders().map(p => ({
+    name:        p.providerName,
+    displayName: p.displayName,
+    configured:  !!(creds[p.providerName]),
+  }));
+  res.json({ providers });
+});
+
+// POST /supplier/credentials — save encrypted API token for a provider
+router.post('/supplier/credentials', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  try {
+    const { providerName, token } = req.body;
+    if (!providerName || !token?.trim()) {
+      return res.status(400).json({ error: 'providerName and token are required' });
+    }
+    if (!getProvider(providerName)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+
+    const vendor = await Vendor.findById(req.vendor._id);
+    const creds  = vendor.supplierCredentials || {};
+    creds[providerName] = encryptCredential(token.trim());
+    await Vendor.findByIdAndUpdate(vendor._id, { supplierCredentials: creds });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Supplier credentials save error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /supplier/credentials/:provider — remove credentials for a provider
+router.delete('/supplier/credentials/:provider', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const vendor = await Vendor.findById(req.vendor._id);
+    const creds  = vendor.supplierCredentials || {};
+    delete creds[provider];
+    await Vendor.findByIdAndUpdate(vendor._id, { supplierCredentials: creds });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Supplier credentials delete error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   SUPPLIER SHIPPING COST LOOKUP
+====================================================== */
+
+// POST /supplier/shipping-lookup
+// Body: { items: [{ supplierVariantRef, rowIndex }], destinationCountry, providerName }
+// Returns per-item shipping costs (USD) using the vendor's stored credentials.
+// Results are cached 24 h in the shared registry cache.
+router.post('/supplier/shipping-lookup', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  try {
+    const { items, destinationCountry = 'GB', providerName } = req.body;
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'items array required' });
+    }
+    if (!providerName) {
+      return res.status(400).json({ error: 'providerName required' });
+    }
+
+    const provider = getProvider(providerName);
+    if (!provider) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+
+    const encryptedToken = req.vendor.supplierCredentials?.[providerName];
+    if (!encryptedToken) {
+      return res.status(400).json({ error: `${providerName} not configured — save your API token in Store Settings first` });
+    }
+
+    const token = decryptCredential(encryptedToken);
+
+    const results = [];
+    for (const item of items) {
+      const { supplierVariantRef, rowIndex } = item;
+      const result = await provider.getShippingCost(
+        { supplierVariantRef, destinationCountry, quantity: 1 },
+        token
+      );
+      results.push({ rowIndex, supplierVariantRef, result });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error('Shipping lookup error:', err);
+    res.status(500).json({ error: 'Shipping lookup failed' });
   }
 });
 
