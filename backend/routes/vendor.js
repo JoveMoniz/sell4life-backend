@@ -954,9 +954,9 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 router.get('/supplier/providers', authMiddleware, requireApprovedVendor, async (req, res) => {
   const creds = req.vendor.supplierCredentials || {};
   const providers = listProviders().map(p => ({
-    name:        p.providerName,
-    displayName: p.displayName,
-    configured:  !!(creds[p.providerName]),
+    providerName: p.providerName,
+    displayName:  p.displayName,
+    configured:   !!(creds[p.providerName]),
   }));
   res.json({ providers });
 });
