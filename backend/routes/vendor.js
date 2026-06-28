@@ -870,7 +870,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 
       // Build variants when multiple rows share the same product name
       const hasAttrValue = (r) =>
-        col(r, 'variant') || col(r, 'attr1value') || col(r, 'attr2value');
+        col(r, 'variant') || col(r, 'attr1value') || col(r, 'attr2value') || col(r, 'attr3value');
       const makeVariants = entries.length > 1 || entries.some(e => hasAttrValue(e.row));
       const variants = makeVariants ? entries.map(e => {
         const r = e.row;
@@ -885,6 +885,9 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         const attr2Name  = col(r, 'attr2name');
         const attr2Value = col(r, 'attr2value');
         if (attr2Name && attr2Value) attributes[attr2Name] = attr2Value;
+        const attr3Name  = col(r, 'attr3name');
+        const attr3Value = col(r, 'attr3value');
+        if (attr3Name && attr3Value) attributes[attr3Name] = attr3Value;
 
         return {
           attributes,
