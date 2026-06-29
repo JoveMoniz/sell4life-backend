@@ -7,11 +7,42 @@
 
 import { registerProvider, getCached, setCached, cacheKey } from './registry.js';
 
+const CJ_AUTH_URL    = 'https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken';
 const CJ_FREIGHT_URL = 'https://developers.cjdropshipping.com/api2.0/v1/logistic/freightCalculate';
 
 // CJ-specific rate limit: delay between consecutive API calls
 const RATE_LIMIT_MS = Number(process.env.CJ_RATE_LIMIT_MS) || 250;
 let _lastCall = 0;
+
+// In-process access token cache (CJ tokens last ~15 days)
+let _accessToken   = null;
+let _tokenExpireAt = 0;
+
+async function getAccessToken(email, apiKey) {
+  if (_accessToken && Date.now() < _tokenExpireAt) return _accessToken;
+
+  const resp = await fetch(CJ_AUTH_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ email, password: apiKey }),
+  });
+  if (!resp.ok) {
+    console.warn('[cjdropshipping] auth HTTP %s', resp.status);
+    return null;
+  }
+  const data = await resp.json();
+  if (data?.code !== 200 || !data?.data?.accessToken) {
+    console.warn('[cjdropshipping] auth failed: code=%s msg=%s', data?.code, data?.message);
+    return null;
+  }
+  _accessToken = data.data.accessToken;
+  const expiry = data.data.accessTokenExpiryDate
+    ? new Date(data.data.accessTokenExpiryDate).getTime()
+    : Date.now() + 14 * 24 * 60 * 60 * 1000;
+  _tokenExpireAt = expiry - 5 * 60 * 1000; // 5-min buffer before true expiry
+  console.log('[cjdropshipping] access token obtained, valid until ~%s', new Date(_tokenExpireAt).toISOString());
+  return _accessToken;
+}
 
 async function throttledFetch(token, body) {
   const gap = _lastCall + RATE_LIMIT_MS - Date.now();
@@ -29,18 +60,38 @@ const cjProvider = {
   providerName: 'cjdropshipping',
   displayName:  'CJdropshipping',
 
+  // Fields shown in Store Settings → Connect Supplier
+  credentialSchema: [
+    { key: 'email',  label: 'CJ Account Email', type: 'email',    placeholder: 'your-cj-account@email.com' },
+    { key: 'apiKey', label: 'CJ API Key',        type: 'password', placeholder: 'API key from CJ Developer Center' },
+  ],
+
   isConfigured(vendor) {
     return !!(vendor.supplierCredentials?.cjdropshipping);
   },
 
-  // input: { supplierVariantRef, destinationCountry, quantity }
-  // token: decrypted API token string (passed by the route, never stored here)
+  // credential: decrypted string — either JSON { email, apiKey } or raw access token (legacy)
   // Returns: { cost, currency, etaDays, raw } | null
-  async getShippingCost(input, token) {
+  async getShippingCost(input, credential) {
     const { supplierVariantRef, destinationCountry = 'GB', quantity = 1 } = input;
-    if (!supplierVariantRef || !token) {
-      console.warn('[cjdropshipping] skipped — supplierVariantRef=%s hasToken=%s', supplierVariantRef, !!token);
+    if (!supplierVariantRef || !credential) {
+      console.warn('[cjdropshipping] skipped — supplierVariantRef=%s hasCredential=%s', supplierVariantRef, !!credential);
       return null;
+    }
+
+    // Resolve access token — support both { email, apiKey } JSON and raw token string
+    let accessToken = credential;
+    try {
+      const creds = JSON.parse(credential);
+      if (creds?.email && creds?.apiKey) {
+        accessToken = await getAccessToken(creds.email, creds.apiKey);
+        if (!accessToken) {
+          console.warn('[cjdropshipping] could not obtain access token from credentials');
+          return null;
+        }
+      }
+    } catch (_) {
+      // Not JSON — use as raw access token (legacy single-token format)
     }
 
     const key    = cacheKey('cjdropshipping', supplierVariantRef, destinationCountry);
@@ -48,7 +99,7 @@ const cjProvider = {
     if (cached !== undefined) return cached; // null = already tried + failed
 
     try {
-      const resp = await throttledFetch(token, {
+      const resp = await throttledFetch(accessToken, {
         startCountryCode: 'CN',
         endCountryCode:   destinationCountry,
         products:         [{ vid: supplierVariantRef, quantity }],
@@ -58,6 +109,8 @@ const cjProvider = {
         const errBody = await resp.json().catch(() => ({}));
         console.warn('[cjdropshipping] HTTP %s for vid=%s: code=%s msg=%s',
           resp.status, supplierVariantRef, errBody?.code, errBody?.message);
+        // 401 = token expired — clear cache so next call re-fetches
+        if (resp.status === 401) { _accessToken = null; _tokenExpireAt = 0; }
         return null;
       }
 

@@ -957,19 +957,23 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 router.get('/supplier/providers', authMiddleware, requireApprovedVendor, async (req, res) => {
   const creds = req.vendor.supplierCredentials || {};
   const providers = listProviders().map(p => ({
-    providerName: p.providerName,
-    displayName:  p.displayName,
-    configured:   !!(creds[p.providerName]),
+    providerName:     p.providerName,
+    displayName:      p.displayName,
+    credentialSchema: p.credentialSchema || null,
+    configured:       !!(creds[p.providerName]),
   }));
   res.json({ providers });
 });
 
-// POST /supplier/credentials — save encrypted API token for a provider
+// POST /supplier/credentials — save encrypted credentials for a provider
+// Body: { providerName, token } (single string) OR { providerName, credentials: { key: value, ... } }
 router.post('/supplier/credentials', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
   try {
-    const { providerName, token } = req.body;
-    if (!providerName || !token?.trim()) {
-      return res.status(400).json({ error: 'providerName and token are required' });
+    const { providerName, token, credentials } = req.body;
+    // credentials = object with multiple fields; token = legacy single string
+    const credValue = credentials ? JSON.stringify(credentials) : token?.trim();
+    if (!providerName || !credValue) {
+      return res.status(400).json({ error: 'providerName and credentials are required' });
     }
     if (!getProvider(providerName)) {
       return res.status(400).json({ error: 'Unknown provider' });
@@ -977,7 +981,7 @@ router.post('/supplier/credentials', authMiddleware, requireApprovedVendor, expr
 
     const vendor = await Vendor.findById(req.vendor._id);
     const creds  = vendor.supplierCredentials || {};
-    creds[providerName] = encryptCredential(token.trim());
+    creds[providerName] = encryptCredential(credValue);
     await Vendor.findByIdAndUpdate(vendor._id, { supplierCredentials: creds });
     res.json({ ok: true });
   } catch (err) {
