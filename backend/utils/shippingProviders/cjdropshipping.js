@@ -38,7 +38,10 @@ const cjProvider = {
   // Returns: { cost, currency, etaDays, raw } | null
   async getShippingCost(input, token) {
     const { supplierVariantRef, destinationCountry = 'GB', quantity = 1 } = input;
-    if (!supplierVariantRef || !token) return null;
+    if (!supplierVariantRef || !token) {
+      console.warn('[cjdropshipping] skipped — supplierVariantRef=%s hasToken=%s', supplierVariantRef, !!token);
+      return null;
+    }
 
     const key    = cacheKey('cjdropshipping', supplierVariantRef, destinationCountry);
     const cached = getCached(key);
@@ -52,7 +55,9 @@ const cjProvider = {
       });
 
       if (!resp.ok) {
-        // Don't cache HTTP errors (could be transient)
+        const errBody = await resp.json().catch(() => ({}));
+        console.warn('[cjdropshipping] HTTP %s for vid=%s: code=%s msg=%s',
+          resp.status, supplierVariantRef, errBody?.code, errBody?.message);
         return null;
       }
 

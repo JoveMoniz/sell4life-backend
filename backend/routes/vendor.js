@@ -1026,6 +1026,9 @@ router.post('/supplier/shipping-lookup', authMiddleware, requireApprovedVendor, 
     }
 
     const encryptedToken = req.vendor.supplierCredentials?.[providerName];
+    console.log('[shipping-lookup] provider=%s items=%d hasToken=%s firstRef=%s dest=%s',
+      providerName, items.length, !!encryptedToken,
+      items[0]?.supplierVariantRef ?? 'NONE', destinationCountry);
     if (!encryptedToken) {
       return res.status(400).json({ error: `${providerName} not configured — save your API token in Store Settings first` });
     }
