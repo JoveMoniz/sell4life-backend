@@ -60,7 +60,9 @@ const cjProvider = {
       const options = data?.data;
 
       if (!Array.isArray(options) || !options.length) {
-        setCached(key, null); // valid response, just no options — cache as miss
+        console.warn('[cjdropshipping] no freight options for vid=%s dest=%s code=%s msg=%s',
+          supplierVariantRef, destinationCountry, data?.code, data?.message);
+        setCached(key, null);
         return null;
       }
 
