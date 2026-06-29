@@ -10,8 +10,8 @@ import { registerProvider, getCached, setCached, cacheKey } from './registry.js'
 const CJ_AUTH_URL    = 'https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken';
 const CJ_FREIGHT_URL = 'https://developers.cjdropshipping.com/api2.0/v1/logistic/freightCalculate';
 
-// CJ-specific rate limit: delay between consecutive API calls
-const RATE_LIMIT_MS = Number(process.env.CJ_RATE_LIMIT_MS) || 250;
+// CJ rate limit: 1 request/second max. Default 1100ms gives a small buffer.
+const RATE_LIMIT_MS = Number(process.env.CJ_RATE_LIMIT_MS) || 1100;
 let _lastCall = 0;
 
 // In-process access token cache (CJ tokens last ~15 days)
