@@ -311,7 +311,7 @@ router.get('/:id', async (req, res) => {
 ====================================================== */
 router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   try {
-    const { ids, price, stock, active } = req.body;
+    const { ids, price, stock, active, shippingCost } = req.body;
 
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ error: 'ids array required' });
@@ -321,8 +321,9 @@ router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('profes
     }
 
     const update = {};
-    if (price  !== undefined && price  !== null && Number.isFinite(Number(price)))  update.price  = Number(price);
-    if (stock  !== undefined && stock  !== null && Number.isFinite(Number(stock)))  update.stock  = Math.max(0, Math.round(Number(stock)));
+    if (price        !== undefined && price        !== null && Number.isFinite(Number(price)))        update.price        = Number(price);
+    if (stock        !== undefined && stock        !== null && Number.isFinite(Number(stock)))        update.stock        = Math.max(0, Math.round(Number(stock)));
+    if (shippingCost !== undefined && shippingCost !== null && Number.isFinite(Number(shippingCost))) update.shippingCost = Math.max(0, Number(shippingCost));
     if (active !== undefined) update.active = !!active;
 
     if (!Object.keys(update).length) {
