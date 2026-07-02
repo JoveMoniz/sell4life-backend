@@ -108,6 +108,12 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
+    markupPct: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
     /* ==============================
        IMAGES
     ============================== */
