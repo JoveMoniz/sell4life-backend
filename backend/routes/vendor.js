@@ -842,6 +842,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     }
 
     const created = [];
+    const updated = [];
     const skipped = [];
 
     // Parse all data rows, group by product name
@@ -881,11 +882,6 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
         });
       }
-
-      const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
-      let slug = baseSlug;
-      let slugCounter = 1;
-      while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
 
       // Build variants when multiple rows share the same product name
       const hasAttrValue = (r) =>
@@ -931,42 +927,72 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         const markupPct    = Number.isFinite(rawMarkupPct) && rawMarkupPct >= 0 ? rawMarkupPct : undefined;
         const shipIncluded = col(firstRow, 'shipincluded') === 'true';
 
-        const product = new Product({
-          vendor:       vendor._id,
-          name,
-          slug,
-          description:  col(firstRow, 'description'),
-          price,
-          comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
-          shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
-          costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
-          markupPct:    markupPct,
-          shipIncluded: shipIncluded,
-          stock:        totalStock,
-          trackInventory: totalStock > 0,
-          category:     col(firstRow, 'category').toLowerCase(),
-          subcategory:  col(firstRow, 'subcategory').toLowerCase(),
-          sku:          col(firstRow, 'sku'),
-          images,
-          variants,
-          active: false,
-          supplier:     supplierName || undefined,
-          ...(supplierRef ? { metadata: { supplierVariantRef: supplierRef } } : {}),
-        });
+        // If a product with this name already exists for this vendor, update it in place
+        // (preserving slug, active status) rather than creating a duplicate.
+        const existing = await Product.findOne({ vendor: vendor._id, name });
 
-        await product.save();
-        created.push(product._id);
+        if (existing) {
+          const updateFields = {
+            price,
+            shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+            stock:        totalStock,
+            trackInventory: totalStock > 0,
+            shipIncluded,
+            ...(Number.isFinite(costPrice)    ? { costPrice }    : {}),
+            ...(markupPct !== undefined        ? { markupPct }    : {}),
+            ...(variants.length                ? { variants }     : {}),
+            ...(images.length                  ? { images }       : {}),
+            ...(col(firstRow, 'description')   ? { description: col(firstRow, 'description') }          : {}),
+            ...(col(firstRow, 'category')      ? { category:    col(firstRow, 'category').toLowerCase() }    : {}),
+            ...(col(firstRow, 'subcategory')   ? { subcategory: col(firstRow, 'subcategory').toLowerCase() } : {}),
+            ...(parseFloat(col(firstRow, 'compareprice')) ? { comparePrice: parseFloat(col(firstRow, 'compareprice')) } : {}),
+            ...(col(firstRow, 'sku')           ? { sku: col(firstRow, 'sku') }         : {}),
+            ...(supplierName                   ? { supplier: supplierName }             : {}),
+            ...(supplierRef                    ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+          };
+          await Product.updateOne({ _id: existing._id }, { $set: updateFields });
+          updated.push(existing._id);
+        } else {
+          const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+          let slug = baseSlug;
+          let slugCounter = 1;
+          while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
+
+          const product = new Product({
+            vendor:       vendor._id,
+            name,
+            slug,
+            description:  col(firstRow, 'description'),
+            price,
+            comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
+            shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+            costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
+            markupPct,
+            shipIncluded,
+            stock:        totalStock,
+            trackInventory: totalStock > 0,
+            category:     col(firstRow, 'category').toLowerCase(),
+            subcategory:  col(firstRow, 'subcategory').toLowerCase(),
+            sku:          col(firstRow, 'sku'),
+            images,
+            variants,
+            active: false,
+            supplier:     supplierName || undefined,
+            ...(supplierRef ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+          });
+          await product.save();
+          created.push(product._id);
+        }
       } catch (rowErr) {
         entries.forEach(e => skipped.push({ row: e.lineNum, reason: rowErr.message || 'Save failed' }));
       }
     }
 
     res.json({
-      created:          created.length,
-      skipped:          skipped.length,
-      skippedDetails:   skipped,
-      shippingFetched:  created.shippingFetched ?? 0,
-      shippingMissing:  created.shippingMissing  ?? 0,
+      created:        created.length,
+      updated:        updated.length,
+      skipped:        skipped.length,
+      skippedDetails: skipped,
     });
   } catch (err) {
     console.error('CSV IMPORT ERROR:', err);
