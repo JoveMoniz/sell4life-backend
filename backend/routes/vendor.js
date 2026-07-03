@@ -791,7 +791,8 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
 router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor  = req.vendor;
-    const product = await Product.findOne({ _id: req.params.id, vendorId: vendor._id, deletedAt: null });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
+    const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id });
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
