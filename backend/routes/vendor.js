@@ -40,7 +40,7 @@ import { mailOrderShipped } from '../utils/email.js';
 
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
-import '../utils/shippingProviders/cjdropshipping.js';
+import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 
@@ -781,6 +781,33 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
   } catch (err) {
     console.error('VENDOR GET PRODUCT ERROR:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   CJ PRODUCT IMAGE FETCH
+====================================================== */
+
+router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor  = req.vendor;
+    const product = await Product.findOne({ _id: req.params.id, vendorId: vendor._id, deletedAt: null });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const vid = (product.variants || []).find(v => v.supplierVariantRef)?.supplierVariantRef;
+    if (!vid) return res.status(400).json({ error: 'No CJ variant ID found on this product' });
+
+    const rawCred = vendor.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+    const credential = decryptCredential(rawCred);
+    const images = await cjGetProductImages(vid, credential);
+    if (!images || !images.length) return res.status(404).json({ error: 'CJ returned no images for this product' });
+
+    return res.json({ images });
+  } catch (err) {
+    console.error('[cj-images]', err);
+    return res.status(500).json({ error: 'Failed to fetch images from CJ' });
   }
 });
 

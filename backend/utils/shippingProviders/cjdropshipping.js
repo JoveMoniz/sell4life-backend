@@ -7,8 +7,9 @@
 
 import { registerProvider, getCached, setCached, cacheKey } from './registry.js';
 
-const CJ_AUTH_URL    = 'https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken';
-const CJ_FREIGHT_URL = 'https://developers.cjdropshipping.com/api2.0/v1/logistic/freightCalculate';
+const CJ_BASE        = 'https://developers.cjdropshipping.com/api2.0/v1';
+const CJ_AUTH_URL    = `${CJ_BASE}/authentication/getAccessToken`;
+const CJ_FREIGHT_URL = `${CJ_BASE}/logistic/freightCalculate`;
 
 // CJ rate limit: 1 request/second max. Default 1100ms gives a small buffer.
 const RATE_LIMIT_MS = Number(process.env.CJ_RATE_LIMIT_MS) || 1100;
@@ -148,3 +149,55 @@ const cjProvider = {
 
 registerProvider(cjProvider);
 export default cjProvider;
+
+// ── Resolve credential string → access token ──────────
+async function resolveToken(credential) {
+  try {
+    const creds = JSON.parse(credential);
+    if (creds?.email && creds?.apiKey) return getAccessToken(creds.email, creds.apiKey);
+  } catch (_) {}
+  return credential; // raw token (legacy)
+}
+
+// ── Fetch full product image set by variant ID ─────────
+export async function getProductImages(vid, credential) {
+  const token = await resolveToken(credential);
+  if (!token) return null;
+
+  try {
+    // Step 1: variant ID → product ID
+    const varResp = await fetch(
+      `${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
+      { headers: { 'CJ-Access-Token': token } }
+    );
+    if (!varResp.ok) return null;
+    const varData = await varResp.json();
+    if (varData?.code !== 200) {
+      console.warn('[cjdropshipping] variant query failed: code=%s msg=%s', varData?.code, varData?.message);
+      return null;
+    }
+    const pid = varData?.data?.productId;
+    if (!pid) return null;
+
+    // Step 2: product ID → full image set
+    const prodResp = await fetch(
+      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+      { headers: { 'CJ-Access-Token': token } }
+    );
+    if (!prodResp.ok) return null;
+    const prodData = await prodResp.json();
+    if (prodData?.code !== 200) {
+      console.warn('[cjdropshipping] product query failed: code=%s msg=%s', prodData?.code, prodData?.message);
+      return null;
+    }
+
+    const imageSet = prodData?.data?.productImageSet;
+    if (Array.isArray(imageSet) && imageSet.length) {
+      return imageSet.map(img => img.imageUrl || img.imageThumbnail).filter(Boolean);
+    }
+    return null;
+  } catch (err) {
+    console.error('[cjdropshipping] getProductImages error:', err.message);
+    return null;
+  }
+}
