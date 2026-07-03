@@ -182,6 +182,7 @@ export async function getProductImages(vid, productName, credential) {
   // CJ VIDs often embed the product ID as the prefix before the first '-'
   // e.g. "CJYD20248570B-red-M" → basePid = "CJYD20248570B"
   const basePid = vid.includes('-') ? vid.split('-')[0] : vid;
+  debug.input = { vid, basePid, productName };
 
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
@@ -208,12 +209,18 @@ export async function getProductImages(vid, productName, credential) {
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach B: search product list by productId using basePid extracted from VID
-    // (CJ VIDs often embed the PID as the prefix before the first '-')
-    if (basePid !== officialPid) {
+    // Approach B1: search by productSku (the VID itself — CJ may index by SKU)
+    await delay(300);
+    const rSku = await listSearch({ productSku: vid });
+    debug.skuSearch = { ...rSku, foundName: rSku.first?.productNameEn };
+    const imgsSku = rSku.first ? extractImages(rSku.first) : null;
+    if (imgsSku?.length) return { images: imgsSku };
+
+    // Approach B2: search product list by productId using basePid extracted from VID
+    if (basePid !== vid) {
       await delay(300);
       const r = await listSearch({ productId: basePid });
-      debug.pidSearchBase = { pid: basePid, ...r };
+      debug.pidSearchBase = { pid: basePid, ...r, foundName: r.first?.productNameEn };
       const imgs = r.first ? extractImages(r.first) : null;
       if (imgs?.length) return { images: imgs };
     }
