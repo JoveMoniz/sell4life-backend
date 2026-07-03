@@ -925,10 +925,8 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
       try {
         const supplierRef  = col(firstRow, 'suppliervariantref');
         const supplierName = col(firstRow, 'suppliername');
-        // Total cost to vendor = base cost + shipping cost (both imported from CJ)
         const baseCost     = parseFloat(col(firstRow, 'costprice'));
-        const shippingForCost = parseFloat(col(firstRow, 'shippingcost')) || 0;
-        const costPrice    = Number.isFinite(baseCost) ? baseCost + shippingForCost : undefined;
+        const costPrice    = Number.isFinite(baseCost) ? baseCost : undefined;
 
         const product = new Product({
           vendor:       vendor._id,
