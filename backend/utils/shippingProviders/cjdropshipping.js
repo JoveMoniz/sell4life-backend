@@ -159,42 +159,63 @@ async function resolveToken(credential) {
   return credential; // raw token (legacy)
 }
 
-// ── Fetch full product image set by variant ID ─────────
-export async function getProductImages(vid, credential) {
+// ── Extract image URLs from a CJ product object ───────
+function extractImages(productData) {
+  const set = productData?.productImageSet;
+  if (Array.isArray(set) && set.length) {
+    return set.map(img => img.imageUrl || img.imageThumbnail).filter(Boolean);
+  }
+  // Fallback: single productImage field
+  if (productData?.productImage) return [productData.productImage];
+  return null;
+}
+
+// ── Fetch full product image set — try two approaches ──
+// Approach A: VID → PID → product query
+// Approach B: search by product name (fallback)
+export async function getProductImages(vid, productName, credential) {
   const token = await resolveToken(credential);
   if (!token) return null;
 
   try {
-    // Step 1: variant ID → product ID
+    // Approach A: variant query → productId → product query
     const varResp = await fetch(
       `${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
       { headers: { 'CJ-Access-Token': token } }
     );
-    if (!varResp.ok) return null;
-    const varData = await varResp.json();
-    if (varData?.code !== 200) {
-      console.warn('[cjdropshipping] variant query failed: code=%s msg=%s', varData?.code, varData?.message);
-      return null;
-    }
-    const pid = varData?.data?.productId;
-    if (!pid) return null;
-
-    // Step 2: product ID → full image set
-    const prodResp = await fetch(
-      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
-      { headers: { 'CJ-Access-Token': token } }
-    );
-    if (!prodResp.ok) return null;
-    const prodData = await prodResp.json();
-    if (prodData?.code !== 200) {
-      console.warn('[cjdropshipping] product query failed: code=%s msg=%s', prodData?.code, prodData?.message);
-      return null;
+    if (varResp.ok) {
+      const varData = await varResp.json();
+      const pid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
+      console.log('[cjdropshipping] variant query code=%s pid=%s', varData?.code, pid);
+      if (pid) {
+        const prodResp = await fetch(
+          `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+          { headers: { 'CJ-Access-Token': token } }
+        );
+        if (prodResp.ok) {
+          const prodData = await prodResp.json();
+          const imgs = prodData?.code === 200 ? extractImages(prodData?.data) : null;
+          if (imgs?.length) return imgs;
+        }
+      }
     }
 
-    const imageSet = prodData?.data?.productImageSet;
-    if (Array.isArray(imageSet) && imageSet.length) {
-      return imageSet.map(img => img.imageUrl || img.imageThumbnail).filter(Boolean);
+    // Approach B: search by product name
+    if (productName) {
+      const searchResp = await fetch(`${CJ_BASE}/product/list/get`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
+        body:    JSON.stringify({ pageNum: 1, pageSize: 1, productNameEn: productName }),
+      });
+      if (searchResp.ok) {
+        const searchData = await searchResp.json();
+        console.log('[cjdropshipping] product search code=%s total=%s', searchData?.code, searchData?.data?.total);
+        const first = searchData?.code === 200 ? searchData?.data?.list?.[0] : null;
+        const imgs = first ? extractImages(first) : null;
+        if (imgs?.length) return imgs;
+      }
     }
+
     return null;
   } catch (err) {
     console.error('[cjdropshipping] getProductImages error:', err.message);

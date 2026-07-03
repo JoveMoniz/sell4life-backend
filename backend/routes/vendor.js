@@ -802,7 +802,7 @@ router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, asy
     if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
 
     const credential = decryptCredential(rawCred);
-    const images = await cjGetProductImages(vid, credential);
+    const images = await cjGetProductImages(vid, product.name, credential);
     if (!images || !images.length) return res.status(404).json({ error: 'CJ returned no images for this product' });
 
     return res.json({ images });
