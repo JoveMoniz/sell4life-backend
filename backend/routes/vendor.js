@@ -804,11 +804,23 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
 
-    const REQUIRED = ['name', 'price'];
-    for (const r of REQUIRED) {
-      if (!headers.includes(r)) {
-        return res.status(400).json({ error: `Missing required column: ${r}` });
-      }
+    // Remap CJ Dropshipping column names to sell4life equivalents
+    const CJ_ALIASES = {
+      'producttitle':        'name',
+      'productbaseprice($)': 'costprice',
+      'shippingfee($)':      'shippingcost',
+      'productimage':        'image1',
+      'specification':       'description',
+    };
+    for (let i = 0; i < headers.length; i++) {
+      if (CJ_ALIASES[headers[i]]) headers[i] = CJ_ALIASES[headers[i]];
+    }
+
+    if (!headers.includes('name')) {
+      return res.status(400).json({ error: 'Missing required column: name (or Product Title for CJ exports)' });
+    }
+    if (!headers.includes('price') && !headers.includes('costprice')) {
+      return res.status(400).json({ error: 'Missing required column: price (or Product Base Price for CJ exports)' });
     }
 
     function parseRow(line) {
@@ -847,10 +859,17 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
       const firstRow = entries[0].row;
       const name     = col(firstRow, 'name');
 
-      const price = parseFloat(col(firstRow, 'price'));
+      let price = parseFloat(col(firstRow, 'price'));
       if (!Number.isFinite(price) || price < 0) {
-        entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Invalid price' }));
-        continue;
+        // CJ imports have no price column — use costprice as a placeholder;
+        // vendor applies markup via the bulk panel before activating
+        const costFallback = parseFloat(col(firstRow, 'costprice'));
+        if (Number.isFinite(costFallback) && costFallback >= 0) {
+          price = costFallback;
+        } else {
+          entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Invalid price' }));
+          continue;
+        }
       }
 
       // Collect unique images across all rows
