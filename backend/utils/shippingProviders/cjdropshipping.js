@@ -183,52 +183,52 @@ export async function getProductImages(vid, productName, credential) {
   // e.g. "CJYD20248570B-red-M" → basePid = "CJYD20248570B"
   const basePid = vid.includes('-') ? vid.split('-')[0] : vid;
 
-  async function queryListByPid(pid) {
-    const params = new URLSearchParams({ pageNum: 1, pageSize: 5, pid });
-    const resp = await fetch(`${CJ_BASE}/product/list?${params}`, { headers: { 'CJ-Access-Token': token } });
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  async function listSearch(params) {
+    const resp = await fetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, ...params })}`,
+      { headers: { 'CJ-Access-Token': token } });
     const data = resp.ok ? await resp.json() : null;
-    return { resp, data, first: data?.code === 200 ? data?.data?.list?.[0] : null };
+    return { httpStatus: resp.status, code: data?.code, message: data?.message, total: data?.data?.total, first: data?.data?.list?.[0] };
   }
 
   try {
-    // Approach A: variant query (POST) → get official pid → search list by pid
-    const varResp = await fetch(`${CJ_BASE}/product/variant/query`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
-      body:    JSON.stringify({ vid }),
-    });
+    // Approach A: variant query (GET) → official pid → search product list by productId
+    const varResp = await fetch(`${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
+      { headers: { 'CJ-Access-Token': token } });
     const varData = varResp.ok ? await varResp.json() : null;
     debug.variantQuery = { httpStatus: varResp.status, code: varData?.code, message: varData?.message };
     const officialPid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
 
     if (officialPid) {
-      const { data: pd, first } = await queryListByPid(officialPid);
-      debug.pidSearchOfficial = { code: pd?.code, message: pd?.message, total: pd?.data?.total, foundName: first?.productNameEn };
-      const imgs = first ? extractImages(first) : null;
+      await delay(300);
+      const r = await listSearch({ productId: officialPid });
+      debug.pidSearchOfficial = r;
+      const imgs = r.first ? extractImages(r.first) : null;
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach B: use basePid extracted from VID (no variant query needed)
+    // Approach B: search product list by productId using basePid extracted from VID
+    // (CJ VIDs often embed the PID as the prefix before the first '-')
     if (basePid !== officialPid) {
-      const { data: pd, first } = await queryListByPid(basePid);
-      debug.pidSearchBase = { pid: basePid, code: pd?.code, message: pd?.message, total: pd?.data?.total, foundName: first?.productNameEn };
-      const imgs = first ? extractImages(first) : null;
+      await delay(300);
+      const r = await listSearch({ productId: basePid });
+      debug.pidSearchBase = { pid: basePid, ...r };
+      const imgs = r.first ? extractImages(r.first) : null;
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach C: name search — only accept if found name shares meaningful words with ours
+    // Approach C: name search — only accept if found name shares enough words with ours
     if (productName) {
-      const params = new URLSearchParams({ pageNum: 1, pageSize: 1, productNameEn: productName });
-      const searchResp = await fetch(`${CJ_BASE}/product/list?${params}`, { headers: { 'CJ-Access-Token': token } });
-      const searchData = searchResp.ok ? await searchResp.json() : null;
-      const first = searchData?.code === 200 ? searchData?.data?.list?.[0] : null;
-      const foundName = first?.productNameEn ?? '';
+      await delay(500);
+      const r = await listSearch({ productNameEn: productName });
+      const foundName = r.first?.productNameEn ?? '';
       const ourWords  = productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
       const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
-      debug.nameSearch = { httpStatus: searchResp.status, code: searchData?.code, total: searchData?.data?.total, foundName, overlap, confident };
+      debug.nameSearch = { ...r, foundName, overlap, confident };
       if (confident) {
-        const imgs = extractImages(first);
+        const imgs = r.first ? extractImages(r.first) : null;
         if (imgs?.length) return { images: imgs };
       }
     }
