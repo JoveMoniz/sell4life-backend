@@ -873,15 +873,18 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         }
       }
 
-      // Collect unique images across all rows (image1–image20)
+      // Collect images: product-level images (image2–image20 from first row) first
+      // so images[0] is the main product photo, then variant SKU images (image1 per row)
       const addedImgs = new Set();
       const images = [];
-      const _imgKeys = Array.from({ length: 20 }, (_, i) => `image${i + 1}`);
+      const _prodImgKeys = Array.from({ length: 19 }, (_, i) => `image${i + 2}`);
+      _prodImgKeys.forEach(k => {
+        const v = col(entries[0].row, k);
+        if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
+      });
       for (const e of entries) {
-        _imgKeys.forEach(k => {
-          const v = col(e.row, k);
-          if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
-        });
+        const v = col(e.row, 'image1');
+        if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
       }
 
       // Build variants when multiple rows share the same product name
