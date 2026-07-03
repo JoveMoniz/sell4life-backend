@@ -873,11 +873,12 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         }
       }
 
-      // Collect unique images across all rows
+      // Collect unique images across all rows (image1–image20)
       const addedImgs = new Set();
       const images = [];
+      const _imgKeys = Array.from({ length: 20 }, (_, i) => `image${i + 1}`);
       for (const e of entries) {
-        ['image1', 'image2'].forEach(k => {
+        _imgKeys.forEach(k => {
           const v = col(e.row, k);
           if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
         });
