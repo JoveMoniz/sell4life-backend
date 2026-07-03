@@ -170,17 +170,28 @@ function extractImages(productData) {
   return null;
 }
 
-// ── Fetch full product image set — try two approaches ──
-// Approach A: VID → PID → product query
-// Approach B: search by product name (fallback)
+// ── Fetch full product image set — three approaches ──
+// A: variant query (POST) → official pid → product list search by pid
+// B: extract base pid from VID (prefix before first '-') → product list search by pid
+// C: name search ONLY if top result name substantially overlaps our name
 export async function getProductImages(vid, productName, credential) {
   const token = await resolveToken(credential);
   if (!token) return { error: 'Could not obtain CJ access token — check credentials in Store Settings' };
 
   const debug = {};
+  // CJ VIDs often embed the product ID as the prefix before the first '-'
+  // e.g. "CJYD20248570B-red-M" → basePid = "CJYD20248570B"
+  const basePid = vid.includes('-') ? vid.split('-')[0] : vid;
+
+  async function queryListByPid(pid) {
+    const params = new URLSearchParams({ pageNum: 1, pageSize: 5, pid });
+    const resp = await fetch(`${CJ_BASE}/product/list?${params}`, { headers: { 'CJ-Access-Token': token } });
+    const data = resp.ok ? await resp.json() : null;
+    return { resp, data, first: data?.code === 200 ? data?.data?.list?.[0] : null };
+  }
 
   try {
-    // Approach A: variant query (POST) → productId → product query
+    // Approach A: variant query (POST) → get official pid → search list by pid
     const varResp = await fetch(`${CJ_BASE}/product/variant/query`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
@@ -188,31 +199,38 @@ export async function getProductImages(vid, productName, credential) {
     });
     const varData = varResp.ok ? await varResp.json() : null;
     debug.variantQuery = { httpStatus: varResp.status, code: varData?.code, message: varData?.message };
-    const pid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
+    const officialPid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
 
-    if (pid) {
-      const prodResp = await fetch(`${CJ_BASE}/product/query`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
-        body:    JSON.stringify({ pid }),
-      });
-      const prodData = prodResp.ok ? await prodResp.json() : null;
-      debug.productQuery = { httpStatus: prodResp.status, code: prodData?.code, message: prodData?.message };
-      const imgs = prodData?.code === 200 ? extractImages(prodData?.data) : null;
+    if (officialPid) {
+      const { data: pd, first } = await queryListByPid(officialPid);
+      debug.pidSearchOfficial = { code: pd?.code, message: pd?.message, total: pd?.data?.total, foundName: first?.productNameEn };
+      const imgs = first ? extractImages(first) : null;
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach B: search by product name (GET with query params)
-    if (productName) {
-      const params = new URLSearchParams({ pageNum: 1, pageSize: 1, productNameEn: productName });
-      const searchResp = await fetch(`${CJ_BASE}/product/list?${params}`, {
-        headers: { 'CJ-Access-Token': token },
-      });
-      const searchData = searchResp.ok ? await searchResp.json() : null;
-      debug.nameSearch = { httpStatus: searchResp.status, code: searchData?.code, message: searchData?.message, total: searchData?.data?.total };
-      const first = searchData?.code === 200 ? searchData?.data?.list?.[0] : null;
+    // Approach B: use basePid extracted from VID (no variant query needed)
+    if (basePid !== officialPid) {
+      const { data: pd, first } = await queryListByPid(basePid);
+      debug.pidSearchBase = { pid: basePid, code: pd?.code, message: pd?.message, total: pd?.data?.total, foundName: first?.productNameEn };
       const imgs = first ? extractImages(first) : null;
       if (imgs?.length) return { images: imgs };
+    }
+
+    // Approach C: name search — only accept if found name shares meaningful words with ours
+    if (productName) {
+      const params = new URLSearchParams({ pageNum: 1, pageSize: 1, productNameEn: productName });
+      const searchResp = await fetch(`${CJ_BASE}/product/list?${params}`, { headers: { 'CJ-Access-Token': token } });
+      const searchData = searchResp.ok ? await searchResp.json() : null;
+      const first = searchData?.code === 200 ? searchData?.data?.list?.[0] : null;
+      const foundName = first?.productNameEn ?? '';
+      const ourWords  = productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
+      const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
+      debug.nameSearch = { httpStatus: searchResp.status, code: searchData?.code, total: searchData?.data?.total, foundName, overlap, confident };
+      if (confident) {
+        const imgs = extractImages(first);
+        if (imgs?.length) return { images: imgs };
+      }
     }
 
     return { error: 'No images found', debug };
