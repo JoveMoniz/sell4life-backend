@@ -927,6 +927,9 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         const supplierName = col(firstRow, 'suppliername');
         const baseCost     = parseFloat(col(firstRow, 'costprice'));
         const costPrice    = Number.isFinite(baseCost) ? baseCost : undefined;
+        const rawMarkupPct = parseFloat(col(firstRow, 'markuppct'));
+        const markupPct    = Number.isFinite(rawMarkupPct) && rawMarkupPct >= 0 ? rawMarkupPct : undefined;
+        const shipIncluded = col(firstRow, 'shipincluded') === 'true';
 
         const product = new Product({
           vendor:       vendor._id,
@@ -937,6 +940,8 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
           shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
           costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
+          markupPct:    markupPct,
+          shipIncluded: shipIncluded,
           stock:        totalStock,
           trackInventory: totalStock > 0,
           category:     col(firstRow, 'category').toLowerCase(),
