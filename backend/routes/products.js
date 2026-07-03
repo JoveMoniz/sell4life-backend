@@ -401,8 +401,14 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'price',
       'comparePrice',
       'costPrice',
+      'markupPct',
       'images',
       'stock',
+      'sku',
+      'trackInventory',
+      'allowBackorder',
+      'weight',
+      'dimensions',
       'category',
       'subcategory',
       'tags',
@@ -423,6 +429,13 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'freeReturns',
       'supplier',
       'supplierUrl',
+      'seoTitle',
+      'seoDescription',
+      'conditionGrade',
+      'testedStatus',
+      'warrantyPeriod',
+      'serialNumber',
+      'refurbishmentNotes',
     ];
 
     allowedFields.forEach((field) => {
