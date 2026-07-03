@@ -180,32 +180,33 @@ export async function getProductImages(vid, productName, credential) {
   const debug = {};
 
   try {
-    // Approach A: variant query → productId → product query
-    const varResp = await fetch(
-      `${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
-      { headers: { 'CJ-Access-Token': token } }
-    );
+    // Approach A: variant query (POST) → productId → product query
+    const varResp = await fetch(`${CJ_BASE}/product/variant/query`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
+      body:    JSON.stringify({ vid }),
+    });
     const varData = varResp.ok ? await varResp.json() : null;
     debug.variantQuery = { httpStatus: varResp.status, code: varData?.code, message: varData?.message };
     const pid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
 
     if (pid) {
-      const prodResp = await fetch(
-        `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
-        { headers: { 'CJ-Access-Token': token } }
-      );
+      const prodResp = await fetch(`${CJ_BASE}/product/query`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
+        body:    JSON.stringify({ pid }),
+      });
       const prodData = prodResp.ok ? await prodResp.json() : null;
       debug.productQuery = { httpStatus: prodResp.status, code: prodData?.code, message: prodData?.message };
       const imgs = prodData?.code === 200 ? extractImages(prodData?.data) : null;
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach B: search by product name
+    // Approach B: search by product name (GET with query params)
     if (productName) {
-      const searchResp = await fetch(`${CJ_BASE}/product/list/get`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
-        body:    JSON.stringify({ pageNum: 1, pageSize: 1, productNameEn: productName }),
+      const params = new URLSearchParams({ pageNum: 1, pageSize: 1, productNameEn: productName });
+      const searchResp = await fetch(`${CJ_BASE}/product/list?${params}`, {
+        headers: { 'CJ-Access-Token': token },
       });
       const searchData = searchResp.ok ? await searchResp.json() : null;
       debug.nameSearch = { httpStatus: searchResp.status, code: searchData?.code, message: searchData?.message, total: searchData?.data?.total };
