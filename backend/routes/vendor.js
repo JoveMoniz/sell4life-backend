@@ -794,7 +794,7 @@ router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, asy
     const product = await Product.findOne({ _id: req.params.id, vendorId: vendor._id, deletedAt: null });
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    const vid = (product.variants || []).find(v => v.supplierVariantRef)?.supplierVariantRef;
+    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
     if (!vid) return res.status(400).json({ error: 'No CJ variant ID found on this product' });
 
     const rawCred = vendor.supplierCredentials?.cjdropshipping;
