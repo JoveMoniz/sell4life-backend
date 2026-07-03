@@ -929,7 +929,9 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 
         // If a product with this name already exists for this vendor, update it in place
         // (preserving slug, active status) rather than creating a duplicate.
-        const existing = await Product.findOne({ vendor: vendor._id, name });
+        // Include deletedAt: null so trashed products are treated as "not found" and
+        // re-imported as new, rather than silently updated while remaining in the trash.
+        const existing = await Product.findOne({ vendor: vendor._id, name, deletedAt: null });
 
         if (existing) {
           const updateFields = {
