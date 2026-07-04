@@ -38,7 +38,7 @@ const tierFieldGuard = stripTierFields({
   refurbishmentNotes: 'refurbished',
   videoUrl3:          'refurbished',
   videoUrl4:          'professional',
-  videoUrl5:          'enterprise',
+  videoUrl5:          'professional',
 });
 
 router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (req, res) => {
