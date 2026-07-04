@@ -179,11 +179,12 @@ function extractImages(productData) {
     }
   }
 
-  // Collect unique variant images from variantList
+  // Combine productImage (main shot) + unique variant images from variantList
   const variants = productData.variantList ?? productData.variants;
   if (Array.isArray(variants) && variants.length) {
-    const imgs = [...new Set(variants.map(v => v.variantImage || v.image || v.imageUrl).filter(Boolean))];
-    if (imgs.length) return imgs;
+    const varImgs = variants.map(v => v.variantImage || v.image || v.imageUrl).filter(Boolean);
+    const all = [...new Set([productData.productImage, ...varImgs].filter(Boolean))];
+    if (all.length) return all;
   }
 
   // Fallback: single productImage field
