@@ -788,8 +788,8 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
    CJ PRODUCT IMAGE FETCH
 ====================================================== */
 
-// Bulk: stream NDJSON progress while fetching CJ images for all products
-// that currently have fewer than minImages (default 3) images saved.
+// Bulk: stream NDJSON progress while fetching CJ images for ALL products,
+// replacing any existing images with fresh ones from CJ.
 router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
   const vendor = req.vendor;
   const rawCred = vendor.supplierCredentials?.cjdropshipping;
@@ -803,15 +803,14 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
   try {
     const credential = decryptCredential(rawCred);
-    const minImages  = Math.max(1, Number(req.query.minImages ?? 3));
 
     const allProducts = await Product.find({ vendor: vendor._id })
       .select('_id name variants images').lean();
 
+    // Target every product that has at least one variant with a SKU — no image-count gate
     const targets = allProducts.filter(p =>
-      (p.images?.length ?? 0) < minImages &&
       (p.variants || []).some(v => v.supplierVariantRef || v.sku)
-    ).slice(0, 200);
+    ).slice(0, 500);
 
     send({ type: 'start', total: targets.length });
 
