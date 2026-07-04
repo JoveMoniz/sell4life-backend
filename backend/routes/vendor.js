@@ -796,10 +796,19 @@ const CLD_PRESET = process.env.CLOUDINARY_PRESET || 'lhhkniqv';
 
 async function rehostVideoOnCloudinary(url) {
   try {
+    // CJ's download domain 403s without this Referer — must download ourselves
+    // (Cloudinary's remote fetch can't send custom headers).
+    const dl = await fetch(url, { headers: { Referer: 'https://developers.cjdropshipping.com' } });
+    if (!dl.ok) return null;
+    const buf = await dl.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > 90 * 1024 * 1024) return null; // Cloudinary limit safety
+
+    const fd = new FormData();
+    fd.append('file', new Blob([buf], { type: 'video/mp4' }), 'cj-video.mp4');
+    fd.append('upload_preset', CLD_PRESET);
     const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/video/upload`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    new URLSearchParams({ file: url, upload_preset: CLD_PRESET }),
+      method: 'POST',
+      body:   fd,
     });
     if (!resp.ok) return null;
     const data = await resp.json();
