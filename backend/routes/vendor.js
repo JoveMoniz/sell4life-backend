@@ -810,8 +810,8 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
     const targets = allProducts.filter(p =>
       (p.images?.length ?? 0) < minImages &&
-      (p.variants || []).some(v => v.supplierVariantRef || /^CJ/i.test(v.sku || ''))
-    ).slice(0, 100);
+      (p.variants || []).some(v => v.supplierVariantRef || v.sku)
+    ).slice(0, 200);
 
     send({ type: 'start', total: targets.length });
 
