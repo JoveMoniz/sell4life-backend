@@ -179,11 +179,11 @@ function extractImages(productData) {
     }
   }
 
-  // Combine productImage (main shot) + unique variant images from variantList
+  // Variant images first, then productImage at the end (so broken main shots don't land in slot 1)
   const variants = productData.variantList ?? productData.variants;
   if (Array.isArray(variants) && variants.length) {
     const varImgs = variants.map(v => v.variantImage || v.image || v.imageUrl).filter(Boolean);
-    const all = [...new Set([productData.productImage, ...varImgs].filter(Boolean))];
+    const all = [...new Set([...varImgs, productData.productImage].filter(Boolean))];
     if (all.length) return all;
   }
 
