@@ -839,7 +839,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
         (result.videos ?? []).slice(0, 5).forEach((url, i) => { updateDoc[videoFields[i]] = url; });
 
-        // Sync per-variant stock and image from CJ variantList
+        // Sync per-variant image from CJ variantList (stock not available via CJ API)
         let variantsSynced = 0;
         if (result.cjVariants?.length) {
           const syncedVariants = (product.variants || []).map(ourV => {
@@ -847,21 +847,11 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
             const cjV = result.cjVariants.find(cv =>
               ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
             );
-            if (!cjV) return ourV;
+            if (!cjV || !cjV.image) return ourV;
             variantsSynced++;
-            return {
-              ...ourV,
-              stock: typeof cjV.stock === 'number' ? cjV.stock : ourV.stock,
-              ...(cjV.image ? { image: cjV.image } : {}),
-            };
+            return { ...ourV, image: cjV.image };
           });
-          updateDoc.variants = syncedVariants;
-          // Only recalculate total stock if matched variants have real stock data
-          // (CJ returns inventoryNum=null for many products — don't zero out stock then)
-          const hasRealStock = result.cjVariants.some(cv => cv.stock > 0);
-          if (variantsSynced > 0 && hasRealStock) {
-            updateDoc.stock = syncedVariants.reduce((s, v) => s + (v.stock || 0), 0);
-          }
+          if (variantsSynced > 0) updateDoc.variants = syncedVariants;
         }
 
         await Product.findByIdAndUpdate(product._id, updateDoc);

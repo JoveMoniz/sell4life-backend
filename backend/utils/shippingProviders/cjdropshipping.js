@@ -262,9 +262,7 @@ export async function getProductImages(vid, productName, credential) {
     return list.map(v => ({
       vid:        String(v.vid        ?? ''),
       variantSku: String(v.variantSku ?? v.vid ?? ''),
-      stock:      Number(v.inventoryNum ?? v.variantStock ?? v.variantStockNum ?? v.stock ?? 0),
       image:      v.variantImage ?? v.image ?? '',
-      price:      v.variantPrice ?? v.price ?? null,
     })).filter(v => v.vid || v.variantSku);
   }
 
@@ -279,15 +277,6 @@ export async function getProductImages(vid, productName, credential) {
       const resp = await cjFetch(url);
       const data = resp?.ok ? await resp.json() : null;
       if (data?.code !== 200 || !data?.data) continue;
-      // Temporary debug: log video-related fields and first variant keys
-      const d = data.data;
-      const videoKeys = Object.keys(d).filter(k => /video/i.test(k));
-      const firstVariant = (d.variantList ?? d.variants ?? [])[0];
-      console.log('[cj-debug] pid=%s videoValue=%j firstVariantSku=%s inventoryNum=%s combineNum=%s inventories=%j',
-        pid, d.productVideo,
-        firstVariant?.variantSku ?? firstVariant?.vid ?? '?',
-        firstVariant?.inventoryNum, firstVariant?.combineNum,
-        firstVariant?.inventories?.[0]);
       const imgs = extractImages(data.data);
       if (imgs?.length) {
         const productUrl = data.data.productUrl
