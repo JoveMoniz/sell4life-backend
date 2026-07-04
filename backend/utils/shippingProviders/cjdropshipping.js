@@ -280,12 +280,7 @@ export async function getProductImages(vid, productName, credential) {
     await delay(300);
     const rSku = await listSearch({ productSku: vid });
     const skuFirst = rSku.first;
-    debug.skuSearch = {
-      ...rSku,
-      foundName: skuFirst?.productNameEn,
-      foundPid:  skuFirst?.pid,
-      firstKeys: Object.keys(skuFirst || {}),  // shows all fields CJ returns in list
-    };
+    debug.skuSearch = { ...rSku, foundName: skuFirst?.productNameEn, foundPid: skuFirst?.pid };
     if (skuFirst?.pid) {
       const imgs = await detailImages(skuFirst.pid, 'detailFromSku');
       if (imgs?.length) return { images: imgs };
