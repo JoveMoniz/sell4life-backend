@@ -193,8 +193,19 @@ export async function getProductImages(vid, productName, credential) {
     return { httpStatus: resp.status, code: data?.code, message: data?.message, total: data?.data?.total, first: data?.data?.list?.[0] };
   }
 
+  // After list search finds the right product, fetch its full detail for all gallery images
+  async function detailImages(pid, debugKey) {
+    await delay(300);
+    const resp = await fetch(`${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+      { headers: { 'CJ-Access-Token': token } });
+    const data = resp.ok ? await resp.json() : null;
+    debug[debugKey] = { httpStatus: resp.status, code: data?.code, message: data?.message, pid };
+    const imgs = data?.code === 200 ? extractImages(data?.data) : null;
+    return imgs;
+  }
+
   try {
-    // Approach A: variant query (GET) → official pid → search product list by productId
+    // Approach A: variant query (GET) → official pid → product detail
     const varResp = await fetch(`${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
       { headers: { 'CJ-Access-Token': token } });
     const varData = varResp.ok ? await varResp.json() : null;
@@ -202,27 +213,33 @@ export async function getProductImages(vid, productName, credential) {
     const officialPid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
 
     if (officialPid) {
-      await delay(300);
-      const r = await listSearch({ productId: officialPid });
-      debug.pidSearchOfficial = r;
-      const imgs = r.first ? extractImages(r.first) : null;
+      const imgs = await detailImages(officialPid, 'detailOfficial');
       if (imgs?.length) return { images: imgs };
     }
 
-    // Approach B1: search by productSku (the VID itself — CJ may index by SKU)
+    // Approach B1: search list by productSku → use returned pid for detail
     await delay(300);
     const rSku = await listSearch({ productSku: vid });
-    debug.skuSearch = { ...rSku, foundName: rSku.first?.productNameEn };
-    const imgsSku = rSku.first ? extractImages(rSku.first) : null;
-    if (imgsSku?.length) return { images: imgsSku };
+    debug.skuSearch = { ...rSku, foundName: rSku.first?.productNameEn, foundPid: rSku.first?.pid };
+    if (rSku.first?.pid) {
+      const imgs = await detailImages(rSku.first.pid, 'detailFromSku');
+      if (imgs?.length) return { images: imgs };
+      // fall back to the single image the list search returned
+      const fallback = extractImages(rSku.first);
+      if (fallback?.length) return { images: fallback };
+    }
 
-    // Approach B2: search product list by productId using basePid extracted from VID
+    // Approach B2: search list by productId (basePid) → detail
     if (basePid !== vid) {
       await delay(300);
       const r = await listSearch({ productId: basePid });
-      debug.pidSearchBase = { pid: basePid, ...r, foundName: r.first?.productNameEn };
-      const imgs = r.first ? extractImages(r.first) : null;
-      if (imgs?.length) return { images: imgs };
+      debug.pidSearchBase = { ...r, pid: basePid, foundName: r.first?.productNameEn };
+      if (r.first?.pid) {
+        const imgs = await detailImages(r.first.pid, 'detailFromPid');
+        if (imgs?.length) return { images: imgs };
+        const fallback = extractImages(r.first);
+        if (fallback?.length) return { images: fallback };
+      }
     }
 
     // Approach C: name search — only accept if found name shares enough words with ours
@@ -234,9 +251,11 @@ export async function getProductImages(vid, productName, credential) {
       const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
       const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
       debug.nameSearch = { ...r, foundName, overlap, confident };
-      if (confident) {
-        const imgs = r.first ? extractImages(r.first) : null;
+      if (confident && r.first?.pid) {
+        const imgs = await detailImages(r.first.pid, 'detailFromName');
         if (imgs?.length) return { images: imgs };
+        const fallback = extractImages(r.first);
+        if (fallback?.length) return { images: fallback };
       }
     }
 
