@@ -279,6 +279,12 @@ export async function getProductImages(vid, productName, credential) {
       const resp = await cjFetch(url);
       const data = resp?.ok ? await resp.json() : null;
       if (data?.code !== 200 || !data?.data) continue;
+      // Temporary debug: log video-related fields and first variant keys
+      const d = data.data;
+      const videoKeys = Object.keys(d).filter(k => /video/i.test(k));
+      const firstVariant = (d.variantList ?? d.variants ?? [])[0];
+      console.log('[cj-debug] pid=%s videoKeys=%j firstVariantKeys=%j firstVariantSku=%s',
+        pid, videoKeys, firstVariant ? Object.keys(firstVariant) : [], firstVariant?.variantSku ?? firstVariant?.vid ?? '?');
       const imgs = extractImages(data.data);
       if (imgs?.length) {
         const productUrl = data.data.productUrl

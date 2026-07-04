@@ -855,7 +855,11 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
             };
           });
           updateDoc.variants = syncedVariants;
-          updateDoc.stock = syncedVariants.reduce((s, v) => s + (v.stock || 0), 0);
+          // Only recalculate total stock if we actually matched CJ variants —
+          // otherwise summing zero-stocked CSV variants would wipe the product stock.
+          if (variantsSynced > 0) {
+            updateDoc.stock = syncedVariants.reduce((s, v) => s + (v.stock || 0), 0);
+          }
         }
 
         await Product.findByIdAndUpdate(product._id, updateDoc);
