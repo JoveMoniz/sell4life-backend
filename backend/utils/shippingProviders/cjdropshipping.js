@@ -181,9 +181,9 @@ function extractImages(productData) {
   const rawSet = productData.productImageSet;
   const set = parseCjField(rawSet);
   if (Array.isArray(set) && set.length) {
-    const imgs = set.map(img =>
+    const imgs = [...new Set(set.map(img =>
       typeof img === 'string' ? img : (img.imageUrl || img.imageThumbnail || img.url)
-    ).filter(Boolean);
+    ).filter(Boolean))];
     if (imgs.length) return imgs;
   }
 
@@ -191,7 +191,7 @@ function extractImages(productData) {
   for (const key of ['imageList', 'images', 'gallery', 'productImages', 'imageUrlList']) {
     const parsed = parseCjField(productData[key]);
     if (Array.isArray(parsed) && parsed.length) {
-      const imgs = parsed.map(img => typeof img === 'string' ? img : (img.imageUrl || img.url || img.src)).filter(Boolean);
+      const imgs = [...new Set(parsed.map(img => typeof img === 'string' ? img : (img.imageUrl || img.url || img.src)).filter(Boolean))];
       if (imgs.length) return imgs;
     }
   }

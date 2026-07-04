@@ -830,7 +830,7 @@ async function syncProductFromCj(product, credential) {
 
   if (!result?.images?.length) {
     // CJ search failed or returned wrong product — fall back to per-variant images already stored
-    const variantImgs = (product.variants || []).map(v => v.image).filter(Boolean);
+    const variantImgs = [...new Set((product.variants || []).map(v => v.image).filter(Boolean))];
     if (variantImgs.length) {
       await Product.findByIdAndUpdate(product._id, { images: variantImgs });
       return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback' };
@@ -839,7 +839,7 @@ async function syncProductFromCj(product, credential) {
   }
 
   const updateDoc = {
-    images:   result.images,
+    images:   [...new Set(result.images)],
     supplier: result.supplier ?? 'CJdropshipping',
     ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
   };
