@@ -879,12 +879,17 @@ async function syncProductFromCj(product, credential) {
   return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced };
 }
 
-// Bulk: stream NDJSON progress while fetching CJ images for ALL products,
-// replacing any existing images with fresh ones from CJ.
-router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+// Bulk: stream NDJSON progress while syncing products from CJ.
+// Body may include { ids: [...] } to sync only those products; without it,
+// every product with a variant SKU is synced.
+router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), express.json(), async (req, res) => {
   const vendor = req.vendor;
   const rawCred = vendor.supplierCredentials?.cjdropshipping;
   if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+  const requestedIds = Array.isArray(req.body?.ids)
+    ? req.body.ids.filter(id => mongoose.Types.ObjectId.isValid(id))
+    : [];
 
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Transfer-Encoding', 'chunked');
@@ -895,7 +900,9 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
   try {
     const credential = decryptCredential(rawCred);
 
-    const allProducts = await Product.find({ vendor: vendor._id })
+    const query = { vendor: vendor._id };
+    if (requestedIds.length) query._id = { $in: requestedIds };
+    const allProducts = await Product.find(query)
       .select('_id name variants images videoUrl').lean();
 
     // Target every product that has at least one variant with a SKU — no image-count gate
