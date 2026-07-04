@@ -788,6 +788,65 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
    CJ PRODUCT IMAGE FETCH
 ====================================================== */
 
+// Bulk: stream NDJSON progress while fetching CJ images for all products
+// that currently have fewer than minImages (default 3) images saved.
+router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
+  const vendor = req.vendor;
+  const rawCred = vendor.supplierCredentials?.cjdropshipping;
+  if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+  const send = obj => res.write(JSON.stringify(obj) + '\n');
+
+  try {
+    const credential = decryptCredential(rawCred);
+    const minImages  = Math.max(1, Number(req.query.minImages ?? 3));
+
+    const allProducts = await Product.find({ vendor: vendor._id })
+      .select('_id name variants images').lean();
+
+    const targets = allProducts.filter(p =>
+      (p.images?.length ?? 0) < minImages &&
+      (p.variants || []).some(v => v.supplierVariantRef || /^CJ/i.test(v.sku || ''))
+    ).slice(0, 100);
+
+    send({ type: 'start', total: targets.length });
+
+    let updated = 0, failed = 0, skipped = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      const product = targets[i];
+      const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+      if (!vid) {
+        skipped++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
+        continue;
+      }
+
+      send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
+
+      const result = await cjGetProductImages(vid, product.name, credential);
+      if (result?.images?.length) {
+        await Product.findByIdAndUpdate(product._id, { images: result.images });
+        updated++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length });
+      } else {
+        failed++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: result?.error });
+      }
+    }
+
+    send({ type: 'done', total: targets.length, updated, failed, skipped });
+  } catch (err) {
+    console.error('[bulk-cj-images]', err);
+    send({ type: 'error', message: err.message });
+  }
+  res.end();
+});
+
 router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor  = req.vendor;
