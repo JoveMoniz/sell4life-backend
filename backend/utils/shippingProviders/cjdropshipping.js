@@ -159,36 +159,57 @@ async function resolveToken(credential) {
   return credential; // raw token (legacy)
 }
 
+// ── Parse a CJ field that might be a JSON-serialised array or plain string ──
+function parseCjField(val) {
+  if (!val) return null;
+  if (Array.isArray(val)) return val; // already parsed by JSON.parse upstream
+  if (typeof val === 'string') {
+    const t = val.trim();
+    if (t.startsWith('[') || t.startsWith('{')) {
+      try { return JSON.parse(t); } catch (_) {}
+    }
+    if (t.startsWith('http')) return [t];
+  }
+  return null;
+}
+
 // ── Extract image URLs from a CJ product object ───────
 function extractImages(productData) {
   if (!productData) return null;
 
-  // Primary: productImageSet array (full gallery)
-  const set = productData.productImageSet;
+  // Primary: productImageSet — may be an array of objects OR a JSON-serialised array string
+  const rawSet = productData.productImageSet;
+  const set = parseCjField(rawSet);
   if (Array.isArray(set) && set.length) {
-    const imgs = set.map(img => img.imageUrl || img.imageThumbnail || img.url).filter(Boolean);
+    const imgs = set.map(img =>
+      typeof img === 'string' ? img : (img.imageUrl || img.imageThumbnail || img.url)
+    ).filter(Boolean);
     if (imgs.length) return imgs;
   }
 
-  // Other possible array field names
+  // Other possible array field names (same parse treatment)
   for (const key of ['imageList', 'images', 'gallery', 'productImages', 'imageUrlList']) {
-    const arr = productData[key];
-    if (Array.isArray(arr) && arr.length) {
-      const imgs = arr.map(img => typeof img === 'string' ? img : (img.imageUrl || img.url || img.src)).filter(Boolean);
+    const parsed = parseCjField(productData[key]);
+    if (Array.isArray(parsed) && parsed.length) {
+      const imgs = parsed.map(img => typeof img === 'string' ? img : (img.imageUrl || img.url || img.src)).filter(Boolean);
       if (imgs.length) return imgs;
     }
   }
 
-  // Variant images first, then productImage at the end (so broken main shots don't land in slot 1)
+  // productImage may itself be a JSON-serialised array — parse it first
+  const mainImgs = parseCjField(productData.productImage);
+
+  // Variant images first, then productImage(s) at the end
   const variants = productData.variantList ?? productData.variants;
   if (Array.isArray(variants) && variants.length) {
     const varImgs = variants.map(v => v.variantImage || v.image || v.imageUrl).filter(Boolean);
-    const all = [...new Set([...varImgs, productData.productImage].filter(Boolean))];
+    const extra   = Array.isArray(mainImgs) ? mainImgs : (mainImgs ?? []);
+    const all     = [...new Set([...varImgs, ...extra].filter(Boolean))];
     if (all.length) return all;
   }
 
-  // Fallback: single productImage field
-  if (productData.productImage) return [productData.productImage];
+  // Fallback: parsed productImage URLs
+  if (Array.isArray(mainImgs) && mainImgs.length) return mainImgs;
   return null;
 }
 
