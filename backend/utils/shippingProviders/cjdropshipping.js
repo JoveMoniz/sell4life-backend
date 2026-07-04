@@ -317,29 +317,40 @@ export async function getProductImages(vid, productName, credential) {
       const needle   = params.productSku.toLowerCase();
       const variants = r.first.variantList ?? [];
       let confirmed  = false;
+      let earlyMedia = null;
 
       if (variants.length > 0) {
         confirmed = variants.some(v => {
           const vVid = (v.vid ?? v.variantSku ?? '').toLowerCase();
           return vVid && (vVid === needle || vVid.startsWith(needle) || needle.startsWith(vVid));
         });
+      } else if (r.first.pid) {
+        // List search returned no variants — CJ often omits them in list mode.
+        // Fetch the detail endpoint which includes the full variantList for validation.
+        await delay(200);
+        const dm = await detailMedia(r.first.pid);
+        if (dm?.cjVariants?.length) {
+          confirmed = dm.cjVariants.some(cv => {
+            const vVid = (cv.variantSku ?? cv.vid ?? '').toLowerCase();
+            return vVid && (vVid === needle || vVid.startsWith(needle) || needle.startsWith(vVid));
+          });
+          if (confirmed) earlyMedia = dm;
+        }
       }
 
-      // Variant list was empty or none matched — fall back to name similarity.
-      // Use strict threshold (0.7) here: a productSku result with only generic
-      // word overlap like "Fashion" + "Women" must not be treated as a match.
+      // Still unconfirmed — fall back to name similarity at 0.5
       if (!confirmed) {
-        confirmed = nameConfident(r.first.productNameEn, productName, 0.7);
+        confirmed = nameConfident(r.first.productNameEn, productName, 0.5);
       }
 
-      if (!confirmed) return null; // wrong product, reject
+      if (!confirmed) return null;
+      if (earlyMedia) return earlyMedia;
     }
 
     if (r.first.pid) {
       const media = await detailMedia(r.first.pid);
       if (media?.images?.length) return media;
     }
-    // List-level fallback: extract images + variant data (no video available here)
     const imgs = extractImages(r.first);
     return imgs?.length ? { images: imgs, videos: [], cjVariants: extractCjVariants(r.first) } : null;
   }
