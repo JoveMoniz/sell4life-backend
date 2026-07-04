@@ -834,7 +834,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length });
       } else {
         // CJ search failed or returned wrong product — fall back to per-variant images already stored
-        const variantImgs = (product.variants || []).map(v => v.variantImage).filter(Boolean);
+        const variantImgs = (product.variants || []).map(v => v.image).filter(Boolean);
         if (variantImgs.length) {
           await Product.findByIdAndUpdate(product._id, { images: variantImgs });
           updated++;
