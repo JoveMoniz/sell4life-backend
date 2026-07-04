@@ -262,7 +262,7 @@ export async function getProductImages(vid, productName, credential) {
     return list.map(v => ({
       vid:        String(v.vid        ?? ''),
       variantSku: String(v.variantSku ?? v.vid ?? ''),
-      stock:      Number(v.variantStock ?? v.variantStockNum ?? v.stock ?? 0),
+      stock:      Number(v.inventoryNum ?? v.variantStock ?? v.variantStockNum ?? v.stock ?? 0),
       image:      v.variantImage ?? v.image ?? '',
       price:      v.variantPrice ?? v.price ?? null,
     })).filter(v => v.vid || v.variantSku);
@@ -283,8 +283,8 @@ export async function getProductImages(vid, productName, credential) {
       const d = data.data;
       const videoKeys = Object.keys(d).filter(k => /video/i.test(k));
       const firstVariant = (d.variantList ?? d.variants ?? [])[0];
-      console.log('[cj-debug] pid=%s videoKeys=%j firstVariantKeys=%j firstVariantSku=%s',
-        pid, videoKeys, firstVariant ? Object.keys(firstVariant) : [], firstVariant?.variantSku ?? firstVariant?.vid ?? '?');
+      console.log('[cj-debug] pid=%s videoKeys=%j videoValue=%j firstVariantSku=%s inventoryNum=%s',
+        pid, videoKeys, d.productVideo, firstVariant?.variantSku ?? firstVariant?.vid ?? '?', firstVariant?.inventoryNum);
       const imgs = extractImages(data.data);
       if (imgs?.length) {
         const productUrl = data.data.productUrl

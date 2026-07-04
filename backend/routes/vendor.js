@@ -843,8 +843,9 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         let variantsSynced = 0;
         if (result.cjVariants?.length) {
           const syncedVariants = (product.variants || []).map(ourV => {
+            const ourSku = (ourV.sku ?? '').trim();
             const cjV = result.cjVariants.find(cv =>
-              ourV.sku && (cv.variantSku === ourV.sku || cv.vid === ourV.sku)
+              ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
             );
             if (!cjV) return ourV;
             variantsSynced++;
