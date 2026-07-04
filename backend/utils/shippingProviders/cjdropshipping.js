@@ -278,10 +278,14 @@ export async function getProductImages(vid, productName, credential) {
       if (data?.code !== 200 || !data?.data) continue;
       const imgs = extractImages(data.data);
       if (imgs?.length) {
+        const productUrl = data.data.productUrl
+          || (pid ? `https://app.cjdropshipping.com/product-detail.html?id=${pid}` : '');
         return {
           images:      imgs,
           videos:      extractVideos(data.data),
           cjVariants:  extractCjVariants(data.data),
+          supplier:    'CJdropshipping',
+          supplierUrl: productUrl,
         };
       }
     }

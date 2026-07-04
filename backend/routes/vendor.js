@@ -829,7 +829,11 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
       const result = await cjGetProductImages(vid, product.name, credential);
       if (result?.images?.length) {
-        const updateDoc = { images: result.images };
+        const updateDoc = {
+          images:   result.images,
+          supplier: result.supplier ?? 'CJdropshipping',
+          ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
+        };
 
         // Save up to 5 video URLs
         const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
