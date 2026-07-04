@@ -259,13 +259,15 @@ export async function getProductImages(vid, productName, credential) {
     return null;
   }
 
-  // Word-overlap confidence between two product names (reused for both searches)
-  function nameConfident(foundName, ourName) {
+  // Word-overlap confidence between two product names.
+  // threshold: fraction of our significant words that must appear in foundName.
+  // productSku validation uses 0.7 (strict); name-search fallback uses 0.4 (lenient).
+  function nameConfident(foundName, ourName, threshold = 0.4) {
     if (!ourName || !foundName) return false;
-    const ourWords  = ourName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const ourWords = ourName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     if (!ourWords.length) return false;
-    const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
-    return overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
+    const overlap  = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
+    return overlap >= Math.max(1, Math.round(ourWords.length * threshold));
   }
 
   // Try list search with the given params; if found, attempt detail then fall back
@@ -289,9 +291,11 @@ export async function getProductImages(vid, productName, credential) {
         });
       }
 
-      // Variant list was empty or none matched — fall back to name similarity
+      // Variant list was empty or none matched — fall back to name similarity.
+      // Use strict threshold (0.7) here: a productSku result with only generic
+      // word overlap like "Fashion" + "Women" must not be treated as a match.
       if (!confirmed) {
-        confirmed = nameConfident(r.first.productNameEn, productName);
+        confirmed = nameConfident(r.first.productNameEn, productName, 0.7);
       }
 
       if (!confirmed) return null; // wrong product, reject
