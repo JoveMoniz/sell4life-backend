@@ -788,6 +788,27 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
    CJ PRODUCT IMAGE FETCH
 ====================================================== */
 
+// CJ video URLs come from a download-only domain that browsers can't stream.
+// Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
+// Cloudinary fetches the remote URL server-side and returns a playable URL.
+const CLD_CLOUD  = process.env.CLOUDINARY_CLOUD  || 'djpkj0s7w';
+const CLD_PRESET = process.env.CLOUDINARY_PRESET || 'lhhkniqv';
+
+async function rehostVideoOnCloudinary(url) {
+  try {
+    const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/video/upload`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    new URLSearchParams({ file: url, upload_preset: CLD_PRESET }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.secure_url || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Bulk: stream NDJSON progress while fetching CJ images for ALL products,
 // replacing any existing images with fresh ones from CJ.
 router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
@@ -805,7 +826,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     const credential = decryptCredential(rawCred);
 
     const allProducts = await Product.find({ vendor: vendor._id })
-      .select('_id name variants images').lean();
+      .select('_id name variants images videoUrl').lean();
 
     // Target every product that has at least one variant with a SKU — no image-count gate
     const targets = allProducts.filter(p =>
@@ -835,9 +856,19 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
           ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
         };
 
-        // Save up to 5 video URLs
-        const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
-        (result.videos ?? []).slice(0, 5).forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+        // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
+        // re-host each on Cloudinary first. Skip if this product already has a
+        // Cloudinary-hosted video — avoids duplicate uploads on every bulk run.
+        const alreadyHosted = (product.videoUrl || '').includes('res.cloudinary.com');
+        if (!alreadyHosted && result.videos?.length) {
+          const hosted = [];
+          for (const rawUrl of result.videos.slice(0, 5)) {
+            const h = await rehostVideoOnCloudinary(rawUrl);
+            if (h) hosted.push(h);
+          }
+          const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
+          hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+        }
 
         // Sync per-variant image from CJ variantList (stock not available via CJ API)
         let variantsSynced = 0;
