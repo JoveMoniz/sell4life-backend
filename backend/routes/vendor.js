@@ -829,9 +829,30 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
       const result = await cjGetProductImages(vid, product.name, credential);
       if (result?.images?.length) {
-        await Product.findByIdAndUpdate(product._id, { images: result.images });
+        const updateDoc = { images: result.images };
+
+        // Save up to 5 video URLs
+        const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
+        (result.videos ?? []).slice(0, 5).forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+
+        // Sync per-variant stock and image from CJ variantList
+        if (result.cjVariants?.length) {
+          const syncedVariants = (product.variants || []).map(ourV => {
+            const cjV = result.cjVariants.find(cv => cv.vid && cv.vid === ourV.sku);
+            if (!cjV) return ourV;
+            return {
+              ...ourV,
+              stock: typeof cjV.stock === 'number' ? cjV.stock : ourV.stock,
+              ...(cjV.image ? { image: cjV.image } : {}),
+            };
+          });
+          updateDoc.variants = syncedVariants;
+          updateDoc.stock = syncedVariants.reduce((s, v) => s + (v.stock || 0), 0);
+        }
+
+        await Product.findByIdAndUpdate(product._id, updateDoc);
         updated++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length });
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length, videos: (result.videos ?? []).length });
       } else {
         // CJ search failed or returned wrong product — fall back to per-variant images already stored
         const variantImgs = (product.variants || []).map(v => v.image).filter(Boolean);

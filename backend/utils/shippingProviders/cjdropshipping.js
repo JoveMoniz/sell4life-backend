@@ -243,9 +243,31 @@ export async function getProductImages(vid, productName, credential) {
     return { code: data?.code, total: data?.data?.total, first: data?.data?.list?.[0] };
   }
 
-  // Fetch full gallery from the product detail endpoint.
+  // Extract video URLs from a CJ product object
+  function extractVideos(productData) {
+    if (!productData) return [];
+    const raw = productData.productVideo ?? productData.video ?? productData.videoUrl;
+    const parsed = parseCjField(raw);
+    if (Array.isArray(parsed)) return parsed.filter(v => typeof v === 'string' && v.startsWith('http'));
+    if (typeof raw === 'string' && raw.startsWith('http')) return [raw];
+    return [];
+  }
+
+  // Extract CJ variant data for syncing stock/image back to our DB
+  function extractCjVariants(productData) {
+    if (!productData) return [];
+    const list = productData.variantList ?? productData.variants ?? [];
+    return list.map(v => ({
+      vid:   v.vid ?? v.variantSku ?? '',
+      stock: Number(v.variantStock ?? v.variantStockNum ?? v.stock ?? 0),
+      image: v.variantImage ?? v.image ?? '',
+      price: v.variantPrice ?? v.price ?? null,
+    })).filter(v => v.vid);
+  }
+
+  // Fetch full product media (images + videos + variant data) from the detail endpoint.
   // Falls back to /product/query if /product/detail fails.
-  async function detailImages(pid) {
+  async function detailMedia(pid) {
     for (const url of [
       `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
       `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
@@ -253,8 +275,15 @@ export async function getProductImages(vid, productName, credential) {
       await delay(200);
       const resp = await cjFetch(url);
       const data = resp?.ok ? await resp.json() : null;
-      const imgs = data?.code === 200 ? extractImages(data?.data) : null;
-      if (imgs?.length) return imgs;
+      if (data?.code !== 200 || !data?.data) continue;
+      const imgs = extractImages(data.data);
+      if (imgs?.length) {
+        return {
+          images:      imgs,
+          videos:      extractVideos(data.data),
+          cjVariants:  extractCjVariants(data.data),
+        };
+      }
     }
     return null;
   }
@@ -302,23 +331,25 @@ export async function getProductImages(vid, productName, credential) {
     }
 
     if (r.first.pid) {
-      const imgs = await detailImages(r.first.pid);
-      if (imgs?.length) return imgs;
+      const media = await detailMedia(r.first.pid);
+      if (media?.images?.length) return media;
     }
-    return extractImages(r.first); // variantList + productImage fallback
+    // List-level fallback: extract images + variant data (no video available here)
+    const imgs = extractImages(r.first);
+    return imgs?.length ? { images: imgs, videos: [], cjVariants: extractCjVariants(r.first) } : null;
   }
 
   try {
     // Primary: search by productSku (most precise — exact CJ SKU match)
-    const imgs = await searchAndExtract({ productSku: vid });
-    if (imgs?.length) return { images: imgs };
+    const media = await searchAndExtract({ productSku: vid });
+    if (media?.images?.length) return media;
 
-    // Secondary: try the base product ID extracted from the VID (handles "CJXXX-color-size" format)
+    // Secondary: try the base product ID (handles "CJXXX-color-size" format)
     const basePid = vid.includes('-') ? vid.split('-')[0] : null;
     if (basePid) {
       await delay(200);
-      const imgs2 = await searchAndExtract({ productSku: basePid });
-      if (imgs2?.length) return { images: imgs2 };
+      const media2 = await searchAndExtract({ productSku: basePid });
+      if (media2?.images?.length) return media2;
     }
 
     // Last resort: name search, accepted only if result name substantially overlaps ours
@@ -326,14 +357,11 @@ export async function getProductImages(vid, productName, credential) {
       await delay(400);
       const r = await listSearch({ productNameEn: productName });
       if (r.first) {
-        const foundName = r.first.productNameEn ?? '';
-        const ourWords  = productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-        const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
-        const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
-        if (confident) {
-          const imgs3 = r.first.pid ? await detailImages(r.first.pid) : null;
-          const result = imgs3?.length ? imgs3 : extractImages(r.first);
-          if (result?.length) return { images: result };
+        if (nameConfident(r.first.productNameEn, productName, 0.4)) {
+          const media3 = r.first.pid ? await detailMedia(r.first.pid) : null;
+          if (media3?.images?.length) return media3;
+          const imgs = extractImages(r.first);
+          if (imgs?.length) return { images: imgs, videos: [], cjVariants: extractCjVariants(r.first) };
         }
       }
     }
