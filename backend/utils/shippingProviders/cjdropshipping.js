@@ -161,12 +161,33 @@ async function resolveToken(credential) {
 
 // ── Extract image URLs from a CJ product object ───────
 function extractImages(productData) {
-  const set = productData?.productImageSet;
+  if (!productData) return null;
+
+  // Primary: productImageSet array (full gallery)
+  const set = productData.productImageSet;
   if (Array.isArray(set) && set.length) {
-    return set.map(img => img.imageUrl || img.imageThumbnail).filter(Boolean);
+    const imgs = set.map(img => img.imageUrl || img.imageThumbnail || img.url).filter(Boolean);
+    if (imgs.length) return imgs;
   }
+
+  // Other possible array field names
+  for (const key of ['imageList', 'images', 'gallery', 'productImages', 'imageUrlList']) {
+    const arr = productData[key];
+    if (Array.isArray(arr) && arr.length) {
+      const imgs = arr.map(img => typeof img === 'string' ? img : (img.imageUrl || img.url || img.src)).filter(Boolean);
+      if (imgs.length) return imgs;
+    }
+  }
+
+  // Collect unique variant images from variantList
+  const variants = productData.variantList ?? productData.variants;
+  if (Array.isArray(variants) && variants.length) {
+    const imgs = [...new Set(variants.map(v => v.variantImage || v.image || v.imageUrl).filter(Boolean))];
+    if (imgs.length) return imgs;
+  }
+
   // Fallback: single productImage field
-  if (productData?.productImage) return [productData.productImage];
+  if (productData.productImage) return [productData.productImage];
   return null;
 }
 
@@ -193,15 +214,26 @@ export async function getProductImages(vid, productName, credential) {
     return { httpStatus: resp.status, code: data?.code, message: data?.message, total: data?.data?.total, first: data?.data?.list?.[0] };
   }
 
-  // After list search finds the right product, fetch its full detail for all gallery images
+  // After list search finds the right product, fetch full detail for all gallery images.
+  // Tries two endpoint paths; logs available fields so we can see what CJ returns.
   async function detailImages(pid, debugKey) {
-    await delay(300);
-    const resp = await fetch(`${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
-      { headers: { 'CJ-Access-Token': token } });
-    const data = resp.ok ? await resp.json() : null;
-    debug[debugKey] = { httpStatus: resp.status, code: data?.code, message: data?.message, pid };
-    const imgs = data?.code === 200 ? extractImages(data?.data) : null;
-    return imgs;
+    const urls = [
+      `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
+      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+    ];
+    for (const url of urls) {
+      await delay(300);
+      const resp = await fetch(url, { headers: { 'CJ-Access-Token': token } });
+      const data = resp.ok ? await resp.json() : null;
+      const entry = { url, httpStatus: resp.status, code: data?.code, message: data?.message, pid };
+      if (data?.code === 200 && data?.data) {
+        entry.fields = Object.keys(data.data); // log available fields for diagnosis
+      }
+      debug[debugKey] = entry;
+      const imgs = data?.code === 200 ? extractImages(data?.data) : null;
+      if (imgs?.length) return imgs;
+    }
+    return null;
   }
 
   try {
