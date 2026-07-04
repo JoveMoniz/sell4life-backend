@@ -122,7 +122,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
         }
 
         const price = Number(product.price);
-        const shippingCost = Number(product.shippingCost || 0);
+        const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
         const subtotal = Number((price * quantity).toFixed(2));
         return {
           productId: product._id,

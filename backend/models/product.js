@@ -103,6 +103,17 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    shipIncluded: {
+      type: Boolean,
+      default: false,
+    },
+
+    markupPct: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
     /* ==============================
        IMAGES
     ============================== */

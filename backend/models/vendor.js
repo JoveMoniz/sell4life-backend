@@ -139,6 +139,14 @@ const vendorSchema = new mongoose.Schema(
       taxIdValue:   { type: String, default: null },
       confirmedAt:  { type: Date,   default: null },
     },
+
+    // Encrypted supplier API credentials, keyed by providerName.
+    // Values are AES-256-GCM blobs produced by taxInfoCrypto.encrypt().
+    // Never expose raw values in any API response.
+    supplierCredentials: {
+      type:    mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );

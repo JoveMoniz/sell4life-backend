@@ -37,6 +37,10 @@ import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
+
+// Shipping cost providers (registers CJ at import time)
+import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
+import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 
@@ -781,6 +785,204 @@ router.get('/products/:id', authMiddleware, requireApprovedVendor, async (req, r
 });
 
 /* ======================================================
+   CJ PRODUCT IMAGE FETCH
+====================================================== */
+
+// CJ video URLs come from a download-only domain that browsers can't stream.
+// Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
+// Cloudinary fetches the remote URL server-side and returns a playable URL.
+const CLD_CLOUD  = process.env.CLOUDINARY_CLOUD  || 'djpkj0s7w';
+const CLD_PRESET = process.env.CLOUDINARY_PRESET || 'lhhkniqv';
+
+async function rehostVideoOnCloudinary(url) {
+  try {
+    // CJ's download domain 403s without this Referer — must download ourselves
+    // (Cloudinary's remote fetch can't send custom headers).
+    const dl = await fetch(url, { headers: { Referer: 'https://developers.cjdropshipping.com' } });
+    if (!dl.ok) return null;
+    const buf = await dl.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > 90 * 1024 * 1024) return null; // Cloudinary limit safety
+
+    const fd = new FormData();
+    fd.append('file', new Blob([buf], { type: 'video/mp4' }), 'cj-video.mp4');
+    fd.append('upload_preset', CLD_PRESET);
+    const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/video/upload`, {
+      method: 'POST',
+      body:   fd,
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.secure_url || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Full CJ sync for one product: images (replaced), videos (re-hosted on
+// Cloudinary), per-variant images, supplier name + URL. Shared by the bulk
+// route and the single-product sync route so both behave identically.
+// Returns { status: 'skipped'|'updated'|'failed', count?, videos?, variantsSynced?, note?, error? }
+async function syncProductFromCj(product, credential) {
+  const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+  if (!vid) return { status: 'skipped' };
+
+  const result = await cjGetProductImages(vid, product.name, credential);
+
+  if (!result?.images?.length) {
+    // CJ search failed or returned wrong product — fall back to per-variant images already stored
+    const variantImgs = [...new Set((product.variants || []).map(v => v.image).filter(Boolean))];
+    if (variantImgs.length) {
+      await Product.findByIdAndUpdate(product._id, { images: variantImgs });
+      return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback' };
+    }
+    return { status: 'failed', error: result?.error };
+  }
+
+  const updateDoc = {
+    images:   [...new Set(result.images)],
+    supplier: result.supplier ?? 'CJdropshipping',
+    ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
+  };
+
+  // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
+  // re-host each on Cloudinary first. Skip if this product already has a
+  // Cloudinary-hosted video — avoids duplicate uploads on every run.
+  const alreadyHosted = (product.videoUrl || '').includes('res.cloudinary.com');
+  let videosSaved = 0;
+  if (!alreadyHosted && result.videos?.length) {
+    const hosted = [];
+    for (const rawUrl of result.videos.slice(0, 5)) {
+      const h = await rehostVideoOnCloudinary(rawUrl);
+      if (h) hosted.push(h);
+    }
+    const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
+    hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+    videosSaved = hosted.length;
+  }
+
+  // Sync per-variant image from CJ variantList (stock not available via CJ API)
+  let variantsSynced = 0;
+  if (result.cjVariants?.length) {
+    const syncedVariants = (product.variants || []).map(ourV => {
+      const ourSku = (ourV.sku ?? '').trim();
+      const cjV = result.cjVariants.find(cv =>
+        ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
+      );
+      if (!cjV || !cjV.image) return ourV;
+      variantsSynced++;
+      return { ...ourV, image: cjV.image };
+    });
+    if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+  }
+
+  await Product.findByIdAndUpdate(product._id, updateDoc);
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced };
+}
+
+// Bulk: stream NDJSON progress while fetching CJ images for ALL products,
+// replacing any existing images with fresh ones from CJ.
+router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  const vendor = req.vendor;
+  const rawCred = vendor.supplierCredentials?.cjdropshipping;
+  if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+  const send = obj => res.write(JSON.stringify(obj) + '\n');
+
+  try {
+    const credential = decryptCredential(rawCred);
+
+    const allProducts = await Product.find({ vendor: vendor._id })
+      .select('_id name variants images videoUrl').lean();
+
+    // Target every product that has at least one variant with a SKU — no image-count gate
+    const targets = allProducts.filter(p =>
+      (p.variants || []).some(v => v.supplierVariantRef || v.sku)
+    ).slice(0, 500);
+
+    send({ type: 'start', total: targets.length });
+
+    let updated = 0, failed = 0, skipped = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      const product = targets[i];
+      send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
+
+      const r = await syncProductFromCj(product, credential);
+      if (r.status === 'updated') {
+        updated++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.note ? { note: r.note } : {}) });
+      } else if (r.status === 'skipped') {
+        skipped++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
+      } else {
+        failed++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: r.error });
+      }
+    }
+
+    send({ type: 'done', total: targets.length, updated, failed, skipped });
+  } catch (err) {
+    console.error('[bulk-cj-images]', err);
+    send({ type: 'error', message: err.message });
+  }
+  res.end();
+});
+
+// Full CJ sync for a single product — saves images, videos, variant images,
+// supplier name + URL to the DB (same behaviour as one bulk-sync iteration).
+router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
+    const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id }).lean();
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const rawCred = vendor.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+    const credential = decryptCredential(rawCred);
+    const r = await syncProductFromCj(product, credential);
+
+    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ' });
+    if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
+    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, note: r.note || null });
+  } catch (err) {
+    console.error('[cj-sync]', err);
+    return res.status(500).json({ error: 'CJ sync failed' });
+  }
+});
+
+router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const vendor  = req.vendor;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
+    const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+    if (!vid) return res.status(400).json({ error: 'No CJ variant ID found on this product' });
+
+    const rawCred = vendor.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+    const credential = decryptCredential(rawCred);
+    const result = await cjGetProductImages(vid, product.name, credential);
+    if (!result?.images?.length) {
+      return res.status(404).json({ error: result?.error || 'CJ returned no images', debug: result?.debug });
+    }
+
+    return res.json({ images: result.images });
+  } catch (err) {
+    console.error('[cj-images]', err);
+    return res.status(500).json({ error: 'Failed to fetch images from CJ' });
+  }
+});
+
+/* ======================================================
    CSV PRODUCT IMPORT
 ====================================================== */
 
@@ -800,11 +1002,23 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
 
-    const REQUIRED = ['name', 'price'];
-    for (const r of REQUIRED) {
-      if (!headers.includes(r)) {
-        return res.status(400).json({ error: `Missing required column: ${r}` });
-      }
+    // Remap CJ Dropshipping column names to sell4life equivalents
+    const CJ_ALIASES = {
+      'producttitle':        'name',
+      'productbaseprice($)': 'costprice',
+      'shippingfee($)':      'shippingcost',
+      'productimage':        'image1',
+      'specification':       'description',
+    };
+    for (let i = 0; i < headers.length; i++) {
+      if (CJ_ALIASES[headers[i]]) headers[i] = CJ_ALIASES[headers[i]];
+    }
+
+    if (!headers.includes('name')) {
+      return res.status(400).json({ error: 'Missing required column: name (or Product Title for CJ exports)' });
+    }
+    if (!headers.includes('price') && !headers.includes('costprice')) {
+      return res.status(400).json({ error: 'Missing required column: price (or Product Base Price for CJ exports)' });
     }
 
     function parseRow(line) {
@@ -826,6 +1040,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     }
 
     const created = [];
+    const updated = [];
     const skipped = [];
 
     // Parse all data rows, group by product name
@@ -843,30 +1058,36 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
       const firstRow = entries[0].row;
       const name     = col(firstRow, 'name');
 
-      const price = parseFloat(col(firstRow, 'price'));
+      let price = parseFloat(col(firstRow, 'price'));
       if (!Number.isFinite(price) || price < 0) {
-        entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Invalid price' }));
-        continue;
+        // CJ imports have no price column — use costprice as a placeholder;
+        // vendor applies markup via the bulk panel before activating
+        const costFallback = parseFloat(col(firstRow, 'costprice'));
+        if (Number.isFinite(costFallback) && costFallback >= 0) {
+          price = costFallback;
+        } else {
+          entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Invalid price' }));
+          continue;
+        }
       }
 
-      // Collect unique images across all rows
+      // Collect images: product-level images (image2–image20 from first row) first
+      // so images[0] is the main product photo, then variant SKU images (image1 per row)
       const addedImgs = new Set();
       const images = [];
+      const _prodImgKeys = Array.from({ length: 19 }, (_, i) => `image${i + 2}`);
+      _prodImgKeys.forEach(k => {
+        const v = col(entries[0].row, k);
+        if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
+      });
       for (const e of entries) {
-        ['image1', 'image2'].forEach(k => {
-          const v = col(e.row, k);
-          if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
-        });
+        const v = col(e.row, 'image1');
+        if (v && !addedImgs.has(v)) { addedImgs.add(v); images.push(v); }
       }
-
-      const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
-      let slug = baseSlug;
-      let slugCounter = 1;
-      while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
 
       // Build variants when multiple rows share the same product name
       const hasAttrValue = (r) =>
-        col(r, 'variant') || col(r, 'attr1value') || col(r, 'attr2value');
+        col(r, 'variant') || col(r, 'attr1value') || col(r, 'attr2value') || col(r, 'attr3value');
       const makeVariants = entries.length > 1 || entries.some(e => hasAttrValue(e.row));
       const variants = makeVariants ? entries.map(e => {
         const r = e.row;
@@ -881,6 +1102,9 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         const attr2Name  = col(r, 'attr2name');
         const attr2Value = col(r, 'attr2value');
         if (attr2Name && attr2Value) attributes[attr2Name] = attr2Value;
+        const attr3Name  = col(r, 'attr3name');
+        const attr3Value = col(r, 'attr3value');
+        if (attr3Name && attr3Value) attributes[attr3Name] = attr3Value;
 
         return {
           attributes,
@@ -897,39 +1121,193 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         : (parseInt(col(firstRow, 'stock'), 10) || 0);
 
       try {
-        const product = new Product({
-          vendor:       vendor._id,
-          name,
-          slug,
-          description:  col(firstRow, 'description'),
-          price,
-          comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
-          shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
-          stock:        totalStock,
-          trackInventory: totalStock > 0,
-          category:     col(firstRow, 'category').toLowerCase(),
-          subcategory:  col(firstRow, 'subcategory').toLowerCase(),
-          sku:          col(firstRow, 'sku'),
-          images,
-          variants,
-          active: false,
-        });
+        const supplierRef  = col(firstRow, 'suppliervariantref');
+        const supplierName = col(firstRow, 'suppliername');
+        const baseCost     = parseFloat(col(firstRow, 'costprice'));
+        const costPrice    = Number.isFinite(baseCost) ? baseCost : undefined;
+        const rawMarkupPct = parseFloat(col(firstRow, 'markuppct'));
+        const markupPct    = Number.isFinite(rawMarkupPct) && rawMarkupPct >= 0 ? rawMarkupPct : undefined;
+        const shipIncluded = col(firstRow, 'shipincluded') === 'true';
 
-        await product.save();
-        created.push(product._id);
+        // If a product with this name already exists for this vendor, update it in place
+        // (preserving slug, active status) rather than creating a duplicate.
+        // Include deletedAt: null so trashed products are treated as "not found" and
+        // re-imported as new, rather than silently updated while remaining in the trash.
+        const existing = await Product.findOne({ vendor: vendor._id, name, deletedAt: null });
+
+        if (existing) {
+          const updateFields = {
+            price,
+            shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+            stock:        totalStock,
+            trackInventory: totalStock > 0,
+            shipIncluded,
+            ...(Number.isFinite(costPrice)    ? { costPrice }    : {}),
+            ...(markupPct !== undefined        ? { markupPct }    : {}),
+            ...(variants.length                ? { variants }     : {}),
+            ...(images.length                  ? { images }       : {}),
+            ...(col(firstRow, 'description')   ? { description: col(firstRow, 'description') }          : {}),
+            ...(col(firstRow, 'category')      ? { category:    col(firstRow, 'category').toLowerCase() }    : {}),
+            ...(col(firstRow, 'subcategory')   ? { subcategory: col(firstRow, 'subcategory').toLowerCase() } : {}),
+            ...(parseFloat(col(firstRow, 'compareprice')) ? { comparePrice: parseFloat(col(firstRow, 'compareprice')) } : {}),
+            ...(col(firstRow, 'sku')           ? { sku: col(firstRow, 'sku') }         : {}),
+            ...(supplierName                   ? { supplier: supplierName }             : {}),
+            ...(supplierRef                    ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+          };
+          await Product.updateOne({ _id: existing._id }, { $set: updateFields });
+          updated.push(existing._id);
+        } else {
+          const baseSlug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+          let slug = baseSlug;
+          let slugCounter = 1;
+          while (await Product.findOne({ slug })) { slug = `${baseSlug}-${slugCounter++}`; }
+
+          const product = new Product({
+            vendor:       vendor._id,
+            name,
+            slug,
+            description:  col(firstRow, 'description'),
+            price,
+            comparePrice: parseFloat(col(firstRow, 'compareprice')) || undefined,
+            shippingCost: parseFloat(col(firstRow, 'shippingcost')) || 0,
+            costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
+            markupPct,
+            shipIncluded,
+            stock:        totalStock,
+            trackInventory: totalStock > 0,
+            category:     col(firstRow, 'category').toLowerCase(),
+            subcategory:  col(firstRow, 'subcategory').toLowerCase(),
+            sku:          col(firstRow, 'sku'),
+            images,
+            variants,
+            active: false,
+            supplier:     supplierName || undefined,
+            ...(supplierRef ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+          });
+          await product.save();
+          created.push(product._id);
+        }
       } catch (rowErr) {
         entries.forEach(e => skipped.push({ row: e.lineNum, reason: rowErr.message || 'Save failed' }));
       }
     }
 
     res.json({
-      created: created.length,
-      skipped: skipped.length,
+      created:        created.length,
+      updated:        updated.length,
+      skipped:        skipped.length,
       skippedDetails: skipped,
     });
   } catch (err) {
     console.error('CSV IMPORT ERROR:', err);
     res.status(500).json({ error: 'Import failed' });
+  }
+});
+
+/* ======================================================
+   SUPPLIER CREDENTIAL MANAGEMENT
+====================================================== */
+
+// GET /supplier/providers — list all registered providers + configured status
+router.get('/supplier/providers', authMiddleware, requireApprovedVendor, async (req, res) => {
+  const creds = req.vendor.supplierCredentials || {};
+  const providers = listProviders().map(p => ({
+    providerName:     p.providerName,
+    displayName:      p.displayName,
+    credentialSchema: p.credentialSchema || null,
+    configured:       !!(creds[p.providerName]),
+  }));
+  res.json({ providers });
+});
+
+// POST /supplier/credentials — save encrypted credentials for a provider
+// Body: { providerName, token } (single string) OR { providerName, credentials: { key: value, ... } }
+router.post('/supplier/credentials', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  try {
+    const { providerName, token, credentials } = req.body;
+    // credentials = object with multiple fields; token = legacy single string
+    const credValue = credentials ? JSON.stringify(credentials) : token?.trim();
+    if (!providerName || !credValue) {
+      return res.status(400).json({ error: 'providerName and credentials are required' });
+    }
+    if (!getProvider(providerName)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+
+    const vendor = await Vendor.findById(req.vendor._id);
+    const creds  = vendor.supplierCredentials || {};
+    creds[providerName] = encryptCredential(credValue);
+    await Vendor.findByIdAndUpdate(vendor._id, { supplierCredentials: creds });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Supplier credentials save error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /supplier/credentials/:provider — remove credentials for a provider
+router.delete('/supplier/credentials/:provider', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const vendor = await Vendor.findById(req.vendor._id);
+    const creds  = vendor.supplierCredentials || {};
+    delete creds[provider];
+    await Vendor.findByIdAndUpdate(vendor._id, { supplierCredentials: creds });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Supplier credentials delete error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   SUPPLIER SHIPPING COST LOOKUP
+====================================================== */
+
+// POST /supplier/shipping-lookup
+// Body: { items: [{ supplierVariantRef, rowIndex }], destinationCountry, providerName }
+// Returns per-item shipping costs (USD) using the vendor's stored credentials.
+// Results are cached 24 h in the shared registry cache.
+router.post('/supplier/shipping-lookup', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  try {
+    const { items, destinationCountry = 'GB', providerName } = req.body;
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'items array required' });
+    }
+    if (!providerName) {
+      return res.status(400).json({ error: 'providerName required' });
+    }
+
+    const provider = getProvider(providerName);
+    if (!provider) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+
+    const encryptedToken = req.vendor.supplierCredentials?.[providerName];
+    console.log('[shipping-lookup] provider=%s items=%d hasToken=%s firstRef=%s dest=%s',
+      providerName, items.length, !!encryptedToken,
+      items[0]?.supplierVariantRef ?? 'NONE', destinationCountry);
+    if (!encryptedToken) {
+      return res.status(400).json({ error: `${providerName} not configured — save your API token in Store Settings first` });
+    }
+
+    const token = decryptCredential(encryptedToken);
+
+    const results = [];
+    for (const item of items) {
+      const { supplierVariantRef, rowIndex } = item;
+      const result = await provider.getShippingCost(
+        { supplierVariantRef, destinationCountry, quantity: 1 },
+        token
+      );
+      results.push({ rowIndex, supplierVariantRef, result });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error('Shipping lookup error:', err);
+    res.status(500).json({ error: 'Shipping lookup failed' });
   }
 });
 

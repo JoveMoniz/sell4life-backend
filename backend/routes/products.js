@@ -38,7 +38,7 @@ const tierFieldGuard = stripTierFields({
   refurbishmentNotes: 'refurbished',
   videoUrl3:          'refurbished',
   videoUrl4:          'professional',
-  videoUrl5:          'enterprise',
+  videoUrl5:          'professional',
 });
 
 router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (req, res) => {
@@ -306,6 +306,45 @@ router.get('/:id', async (req, res) => {
 });
 
 /* ======================================================
+   BULK EDIT (Professional+)
+   PATCH /products/bulk { ids: [...], price?, stock?, active? }
+====================================================== */
+router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const { ids, price, stock, active, shippingCost, shipIncluded, markupPct } = req.body;
+
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ error: 'Invalid product ID in ids' });
+    }
+
+    const update = {};
+    if (price        !== undefined && price        !== null && Number.isFinite(Number(price)))        update.price        = Number(price);
+    if (stock        !== undefined && stock        !== null && Number.isFinite(Number(stock)))        update.stock        = Math.max(0, Math.round(Number(stock)));
+    if (shippingCost !== undefined && shippingCost !== null && Number.isFinite(Number(shippingCost))) update.shippingCost = Math.max(0, Number(shippingCost));
+    if (shipIncluded !== undefined) update.shipIncluded = !!shipIncluded;
+    if (markupPct    !== undefined && markupPct    !== null && Number.isFinite(Number(markupPct)) && Number(markupPct) >= 0) update.markupPct = Number(markupPct);
+    if (active !== undefined) update.active = !!active;
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'Nothing to update' });
+    }
+
+    const result = await Product.updateMany(
+      { _id: { $in: ids }, vendor: req.vendor._id },
+      { $set: update }
+    );
+
+    res.json({ success: true, updated: result.modifiedCount });
+  } catch (err) {
+    console.error('Bulk edit error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    UPDATE PRODUCT
 ====================================================== */
 
@@ -362,12 +401,19 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'price',
       'comparePrice',
       'costPrice',
+      'markupPct',
       'images',
       'stock',
+      'sku',
+      'trackInventory',
+      'allowBackorder',
+      'weight',
+      'dimensions',
       'category',
       'subcategory',
       'tags',
       'shippingCost',
+      'shipIncluded',
       'variants',
       'addOns',
       'videoUrl',
@@ -383,6 +429,13 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'freeReturns',
       'supplier',
       'supplierUrl',
+      'seoTitle',
+      'seoDescription',
+      'conditionGrade',
+      'testedStatus',
+      'warrantyPeriod',
+      'serialNumber',
+      'refurbishmentNotes',
     ];
 
     allowedFields.forEach((field) => {
@@ -400,42 +453,6 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     res.status(500).json({
       error: 'Failed to update product',
     });
-  }
-});
-
-/* ======================================================
-   BULK EDIT (Professional+)
-   PATCH /products/bulk { ids: [...], price?, stock?, active? }
-====================================================== */
-router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
-  try {
-    const { ids, price, stock, active } = req.body;
-
-    if (!Array.isArray(ids) || !ids.length) {
-      return res.status(400).json({ error: 'ids array required' });
-    }
-    if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
-      return res.status(400).json({ error: 'Invalid product ID in ids' });
-    }
-
-    const update = {};
-    if (price  !== undefined && price  !== null && Number.isFinite(Number(price)))  update.price  = Number(price);
-    if (stock  !== undefined && stock  !== null && Number.isFinite(Number(stock)))  update.stock  = Math.max(0, Math.round(Number(stock)));
-    if (active !== undefined) update.active = !!active;
-
-    if (!Object.keys(update).length) {
-      return res.status(400).json({ error: 'Nothing to update' });
-    }
-
-    const result = await Product.updateMany(
-      { _id: { $in: ids }, vendor: req.vendor._id },
-      { $set: update }
-    );
-
-    res.json({ success: true, updated: result.modifiedCount });
-  } catch (err) {
-    console.error('Bulk edit error:', err);
-    res.status(500).json({ error: 'Server error' });
   }
 });
 
