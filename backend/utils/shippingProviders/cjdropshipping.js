@@ -213,115 +213,97 @@ function extractImages(productData) {
   return null;
 }
 
-// ── Fetch full product image set — three approaches ──
-// A: variant query (POST) → official pid → product list search by pid
-// B: extract base pid from VID (prefix before first '-') → product list search by pid
-// C: name search ONLY if top result name substantially overlaps our name
+// ── Fetch full product image set from CJ ─────────────
+// Strategy: productSku list search → product/detail for gallery → variantList fallback
+// Retries automatically on 429 (rate limit) and 5xx transient errors.
 export async function getProductImages(vid, productName, credential) {
   const token = await resolveToken(credential);
   if (!token) return { error: 'Could not obtain CJ access token — check credentials in Store Settings' };
 
-  const debug = {};
-  // CJ VIDs often embed the product ID as the prefix before the first '-'
-  // e.g. "CJYD20248570B-red-M" → basePid = "CJYD20248570B"
-  const basePid = vid.includes('-') ? vid.split('-')[0] : vid;
-  debug.input = { vid, basePid, productName };
-
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
-  async function listSearch(params) {
-    const resp = await fetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, ...params })}`,
-      { headers: { 'CJ-Access-Token': token } });
-    const data = resp.ok ? await resp.json() : null;
-    return { httpStatus: resp.status, code: data?.code, message: data?.message, total: data?.data?.total, first: data?.data?.list?.[0] };
+  // Fetch with retry on 429 / 5xx (exponential back-off)
+  async function cjFetch(url, opts = {}, maxRetries = 2) {
+    const headers = { 'CJ-Access-Token': token, ...opts.headers };
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) await delay(1200 * attempt); // 1.2 s, 2.4 s
+      try {
+        const resp = await fetch(url, { ...opts, headers });
+        if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) continue;
+        return resp;
+      } catch (err) {
+        if (attempt === maxRetries) throw err;
+      }
+    }
   }
 
-  // After list search finds the right product, fetch full detail for all gallery images.
-  // Tries two endpoint paths; logs available fields so we can see what CJ returns.
-  async function detailImages(pid, debugKey) {
-    const attempts = [
-      // GET variants
-      { method: 'GET', url: `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}` },
-      { method: 'GET', url: `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}` },
-      // POST variant — body format CJ uses for other POST endpoints
-      { method: 'POST', url: `${CJ_BASE}/product/query`, body: { pid } },
-      { method: 'POST', url: `${CJ_BASE}/product/detail`, body: { pid } },
-    ];
-    debug[debugKey] = [];
-    for (const { method, url, body } of attempts) {
-      await delay(300);
-      const opts = { method, headers: { 'CJ-Access-Token': token } };
-      if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-      const resp = await fetch(url, opts);
-      const data = resp.ok ? await resp.json() : null;
-      const entry = { method, url, httpStatus: resp.status, code: data?.code, message: data?.message };
-      if (data?.code === 200 && data?.data) entry.fields = Object.keys(data.data);
-      debug[debugKey].push(entry);
+  async function listSearch(params) {
+    const resp = await cjFetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, ...params })}`);
+    const data = resp?.ok ? await resp.json() : null;
+    return { code: data?.code, total: data?.data?.total, first: data?.data?.list?.[0] };
+  }
+
+  // Fetch full gallery from the product detail endpoint.
+  // Falls back to /product/query if /product/detail fails.
+  async function detailImages(pid) {
+    for (const url of [
+      `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
+      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+    ]) {
+      await delay(200);
+      const resp = await cjFetch(url);
+      const data = resp?.ok ? await resp.json() : null;
       const imgs = data?.code === 200 ? extractImages(data?.data) : null;
       if (imgs?.length) return imgs;
     }
     return null;
   }
 
+  // Try list search with the given params; if found, attempt detail then fall back
+  // to whatever images the list result already carries (variantList etc.)
+  async function searchAndExtract(params) {
+    const r = await listSearch(params);
+    if (!r.first) return null;
+    if (r.first.pid) {
+      const imgs = await detailImages(r.first.pid);
+      if (imgs?.length) return imgs;
+    }
+    return extractImages(r.first); // variantList + productImage fallback
+  }
+
   try {
-    // Approach A: variant query (GET) → official pid → product detail
-    const varResp = await fetch(`${CJ_BASE}/product/variant/query?vid=${encodeURIComponent(vid)}`,
-      { headers: { 'CJ-Access-Token': token } });
-    const varData = varResp.ok ? await varResp.json() : null;
-    debug.variantQuery = { httpStatus: varResp.status, code: varData?.code, message: varData?.message };
-    const officialPid = varData?.code === 200 ? (varData?.data?.productId ?? varData?.data?.pid) : null;
+    // Primary: search by productSku (most precise — exact CJ SKU match)
+    const imgs = await searchAndExtract({ productSku: vid });
+    if (imgs?.length) return { images: imgs };
 
-    if (officialPid) {
-      const imgs = await detailImages(officialPid, 'detailOfficial');
-      if (imgs?.length) return { images: imgs };
+    // Secondary: try the base product ID extracted from the VID (handles "CJXXX-color-size" format)
+    const basePid = vid.includes('-') ? vid.split('-')[0] : null;
+    if (basePid) {
+      await delay(200);
+      const imgs2 = await searchAndExtract({ productSku: basePid });
+      if (imgs2?.length) return { images: imgs2 };
     }
 
-    // Approach B1: search list by productSku → use returned pid for detail
-    await delay(300);
-    const rSku = await listSearch({ productSku: vid });
-    const skuFirst = rSku.first;
-    debug.skuSearch = { ...rSku, foundName: skuFirst?.productNameEn, foundPid: skuFirst?.pid };
-    if (skuFirst?.pid) {
-      const imgs = await detailImages(skuFirst.pid, 'detailFromSku');
-      if (imgs?.length) return { images: imgs };
-      // fall back to whatever the list result itself has
-      const fallback = extractImages(skuFirst);
-      if (fallback?.length) return { images: fallback };
-    }
-
-    // Approach B2: search list by productId (basePid) → detail
-    if (basePid !== vid) {
-      await delay(300);
-      const r = await listSearch({ productId: basePid });
-      debug.pidSearchBase = { ...r, pid: basePid, foundName: r.first?.productNameEn };
-      if (r.first?.pid) {
-        const imgs = await detailImages(r.first.pid, 'detailFromPid');
-        if (imgs?.length) return { images: imgs };
-        const fallback = extractImages(r.first);
-        if (fallback?.length) return { images: fallback };
-      }
-    }
-
-    // Approach C: name search — only accept if found name shares enough words with ours
+    // Last resort: name search, accepted only if result name substantially overlaps ours
     if (productName) {
-      await delay(500);
+      await delay(400);
       const r = await listSearch({ productNameEn: productName });
-      const foundName = r.first?.productNameEn ?? '';
-      const ourWords  = productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
-      const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
-      debug.nameSearch = { ...r, foundName, overlap, confident };
-      if (confident && r.first?.pid) {
-        const imgs = await detailImages(r.first.pid, 'detailFromName');
-        if (imgs?.length) return { images: imgs };
-        const fallback = extractImages(r.first);
-        if (fallback?.length) return { images: fallback };
+      if (r.first) {
+        const foundName = r.first.productNameEn ?? '';
+        const ourWords  = productName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
+        const confident = ourWords.length > 0 && overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
+        if (confident) {
+          const imgs3 = r.first.pid ? await detailImages(r.first.pid) : null;
+          const result = imgs3?.length ? imgs3 : extractImages(r.first);
+          if (result?.length) return { images: result };
+        }
       }
     }
 
-    return { error: 'No images found', debug };
+    return { error: 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating' };
   } catch (err) {
     console.error('[cjdropshipping] getProductImages error:', err.message);
-    return { error: err.message };
+    return { error: `CJ API error: ${err.message}` };
   }
 }
