@@ -266,6 +266,27 @@ export async function getProductImages(vid, productName, credential) {
     })).filter(v => v.vid || v.variantSku);
   }
 
+  // Videos live behind a dedicated endpoint (POST /product/queryVideosByProductId) —
+  // the productVideo field on /product/detail is empty unless requested separately.
+  // Response uses code:0 + success:true (unlike the other endpoints' code:200).
+  async function fetchVideosByPid(pid) {
+    try {
+      await delay(200);
+      const resp = await cjFetch(`${CJ_BASE}/product/queryVideosByProductId`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Referer': 'https://developers.cjdropshipping.com' },
+        body:    JSON.stringify({ productId: pid }),
+      });
+      const data = resp?.ok ? await resp.json() : null;
+      if (!data || (data.code !== 0 && data.code !== 200) || !Array.isArray(data.data)) return [];
+      return data.data
+        .map(v => v.videoUrl)
+        .filter(u => typeof u === 'string' && u.startsWith('http'));
+    } catch (_) {
+      return [];
+    }
+  }
+
   // Fetch full product media (images + videos + variant data) from the detail endpoint.
   // Falls back to /product/query if /product/detail fails.
   async function detailMedia(pid) {
@@ -281,9 +302,10 @@ export async function getProductImages(vid, productName, credential) {
       if (imgs?.length) {
         const productUrl = data.data.productUrl
           || (pid ? `https://app.cjdropshipping.com/product-detail.html?id=${pid}` : '');
+        const apiVideos = await fetchVideosByPid(pid);
         return {
           images:      imgs,
-          videos:      extractVideos(data.data),
+          videos:      [...new Set([...apiVideos, ...extractVideos(data.data)])],
           cjVariants:  extractCjVariants(data.data),
           supplier:    'CJdropshipping',
           supplierUrl: productUrl,
