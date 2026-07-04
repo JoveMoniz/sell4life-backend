@@ -264,6 +264,22 @@ export async function getProductImages(vid, productName, credential) {
   async function searchAndExtract(params) {
     const r = await listSearch(params);
     if (!r.first) return null;
+
+    // When searching by productSku, reject results where none of the returned
+    // variants' vids match our search term — CJ does partial matching and can
+    // return a completely different product (e.g. a shirt when we want a bag).
+    if (params.productSku) {
+      const needle = params.productSku.toLowerCase();
+      const variants = r.first.variantList ?? [];
+      if (variants.length > 0) {
+        const matched = variants.some(v => {
+          const vVid = (v.vid ?? v.variantSku ?? '').toLowerCase();
+          return vVid && (vVid === needle || vVid.startsWith(needle) || needle.startsWith(vVid));
+        });
+        if (!matched) return null; // wrong product returned by CJ
+      }
+    }
+
     if (r.first.pid) {
       const imgs = await detailImages(r.first.pid);
       if (imgs?.length) return imgs;

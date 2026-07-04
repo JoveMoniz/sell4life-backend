@@ -833,8 +833,16 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         updated++;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length });
       } else {
-        failed++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: result?.error });
+        // CJ search failed or returned wrong product — fall back to per-variant images already stored
+        const variantImgs = (product.variants || []).map(v => v.variantImage).filter(Boolean);
+        if (variantImgs.length) {
+          await Product.findByIdAndUpdate(product._id, { images: variantImgs });
+          updated++;
+          send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: variantImgs.length, note: 'variant-fallback' });
+        } else {
+          failed++;
+          send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: result?.error });
+        }
       }
     }
 
