@@ -217,19 +217,24 @@ export async function getProductImages(vid, productName, credential) {
   // After list search finds the right product, fetch full detail for all gallery images.
   // Tries two endpoint paths; logs available fields so we can see what CJ returns.
   async function detailImages(pid, debugKey) {
-    const urls = [
-      `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
-      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+    const attempts = [
+      // GET variants
+      { method: 'GET', url: `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}` },
+      { method: 'GET', url: `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}` },
+      // POST variant — body format CJ uses for other POST endpoints
+      { method: 'POST', url: `${CJ_BASE}/product/query`, body: { pid } },
+      { method: 'POST', url: `${CJ_BASE}/product/detail`, body: { pid } },
     ];
-    for (const url of urls) {
+    debug[debugKey] = [];
+    for (const { method, url, body } of attempts) {
       await delay(300);
-      const resp = await fetch(url, { headers: { 'CJ-Access-Token': token } });
+      const opts = { method, headers: { 'CJ-Access-Token': token } };
+      if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+      const resp = await fetch(url, opts);
       const data = resp.ok ? await resp.json() : null;
-      const entry = { url, httpStatus: resp.status, code: data?.code, message: data?.message, pid };
-      if (data?.code === 200 && data?.data) {
-        entry.fields = Object.keys(data.data); // log available fields for diagnosis
-      }
-      debug[debugKey] = entry;
+      const entry = { method, url, httpStatus: resp.status, code: data?.code, message: data?.message };
+      if (data?.code === 200 && data?.data) entry.fields = Object.keys(data.data);
+      debug[debugKey].push(entry);
       const imgs = data?.code === 200 ? extractImages(data?.data) : null;
       if (imgs?.length) return imgs;
     }
@@ -252,12 +257,18 @@ export async function getProductImages(vid, productName, credential) {
     // Approach B1: search list by productSku → use returned pid for detail
     await delay(300);
     const rSku = await listSearch({ productSku: vid });
-    debug.skuSearch = { ...rSku, foundName: rSku.first?.productNameEn, foundPid: rSku.first?.pid };
-    if (rSku.first?.pid) {
-      const imgs = await detailImages(rSku.first.pid, 'detailFromSku');
+    const skuFirst = rSku.first;
+    debug.skuSearch = {
+      ...rSku,
+      foundName: skuFirst?.productNameEn,
+      foundPid:  skuFirst?.pid,
+      firstKeys: Object.keys(skuFirst || {}),  // shows all fields CJ returns in list
+    };
+    if (skuFirst?.pid) {
+      const imgs = await detailImages(skuFirst.pid, 'detailFromSku');
       if (imgs?.length) return { images: imgs };
-      // fall back to the single image the list search returned
-      const fallback = extractImages(rSku.first);
+      // fall back to whatever the list result itself has
+      const fallback = extractImages(skuFirst);
       if (fallback?.length) return { images: fallback };
     }
 
