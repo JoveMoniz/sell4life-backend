@@ -259,25 +259,42 @@ export async function getProductImages(vid, productName, credential) {
     return null;
   }
 
+  // Word-overlap confidence between two product names (reused for both searches)
+  function nameConfident(foundName, ourName) {
+    if (!ourName || !foundName) return false;
+    const ourWords  = ourName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    if (!ourWords.length) return false;
+    const overlap   = ourWords.filter(w => foundName.toLowerCase().includes(w)).length;
+    return overlap >= Math.max(1, Math.round(ourWords.length * 0.4));
+  }
+
   // Try list search with the given params; if found, attempt detail then fall back
   // to whatever images the list result already carries (variantList etc.)
+  // For productSku searches, validates the result is the right product via:
+  //   1. variant vid match (if variantList is present)
+  //   2. product name overlap (fallback when variantList is empty)
   async function searchAndExtract(params) {
     const r = await listSearch(params);
     if (!r.first) return null;
 
-    // When searching by productSku, reject results where none of the returned
-    // variants' vids match our search term — CJ does partial matching and can
-    // return a completely different product (e.g. a shirt when we want a bag).
     if (params.productSku) {
-      const needle = params.productSku.toLowerCase();
+      const needle   = params.productSku.toLowerCase();
       const variants = r.first.variantList ?? [];
+      let confirmed  = false;
+
       if (variants.length > 0) {
-        const matched = variants.some(v => {
+        confirmed = variants.some(v => {
           const vVid = (v.vid ?? v.variantSku ?? '').toLowerCase();
           return vVid && (vVid === needle || vVid.startsWith(needle) || needle.startsWith(vVid));
         });
-        if (!matched) return null; // wrong product returned by CJ
       }
+
+      // Variant list was empty or none matched — fall back to name similarity
+      if (!confirmed) {
+        confirmed = nameConfident(r.first.productNameEn, productName);
+      }
+
+      if (!confirmed) return null; // wrong product, reject
     }
 
     if (r.first.pid) {
