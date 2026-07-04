@@ -856,9 +856,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
             };
           });
           updateDoc.variants = syncedVariants;
-          // Only recalculate total stock if we actually matched CJ variants —
-          // otherwise summing zero-stocked CSV variants would wipe the product stock.
-          if (variantsSynced > 0) {
+          // Only recalculate total stock if matched variants have real stock data
+          // (CJ returns inventoryNum=null for many products — don't zero out stock then)
+          const hasRealStock = result.cjVariants.some(cv => cv.stock > 0);
+          if (variantsSynced > 0 && hasRealStock) {
             updateDoc.stock = syncedVariants.reduce((s, v) => s + (v.stock || 0), 0);
           }
         }

@@ -283,8 +283,11 @@ export async function getProductImages(vid, productName, credential) {
       const d = data.data;
       const videoKeys = Object.keys(d).filter(k => /video/i.test(k));
       const firstVariant = (d.variantList ?? d.variants ?? [])[0];
-      console.log('[cj-debug] pid=%s videoKeys=%j videoValue=%j firstVariantSku=%s inventoryNum=%s',
-        pid, videoKeys, d.productVideo, firstVariant?.variantSku ?? firstVariant?.vid ?? '?', firstVariant?.inventoryNum);
+      console.log('[cj-debug] pid=%s videoValue=%j firstVariantSku=%s inventoryNum=%s combineNum=%s inventories=%j',
+        pid, d.productVideo,
+        firstVariant?.variantSku ?? firstVariant?.vid ?? '?',
+        firstVariant?.inventoryNum, firstVariant?.combineNum,
+        firstVariant?.inventories?.[0]);
       const imgs = extractImages(data.data);
       if (imgs?.length) {
         const productUrl = data.data.productUrl
