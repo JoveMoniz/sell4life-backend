@@ -840,12 +840,14 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         (result.videos ?? []).slice(0, 5).forEach((url, i) => { updateDoc[videoFields[i]] = url; });
 
         // Sync per-variant stock and image from CJ variantList
+        let variantsSynced = 0;
         if (result.cjVariants?.length) {
           const syncedVariants = (product.variants || []).map(ourV => {
             const cjV = result.cjVariants.find(cv =>
               ourV.sku && (cv.variantSku === ourV.sku || cv.vid === ourV.sku)
             );
             if (!cjV) return ourV;
+            variantsSynced++;
             return {
               ...ourV,
               stock: typeof cjV.stock === 'number' ? cjV.stock : ourV.stock,
@@ -858,9 +860,6 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
         await Product.findByIdAndUpdate(product._id, updateDoc);
         updated++;
-        const variantsSynced = result.cjVariants?.length
-          ? syncedVariants.filter((v, idx) => v !== product.variants[idx]).length
-          : 0;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length, videos: (result.videos ?? []).length, variantsSynced });
       } else {
         // CJ search failed or returned wrong product — fall back to per-variant images already stored
