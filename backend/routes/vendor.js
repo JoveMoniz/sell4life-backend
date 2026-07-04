@@ -820,7 +820,7 @@ async function rehostVideoOnCloudinary(url) {
 
 // Bulk: stream NDJSON progress while fetching CJ images for ALL products,
 // replacing any existing images with fresh ones from CJ.
-router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
+router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   const vendor = req.vendor;
   const rawCred = vendor.supplierCredentials?.cjdropshipping;
   if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
@@ -919,7 +919,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
   res.end();
 });
 
-router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, async (req, res) => {
+router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   try {
     const vendor  = req.vendor;
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
