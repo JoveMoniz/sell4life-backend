@@ -818,6 +818,67 @@ async function rehostVideoOnCloudinary(url) {
   }
 }
 
+// Full CJ sync for one product: images (replaced), videos (re-hosted on
+// Cloudinary), per-variant images, supplier name + URL. Shared by the bulk
+// route and the single-product sync route so both behave identically.
+// Returns { status: 'skipped'|'updated'|'failed', count?, videos?, variantsSynced?, note?, error? }
+async function syncProductFromCj(product, credential) {
+  const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+  if (!vid) return { status: 'skipped' };
+
+  const result = await cjGetProductImages(vid, product.name, credential);
+
+  if (!result?.images?.length) {
+    // CJ search failed or returned wrong product — fall back to per-variant images already stored
+    const variantImgs = (product.variants || []).map(v => v.image).filter(Boolean);
+    if (variantImgs.length) {
+      await Product.findByIdAndUpdate(product._id, { images: variantImgs });
+      return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback' };
+    }
+    return { status: 'failed', error: result?.error };
+  }
+
+  const updateDoc = {
+    images:   result.images,
+    supplier: result.supplier ?? 'CJdropshipping',
+    ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
+  };
+
+  // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
+  // re-host each on Cloudinary first. Skip if this product already has a
+  // Cloudinary-hosted video — avoids duplicate uploads on every run.
+  const alreadyHosted = (product.videoUrl || '').includes('res.cloudinary.com');
+  let videosSaved = 0;
+  if (!alreadyHosted && result.videos?.length) {
+    const hosted = [];
+    for (const rawUrl of result.videos.slice(0, 5)) {
+      const h = await rehostVideoOnCloudinary(rawUrl);
+      if (h) hosted.push(h);
+    }
+    const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
+    hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+    videosSaved = hosted.length;
+  }
+
+  // Sync per-variant image from CJ variantList (stock not available via CJ API)
+  let variantsSynced = 0;
+  if (result.cjVariants?.length) {
+    const syncedVariants = (product.variants || []).map(ourV => {
+      const ourSku = (ourV.sku ?? '').trim();
+      const cjV = result.cjVariants.find(cv =>
+        ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
+      );
+      if (!cjV || !cjV.image) return ourV;
+      variantsSynced++;
+      return { ...ourV, image: cjV.image };
+    });
+    if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+  }
+
+  await Product.findByIdAndUpdate(product._id, updateDoc);
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced };
+}
+
 // Bulk: stream NDJSON progress while fetching CJ images for ALL products,
 // replacing any existing images with fresh ones from CJ.
 router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
@@ -848,66 +909,18 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
     for (let i = 0; i < targets.length; i++) {
       const product = targets[i];
-      const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
-      if (!vid) {
-        skipped++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
-        continue;
-      }
-
       send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
 
-      const result = await cjGetProductImages(vid, product.name, credential);
-      if (result?.images?.length) {
-        const updateDoc = {
-          images:   result.images,
-          supplier: result.supplier ?? 'CJdropshipping',
-          ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
-        };
-
-        // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
-        // re-host each on Cloudinary first. Skip if this product already has a
-        // Cloudinary-hosted video — avoids duplicate uploads on every bulk run.
-        const alreadyHosted = (product.videoUrl || '').includes('res.cloudinary.com');
-        if (!alreadyHosted && result.videos?.length) {
-          const hosted = [];
-          for (const rawUrl of result.videos.slice(0, 5)) {
-            const h = await rehostVideoOnCloudinary(rawUrl);
-            if (h) hosted.push(h);
-          }
-          const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
-          hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
-        }
-
-        // Sync per-variant image from CJ variantList (stock not available via CJ API)
-        let variantsSynced = 0;
-        if (result.cjVariants?.length) {
-          const syncedVariants = (product.variants || []).map(ourV => {
-            const ourSku = (ourV.sku ?? '').trim();
-            const cjV = result.cjVariants.find(cv =>
-              ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
-            );
-            if (!cjV || !cjV.image) return ourV;
-            variantsSynced++;
-            return { ...ourV, image: cjV.image };
-          });
-          if (variantsSynced > 0) updateDoc.variants = syncedVariants;
-        }
-
-        await Product.findByIdAndUpdate(product._id, updateDoc);
+      const r = await syncProductFromCj(product, credential);
+      if (r.status === 'updated') {
         updated++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: result.images.length, videos: (result.videos ?? []).length, variantsSynced });
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.note ? { note: r.note } : {}) });
+      } else if (r.status === 'skipped') {
+        skipped++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
       } else {
-        // CJ search failed or returned wrong product — fall back to per-variant images already stored
-        const variantImgs = (product.variants || []).map(v => v.image).filter(Boolean);
-        if (variantImgs.length) {
-          await Product.findByIdAndUpdate(product._id, { images: variantImgs });
-          updated++;
-          send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: variantImgs.length, note: 'variant-fallback' });
-        } else {
-          failed++;
-          send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: result?.error });
-        }
+        failed++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: r.error });
       }
     }
 
@@ -917,6 +930,30 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     send({ type: 'error', message: err.message });
   }
   res.end();
+});
+
+// Full CJ sync for a single product — saves images, videos, variant images,
+// supplier name + URL to the DB (same behaviour as one bulk-sync iteration).
+router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
+    const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id }).lean();
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const rawCred = vendor.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+    const credential = decryptCredential(rawCred);
+    const r = await syncProductFromCj(product, credential);
+
+    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ' });
+    if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
+    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, note: r.note || null });
+  } catch (err) {
+    console.error('[cj-sync]', err);
+    return res.status(500).json({ error: 'CJ sync failed' });
+  }
 });
 
 router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
