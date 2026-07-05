@@ -898,7 +898,11 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
   res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('Cache-Control', 'no-cache');
   res.flushHeaders();
-  const send = obj => res.write(JSON.stringify(obj) + '\n');
+
+  // Stop processing if the client disconnects (Cancel button / closed tab)
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
+  const send = obj => { if (!clientGone && !res.writableEnded) res.write(JSON.stringify(obj) + '\n'); };
 
   try {
     const credential = decryptCredential(rawCred);
@@ -918,6 +922,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     let updated = 0, failed = 0, skipped = 0;
 
     for (let i = 0; i < targets.length; i++) {
+      if (clientGone) {
+        console.log('[bulk-cj-images] client disconnected — stopping at %d/%d', i, targets.length);
+        break;
+      }
       const product = targets[i];
       send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
 
