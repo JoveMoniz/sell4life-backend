@@ -818,15 +818,27 @@ async function rehostVideoOnCloudinary(url) {
   }
 }
 
+// Extract a CJ product id from a pasted CJ product URL — supports
+// app.cjdropshipping.com/product-detail.html?id=<pid> and
+// cjdropshipping.com/product/...-p-<pid>.html formats.
+function cjPidFromUrl(url) {
+  if (!url || !/cjdropshipping\.com/i.test(String(url))) return null;
+  const m = String(url).match(/[?&]id=([\w-]+)/) || String(url).match(/-p-(\w+)\.html/i);
+  return m ? m[1] : null;
+}
+
 // Full CJ sync for one product: images (replaced), videos (re-hosted on
 // Cloudinary), per-variant images, supplier name + URL. Shared by the bulk
 // route and the single-product sync route so both behave identically.
+// When the vendor has saved a CJ link in supplierUrl, that product is fetched
+// directly (no fuzzy search) — the manual override for wrong matches.
 // Returns { status: 'skipped'|'updated'|'failed', count?, videos?, variantsSynced?, note?, error? }
 async function syncProductFromCj(product, credential) {
+  const pidOverride = cjPidFromUrl(product.supplierUrl);
   const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
-  if (!vid) return { status: 'skipped' };
+  if (!vid && !pidOverride) return { status: 'skipped' };
 
-  const result = await cjGetProductImages(vid, product.name, credential);
+  const result = await cjGetProductImages(vid, product.name, credential, pidOverride);
 
   if (!result?.images?.length) {
     // CJ search failed or returned wrong product — fall back to per-variant images already stored
@@ -847,19 +859,25 @@ async function syncProductFromCj(product, credential) {
   // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
   // re-host each on Cloudinary first. Skip if this product already has a
   // Cloudinary-hosted video — avoids duplicate uploads on every run.
+  // Exception: with a pinned supplierUrl the previous videos may belong to a
+  // wrongly-matched product, so replace them outright (clearing unused slots).
   // videosSaved reports what the product HAS (kept ones count too), not just new uploads.
   const videoFields = ['videoUrl', 'videoUrl2', 'videoUrl3', 'videoUrl4', 'videoUrl5'];
   const alreadyHosted = (product.videoUrl || '').includes('res.cloudinary.com');
   let videosSaved = 0;
-  if (alreadyHosted) {
+  if (alreadyHosted && !pidOverride) {
     videosSaved = videoFields.filter(f => (product[f] || '').trim()).length;
-  } else if (result.videos?.length) {
+  } else if (result.videos?.length || pidOverride) {
     const hosted = [];
-    for (const rawUrl of result.videos.slice(0, 5)) {
+    for (const rawUrl of (result.videos || []).slice(0, 5)) {
       const h = await rehostVideoOnCloudinary(rawUrl);
       if (h) hosted.push(h);
     }
-    hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+    if (pidOverride) {
+      videoFields.forEach((f, i) => { updateDoc[f] = hosted[i] || ''; });
+    } else {
+      hosted.forEach((url, i) => { updateDoc[videoFields[i]] = url; });
+    }
     videosSaved = hosted.length;
   }
 
@@ -910,7 +928,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     const query = { vendor: vendor._id };
     if (requestedIds.length) query._id = { $in: requestedIds };
     const allProducts = await Product.find(query)
-      .select('_id name variants images videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5').lean();
+      .select('_id name variants images supplierUrl videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5').lean();
 
     // Target every product that has at least one variant with a SKU — no image-count gate
     const targets = allProducts.filter(p =>

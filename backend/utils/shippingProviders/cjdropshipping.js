@@ -214,9 +214,10 @@ function extractImages(productData) {
 }
 
 // ── Fetch full product image set from CJ ─────────────
-// Strategy: productSku list search → product/detail for gallery → variantList fallback
+// Strategy: pidOverride (vendor-pasted CJ URL — exact, no search) →
+// productSku list search → product/detail for gallery → variantList fallback.
 // Retries automatically on 429 (rate limit) and 5xx transient errors.
-export async function getProductImages(vid, productName, credential) {
+export async function getProductImages(vid, productName, credential, pidOverride = null) {
   const token = await resolveToken(credential);
   if (!token) return { error: 'Could not obtain CJ access token — check credentials in Store Settings' };
 
@@ -378,6 +379,14 @@ export async function getProductImages(vid, productName, credential) {
   }
 
   try {
+    // Vendor-pinned product: supplierUrl carried an explicit CJ pid — fetch it
+    // directly, no fuzzy search. This is the manual fix for wrong matches.
+    if (pidOverride) {
+      const pinned = await detailMedia(pidOverride);
+      if (pinned?.images?.length) return pinned;
+      return { error: 'Could not fetch the CJ product from the Supplier Product URL — check the link' };
+    }
+
     // Primary: search by productSku (most precise — exact CJ SKU match)
     const media = await searchAndExtract({ productSku: vid });
     if (media?.images?.length) return media;
