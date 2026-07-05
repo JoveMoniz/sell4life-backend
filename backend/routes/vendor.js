@@ -40,7 +40,7 @@ import { mailOrderShipped } from '../utils/email.js';
 
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
-import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
+import cjProvider, { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 
@@ -881,23 +881,42 @@ async function syncProductFromCj(product, credential) {
     videosSaved = hosted.length;
   }
 
-  // Sync per-variant image from CJ variantList (stock not available via CJ API)
+  // Sync per-variant image + CJ vid from CJ variantList (stock not available via CJ API).
+  // The vid is CJ's internal variant id — needed for live freight quotes.
   let variantsSynced = 0;
+  let firstCjVid = '';
   if (result.cjVariants?.length) {
     const syncedVariants = (product.variants || []).map(ourV => {
       const ourSku = (ourV.sku ?? '').trim();
       const cjV = result.cjVariants.find(cv =>
         ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
       );
-      if (!cjV || !cjV.image) return ourV;
+      if (!cjV) return ourV;
+      if (!firstCjVid && cjV.vid) firstCjVid = cjV.vid;
       variantsSynced++;
-      return { ...ourV, image: cjV.image };
+      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid };
     });
     if (variantsSynced > 0) updateDoc.variants = syncedVariants;
   }
 
+  // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
+  // "variant not found"). Only overwrite shippingCost when a quote succeeds —
+  // otherwise the existing (weight-estimated) value stays.
+  let shippingGbp = null;
+  if (firstCjVid) {
+    const usdGbp = Number(process.env.CJ_USD_GBP_RATE) || 0.79;
+    const quote = await cjProvider.getShippingCost(
+      { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1 },
+      credential
+    );
+    if (quote && Number.isFinite(Number(quote.cost))) {
+      shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
+      updateDoc.shippingCost = shippingGbp;
+    }
+  }
+
   await Product.findByIdAndUpdate(product._id, updateDoc);
-  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced };
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, shipping: shippingGbp };
 }
 
 // Bulk: stream NDJSON progress while syncing products from CJ.
@@ -950,7 +969,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       const r = await syncProductFromCj(product, credential);
       if (r.status === 'updated') {
         updated++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.note ? { note: r.note } : {}) });
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.shipping != null ? { shipping: r.shipping } : {}), ...(r.note ? { note: r.note } : {}) });
       } else if (r.status === 'skipped') {
         skipped++;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
@@ -985,7 +1004,7 @@ router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requ
 
     if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ' });
     if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
-    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, note: r.note || null });
+    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, shipping: r.shipping ?? null, note: r.note || null });
   } catch (err) {
     console.error('[cj-sync]', err);
     return res.status(500).json({ error: 'CJ sync failed' });
