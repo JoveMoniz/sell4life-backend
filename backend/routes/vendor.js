@@ -767,10 +767,18 @@ router.get('/stripe/status', authMiddleware, requireApprovedVendor, async (req, 
   }
 });
 
+const STRIPE_CONNECT_ALLOWED_ORIGINS = [
+  'https://sell4life.com',
+  'https://staging.sell4life.com',
+];
+
 router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
-    const base = `https://${process.env.FRONTEND_URL || 'sell4life.com'}`;
+    const requestedOrigin = req.body?.origin;
+    const base = STRIPE_CONNECT_ALLOWED_ORIGINS.includes(requestedOrigin)
+      ? requestedOrigin
+      : 'https://sell4life.com';
 
     let accountId = vendor.stripeAccountId;
     if (!accountId) {
