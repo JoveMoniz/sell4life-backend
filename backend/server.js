@@ -23,6 +23,7 @@ import cookieParser from 'cookie-parser';
 // ROUTES
 // ======================================================
 import { startRefundWorker } from './jobs/refundWorker.js';
+import { startVendorPayoutWorker } from './jobs/vendorPayoutWorker.js';
 import authRoute from './routes/auth.js';
 import vendorRoutes from './routes/vendor.js';
 import ordersRoute from './routes/orders.js';
@@ -160,7 +161,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260707a';
+const APP_VERSION = '20260707b';
 
 // ======================================================
 // VERSION ENDPOINT
@@ -280,4 +281,5 @@ mongoose
     // ======================================================
 
     startRefundWorker();
+    startVendorPayoutWorker();
   });
