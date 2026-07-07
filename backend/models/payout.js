@@ -10,6 +10,7 @@ const payoutSchema = new mongoose.Schema({
   reference:   String,
   note:        String,
   processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  stripeTransferId: { type: String, default: '' },
 }, { timestamps: true });
 
 export default mongoose.model('Payout', payoutSchema);

@@ -465,6 +465,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
       }
     }
+    /* ======================================================
+       CONNECTED ACCOUNT UPDATED (vendor payout status)
+    ====================================================== */
+    if (event.type === 'account.updated') {
+      const account = event.data.object;
+      const vendor = await Vendor.findOne({ stripeAccountId: account.id });
+
+      if (vendor) {
+        const payoutEnabled = !!account.payouts_enabled;
+        if (vendor.payoutEnabled !== payoutEnabled) {
+          vendor.payoutEnabled = payoutEnabled;
+          await vendor.save();
+          console.log(`🏦 Vendor ${vendor._id} payoutEnabled -> ${payoutEnabled}`);
+        }
+      }
+    }
   } catch (err) {
     console.error('❌ Webhook error:', err);
     return res.status(500).json({ error: 'Webhook failed' });

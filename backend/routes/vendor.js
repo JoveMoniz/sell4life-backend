@@ -37,6 +37,7 @@ import Payout from '../models/payout.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
+import stripe from '../config/stripe.js';
 
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
@@ -727,6 +728,76 @@ router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (re
   } catch (err) {
     console.error('Payout request error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   STRIPE CONNECT (VENDOR PAYOUT ACCOUNT)
+   Vendor onboards a Stripe Express account and adds their
+   own bank account directly with Stripe — we never see or
+   store the bank details. Approved payouts are then sent
+   via stripe.transfers.create() to this account.
+====================================================== */
+
+router.get('/stripe/status', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+
+    if (!vendor.stripeAccountId) {
+      return res.json({ connected: false, payoutEnabled: false });
+    }
+
+    const account = await stripe.accounts.retrieve(vendor.stripeAccountId);
+    const payoutEnabled = !!account.payouts_enabled;
+
+    if (payoutEnabled !== vendor.payoutEnabled) {
+      vendor.payoutEnabled = payoutEnabled;
+      await vendor.save();
+    }
+
+    res.json({
+      connected: true,
+      payoutEnabled,
+      detailsSubmitted: !!account.details_submitted,
+      requirementsDue: account.requirements?.currently_due || [],
+    });
+  } catch (err) {
+    console.error('Stripe status error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    const base = `https://${process.env.FRONTEND_URL || 'sell4life.com'}`;
+
+    let accountId = vendor.stripeAccountId;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'GB',
+        email: req.user.email,
+        capabilities: { transfers: { requested: true } },
+        business_type: 'individual',
+        metadata: { vendorId: String(vendor._id) },
+      });
+      accountId = account.id;
+      vendor.stripeAccountId = accountId;
+      await vendor.save();
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${base}/account/vendor/settings.html?stripe=refresh`,
+      return_url: `${base}/account/vendor/settings.html?stripe=return`,
+      type: 'account_onboarding',
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err) {
+    console.error('Stripe connect error:', err);
+    res.status(500).json({ error: err.message || 'Could not start Stripe onboarding' });
   }
 });
 

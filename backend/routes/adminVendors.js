@@ -892,7 +892,7 @@ router.get('/payouts', async (req, res) => {
     const payouts = await Payout.find(filter)
       .populate({
         path: 'vendorId',
-        select: 'storeName storeSlug',
+        select: 'storeName storeSlug stripeAccountId payoutEnabled',
         populate: { path: 'userId', select: 'email' },
       })
       .sort({ requestedAt: -1 })
@@ -917,19 +917,48 @@ router.patch('/payouts/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid payout ID' });
     }
 
-    const update = { status, processedBy: req.user._id };
-    if (note) update.note = note;
-    if (status === 'paid') {
-      update.paidAt = new Date();
-      if (reference) update.reference = reference;
-    }
-
-    const payout = await Payout.findByIdAndUpdate(id, update, { new: true }).populate({
+    const payout = await Payout.findById(id).populate({
       path: 'vendorId',
-      select: 'storeName userId',
+      select: 'storeName userId stripeAccountId payoutEnabled',
       populate: { path: 'userId', select: 'email' },
     });
     if (!payout) return res.status(404).json({ error: 'Payout not found' });
+    if (payout.status !== 'requested') {
+      return res.status(400).json({ error: 'Payout has already been processed' });
+    }
+
+    let finalReference = reference;
+
+    // If the vendor has a verified Stripe Connect account, move the money for
+    // real via a Stripe transfer instead of relying on a manual bank transfer.
+    if (status === 'paid') {
+      const vendor = payout.vendorId;
+      if (vendor?.stripeAccountId && vendor.payoutEnabled) {
+        try {
+          const transfer = await stripe.transfers.create({
+            amount: Math.round(Number(payout.amount) * 100),
+            currency: 'gbp',
+            destination: vendor.stripeAccountId,
+            description: `Sell4Life payout ${payout._id}`,
+            metadata: { payoutId: String(payout._id), vendorId: String(vendor._id) },
+          });
+          payout.stripeTransferId = transfer.id;
+          finalReference = finalReference || transfer.id;
+        } catch (transferErr) {
+          console.error('Stripe transfer error:', transferErr);
+          return res.status(502).json({ error: `Stripe transfer failed: ${transferErr.message}` });
+        }
+      }
+    }
+
+    payout.status = status;
+    payout.processedBy = req.user._id;
+    if (note) payout.note = note;
+    if (status === 'paid') {
+      payout.paidAt = new Date();
+      if (finalReference) payout.reference = finalReference;
+    }
+    await payout.save();
 
     if (status === 'paid') {
       const vendorEmail = payout.vendorId?.userId?.email;
