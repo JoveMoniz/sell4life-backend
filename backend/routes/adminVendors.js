@@ -2,6 +2,7 @@ import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 import { computeVendorBalance } from '../utils/vendorBalance.js';
 import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
+import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -971,6 +972,57 @@ router.patch('/payouts/:id', async (req, res) => {
     res.json({ success: true, payout });
   } catch (err) {
     console.error('Admin payout update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   MANUALLY RUN THE AUTO-PAYOUT WORKER
+   Runs the same eligibility-gated logic as the scheduled
+   6-hourly job, on demand — useful for testing and for not
+   waiting on the next tick when you know a payout just cleared.
+====================================================== */
+router.post('/payouts/run-worker', async (req, res) => {
+  try {
+    const summary = await processAutoPayouts();
+    res.json({ success: true, ...summary });
+  } catch (err) {
+    console.error('Manual payout worker run error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   TEST-ONLY — backdate a delivered item so it immediately
+   clears the hold/reserve window, to exercise the payout
+   worker without waiting weeks. Hard-blocked outside Stripe
+   test mode so it can never touch a real live order.
+====================================================== */
+router.post('/payouts/debug-backdate-delivery', async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+    return res.status(403).json({ error: 'Only available in Stripe test mode' });
+  }
+  try {
+    const { orderId, itemId, daysAgo } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid orderId/itemId' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const backdatedDate = new Date(Date.now() - Number(daysAgo || 100) * 24 * 60 * 60 * 1000);
+    item.status = 'Delivered';
+    item.deliveredAt = backdatedDate;
+    order.markModified('items');
+    await order.save();
+
+    res.json({ success: true, itemId, deliveredAt: backdatedDate });
+  } catch (err) {
+    console.error('Backdate delivery debug error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
