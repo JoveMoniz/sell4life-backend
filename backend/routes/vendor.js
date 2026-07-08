@@ -465,6 +465,11 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
       const netAmountForShipping = itemsTotal - orderRefundTotal;
       if (isPaid && netAmountForShipping > 0) totalShipping += orderShipping;
 
+      // Reserve only actually starts once an item is Delivered — used to
+      // gate the reserve preview row so it doesn't show a "releases at 90
+      // days" countdown for money whose hold hasn't even started yet.
+      const allDelivered = activeItems.length > 0 && activeItems.every(i => i.status === 'Delivered');
+
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
         const netAmount = itemsTotal - orderRefundTotal;
@@ -483,6 +488,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             commission,
             commissionRate: COMMISSION_RATE,
             reserveRate:    RESERVE_RATE,
+            allDelivered,
             vatAmount,
             shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
@@ -518,6 +524,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             commission,
             commissionRate: COMMISSION_RATE,
             reserveRate:    RESERVE_RATE,
+            allDelivered,
             vatAmount,
             shippingAmount: Number(orderShipping.toFixed(2)),
             stripeFee:   vendorStripeFee,
