@@ -289,6 +289,41 @@ router.get('/:id/debug-cj-eligibility', authMiddleware, adminMiddleware, async (
 });
 
 /* ======================================================
+   CORRECT STALE ITEM SHIPPING COST (ADMIN)
+   One-off data-correction tool for orders placed before the
+   shipIncluded webhook fix, where item.shippingCost was
+   incorrectly stamped non-zero even though nothing was actually
+   charged for shipping. Logged for audit purposes.
+====================================================== */
+router.patch('/:id/items/:itemId/correct-shipping-cost', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    const { shippingCost } = req.body;
+    if (!Number.isFinite(Number(shippingCost)) || Number(shippingCost) < 0) {
+      return res.status(400).json({ error: 'Invalid shippingCost' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const before = item.shippingCost;
+    item.shippingCost = Number(shippingCost);
+    order.markModified('items');
+    await order.save();
+
+    console.log(`[admin] Corrected shippingCost on order ${order._id} item ${item._id}: ${before} -> ${item.shippingCost} (by ${req.user._id})`);
+    res.json({ success: true, itemId: item._id, before, after: item.shippingCost });
+  } catch (err) {
+    console.error('Correct shipping cost error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    UPDATE ORDER STATUS (ADMIN)
 ====================================================== */
 router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
