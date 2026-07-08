@@ -677,7 +677,7 @@ router.post('/:id/items/:itemId/goodwill-refund', authMiddleware, adminMiddlewar
     const item = findOrderItem(order, itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
 
-    if (!['paid', 'partially_refunded'].includes(order.paymentStatus)) {
+    if (!['paid', 'partially_refunded', 'refunded'].includes(order.paymentStatus)) {
       return res.status(400).json({ error: 'Only paid orders can be refunded' });
     }
     if (['requested', 'processing', 'scheduled'].includes(item.refundStatus)) {

@@ -1988,7 +1988,7 @@ router.post('/orders/:id/items/:itemId/goodwill-refund', authMiddleware, require
       return res.status(403).json({ error: 'Not your item' });
     }
 
-    if (!['paid', 'partially_refunded'].includes(order.paymentStatus)) {
+    if (!['paid', 'partially_refunded', 'refunded'].includes(order.paymentStatus)) {
       return res.status(400).json({ error: 'Only paid orders can be refunded' });
     }
     if (['requested', 'processing', 'scheduled'].includes(item.refundStatus)) {
