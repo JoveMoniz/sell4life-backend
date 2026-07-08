@@ -97,7 +97,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           throw new Error('Invalid quantity');
         }
         const price = Number(product.price);
-        const shippingCost = Number(product.shippingCost || 0);
+        // Must match the same check used when the PaymentIntent amount was
+        // calculated (orders.js) — otherwise a shipIncluded product ends up
+        // with a non-zero shippingCost stamped on the order even though
+        // nothing was actually charged for shipping.
+        const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
         const subtotal = price * quantity;
 
         // Resolve free-returns: product-level override wins, else the vendor's store default
