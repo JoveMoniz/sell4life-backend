@@ -459,8 +459,11 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           ? activeItems.reduce((s, i) => s + Number(i.quantity || 1), 0)
           : null;
 
-      // Shipping is always kept by vendor — count it for all paid orders regardless of tab or returns
-      if (isPaid) totalShipping += orderShipping;
+      // Shipping is only actually kept when the order still retains real
+      // value after refunds — a fully cancelled/refunded order returns
+      // everything (shipping included), so it shouldn't count here either.
+      const netAmountForShipping = itemsTotal - orderRefundTotal;
+      if (isPaid && netAmountForShipping > 0) totalShipping += orderShipping;
 
       if (type === 'sales') {
         // Sales tab: one entry per order showing net cash retained
