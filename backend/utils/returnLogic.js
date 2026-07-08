@@ -348,7 +348,9 @@ export function calculateItemRefundAmount(item, quantity) {
   const itemSubtotal = price * qty;
 
   const tax = Number(item.taxAmount || 0);
-  const shipping = Number(item.shippingAmount || 0);
+  // item.shippingAmount is a separate, never-populated field (always 0) —
+  // item.shippingCost is what's actually set at order-creation time.
+  const shipping = Number(item.shippingCost || 0);
   const discount = Number(item.discountAmount || 0);
   const platformFee = Number(item.platformFeeAmount || 0);
 

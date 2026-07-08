@@ -1991,11 +1991,22 @@ router.post('/orders/:id/items/:itemId/goodwill-refund', authMiddleware, require
     if (!['paid', 'partially_refunded'].includes(order.paymentStatus)) {
       return res.status(400).json({ error: 'Only paid orders can be refunded' });
     }
-    if (['requested', 'processing', 'processed', 'scheduled'].includes(item.refundStatus)) {
-      return res.status(400).json({ error: 'A refund is already requested, scheduled, or processed for this item' });
+    if (['requested', 'processing', 'scheduled'].includes(item.refundStatus)) {
+      return res.status(400).json({ error: 'A refund is already requested or scheduled for this item' });
     }
 
-    const maxRefundable = calculateItemRefundAmount(item, item.quantity).total - Number(item.refundedAmount || 0);
+    // A previous refund being 'processed' doesn't mean nothing's left —
+    // e.g. a return with shipping withheld leaves that shipping amount
+    // still legitimately refundable via goodwill. Deliberately NOT using
+    // calculateItemRefundAmount() here — it excludes withheld postage by
+    // design for standard returns, but goodwill exists specifically to
+    // allow releasing that withheld amount as an exception.
+    const maxRefundable = Math.max(0,
+      Number(item.price || 0) * Number(item.quantity || 0)
+      + Number(item.shippingCost || 0)
+      - Number(item.discountAmount || 0)
+      - Number(item.refundedAmount || 0)
+    );
     const refundAmount = Number(amount);
 
     if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
