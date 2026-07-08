@@ -239,6 +239,56 @@ router.get('/:id', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 /* ======================================================
+   DEBUG — WHY DIDN'T CJ AUTO-ORDER FIRE FOR THIS ORDER?
+   Read-only diagnostic: reports, per item, whether it qualified
+   for CJ auto-order and if not, exactly which condition failed.
+====================================================== */
+router.get('/:id/debug-cj-eligibility', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const Product = (await import('../models/product.js')).default;
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const hasShippingAddress = !!order.shippingAddress?.address1;
+
+    const results = [];
+    for (const item of order.items) {
+      const vendor = await Vendor.findById(item.vendorId).select('type storeName supplierCredentials').lean();
+      const product = await Product.findById(item.productId).select('variants').lean();
+      const variants = product?.variants || [];
+      const matched = variants.find(v => v.sku && item.variantSku && v.sku.trim() === item.variantSku.trim());
+      const vid = matched?.cjVid || variants.find(v => v.cjVid)?.cjVid;
+
+      results.push({
+        itemId: item._id,
+        name: item.name,
+        vendorStoreName: vendor?.storeName || null,
+        vendorType: vendor?.type || null,
+        isProfessional: vendor?.type === 'professional',
+        hasCjCredentials: !!vendor?.supplierCredentials?.cjdropshipping,
+        variantSkuOnItem: item.variantSku || '(none)',
+        variantCount: variants.length,
+        variantsWithCjVid: variants.filter(v => v.cjVid).length,
+        resolvedVid: vid || null,
+        cjOrderId: item.cjOrderId || null,
+        cjOrderStatus: item.cjOrderStatus || null,
+        cjOrderError: item.cjOrderError || null,
+        wouldQualify: !!(vendor?.type === 'professional' && vendor?.supplierCredentials?.cjdropshipping && vid),
+      });
+    }
+
+    res.json({ hasShippingAddress, shippingAddress: order.shippingAddress || null, items: results });
+  } catch (err) {
+    console.error('CJ eligibility debug error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    UPDATE ORDER STATUS (ADMIN)
 ====================================================== */
 router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
