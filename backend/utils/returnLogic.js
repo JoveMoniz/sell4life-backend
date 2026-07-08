@@ -29,7 +29,14 @@ export function findVendorItems(order, vendorId) {
 // RETURN REQUEST VALIDATION
 // ======================================================
 
-export function validateReturnRequest(order, item, quantity) {
+// Change-of-mind returns must be requested within this many days of delivery
+// (matches the 14-day window advertised on the product/returns/FAQ pages).
+// Faulty/damaged/wrong/misdescribed items are exempt — those are a statutory
+// consumer-rights matter, not the distance-selling cooling-off period, and
+// have no fixed cutoff here.
+export const CHANGE_OF_MIND_RETURN_DAYS = 14;
+
+export function validateReturnRequest(order, item, quantity, reasonCategory) {
   if (!order) {
     return { ok: false, error: 'Order not found' };
   }
@@ -44,6 +51,17 @@ export function validateReturnRequest(order, item, quantity) {
 
   if (item.status !== 'Delivered') {
     return { ok: false, error: 'Item can only be returned after delivery' };
+  }
+
+  if (reasonCategory === 'change_of_mind') {
+    const deliveredAt = item.deliveredAt ? new Date(item.deliveredAt) : new Date(order.createdAt || 0);
+    const daysSinceDelivery = (Date.now() - deliveredAt.getTime()) / (24 * 60 * 60 * 1000);
+    if (daysSinceDelivery > CHANGE_OF_MIND_RETURN_DAYS) {
+      return {
+        ok: false,
+        error: `Change-of-mind returns must be requested within ${CHANGE_OF_MIND_RETURN_DAYS} days of delivery. If the item is faulty, damaged, or not as described, please select that reason instead.`,
+      };
+    }
   }
 
   const requestedQty = Number(quantity);

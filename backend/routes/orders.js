@@ -391,7 +391,7 @@ router.post('/:id/items/:itemId/return-request', authMiddleware, async (req, res
       });
     }
 
-    const check = validateReturnRequest(order, item, quantity);
+    const check = validateReturnRequest(order, item, quantity, reasonCategory);
 
     if (!check.ok) {
       return res.status(400).json({ error: check.error });
