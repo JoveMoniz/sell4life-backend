@@ -401,9 +401,18 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
           const moneyMoved = refundType !== 'return_pending';
           if (moneyMoved) orderRefundTotal += refundAmount;
 
-          // Shipping is non-refundable — vendor keeps it on full returns
+          // Shipping is only non-refundable for change-of-mind returns where
+          // the vendor/product doesn't offer free returns — matches the real
+          // refund math in returnLogic.js's calculateItemRefundAmount().
+          // Cancellations and faulty/damaged/wrong returns always refund
+          // shipping in full, so shippingKept must be 0 for those.
           const isFullReturn = refundQty >= Number(item.quantity || 0);
-          const shippingKept = (moneyMoved && isFullReturn)
+          const isChangeOfMindNoFreeReturns = refundType === 'returned'
+            && item.returnReasonCategory === 'change_of_mind'
+            && !item.freeReturns;
+          const shippingKept = (moneyMoved && isFullReturn && isChangeOfMindNoFreeReturns)
+            ? Number(item.shippingCost || 0) : 0;
+          const shippingRefunded = (moneyMoved && isFullReturn && !isChangeOfMindNoFreeReturns)
             ? Number(item.shippingCost || 0) : 0;
 
           refundEntries.push({
@@ -418,6 +427,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             qty:         refundQty,
             amount:      -refundAmount,
             shippingKept,
+            shippingRefunded,
             pending:     !moneyMoved,
           });
         }
