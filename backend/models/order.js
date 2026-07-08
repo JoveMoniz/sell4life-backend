@@ -48,6 +48,16 @@ const orderItemSchema = new mongoose.Schema({
   supplier: { type: String, default: '' },
   supplierUrl: { type: String, default: '' },
 
+  // CJ auto-order — created automatically (unpaid) when the buyer pays, so
+  // the vendor just has to go pay for it in the CJ dashboard rather than
+  // re-entering the order by hand. cjOrderStatus 'failed' means creation
+  // didn't succeed and the vendor needs to place it manually as before.
+  cjOrderId: { type: String, default: '' },
+  cjOrderNumber: { type: String, default: '' },
+  cjOrderStatus: { type: String, default: '' },
+  cjOrderError: { type: String, default: '' },
+  cjOrderCreatedAt: Date,
+
   taxAmount: { type: Number, default: 0, min: 0 },
   shippingAmount: { type: Number, default: 0, min: 0 },
   discountAmount: { type: Number, default: 0, min: 0 },

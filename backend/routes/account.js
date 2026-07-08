@@ -41,7 +41,7 @@ router.get('/me', async (req, res) => {
   try {
     const user = await getUser(req, res);
     if (!user) return;
-    res.json({ name: user.name, email: user.email });
+    res.json({ name: user.name, email: user.email, defaultShippingAddress: user.defaultShippingAddress || null });
   } catch (err) {
     console.error('Account GET error:', err);
     res.status(500).json({ error: 'Server error' });

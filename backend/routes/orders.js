@@ -159,6 +159,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           normalizedItems.map((item) => ({
             productId: String(item.productId),
             quantity: item.quantity,
+            variantSku: item.variantSku || '',
           }))
         ),
       },
@@ -166,6 +167,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
 
     res.json({
       clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
       shipping: shippingAmount,
     });
   } catch (err) {
@@ -173,6 +175,58 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
     res.status(500).json({
       error: err.message || 'Payment error',
     });
+  }
+});
+
+/* ======================================================
+   SET SHIPPING ADDRESS ON AN IN-PROGRESS PAYMENT INTENT
+   Called from checkout right before confirming payment, so the
+   webhook has a real delivery address to snapshot onto the order.
+====================================================== */
+
+router.post('/shipping-address', authMiddleware, async (req, res) => {
+  try {
+    const { paymentIntentId, name, phone, address1, address2, city, county, postcode, country, saveAsDefault } = req.body;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Missing paymentIntentId' });
+    }
+    if (!name || !address1 || !city || !postcode) {
+      return res.status(400).json({ error: 'Please fill in name, address, city and postcode' });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!paymentIntent || paymentIntent.metadata?.userId !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    const address = {
+      name: String(name).trim(),
+      phone: String(phone || '').trim(),
+      address1: String(address1).trim(),
+      address2: String(address2 || '').trim(),
+      city: String(city).trim(),
+      county: String(county || '').trim(),
+      postcode: String(postcode).trim(),
+      // Platform is UK-only for now (shipping quotes, HMRC reporting, CJ
+      // freight all assume GB) — store the real ISO code regardless of
+      // whatever the free-text country field on checkout says.
+      country: 'GB',
+    };
+
+    await stripe.paymentIntents.update(paymentIntentId, {
+      metadata: { shippingAddress: JSON.stringify(address) },
+    });
+
+    if (saveAsDefault) {
+      const User = (await import('../models/user.js')).default;
+      await User.findByIdAndUpdate(req.user._id, { defaultShippingAddress: address });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('SHIPPING ADDRESS ERROR:', err);
+    res.status(500).json({ error: 'Could not save shipping address' });
   }
 });
 

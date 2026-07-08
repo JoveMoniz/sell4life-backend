@@ -8,6 +8,8 @@ import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
 import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
+import cjProvider from '../utils/shippingProviders/cjdropshipping.js';
+import { decryptCredential } from '../utils/shippingProviders/registry.js';
 
 const router = express.Router();
 
@@ -114,6 +116,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         items.push({
           productId: product._id,
           vendorId: product.vendor,
+          variantSku: raw.variantSku || '',
           name: product.name || 'Unknown Product',
           price,
           quantity,
@@ -188,6 +191,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       const orderSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
       const orderShipping = Number(paymentIntent.metadata.shipping || 0);
 
+      let shippingAddress;
+      try {
+        shippingAddress = paymentIntent.metadata.shippingAddress
+          ? JSON.parse(paymentIntent.metadata.shippingAddress)
+          : undefined;
+      } catch (_) {
+        shippingAddress = undefined;
+      }
+
       const order = await Order.create({
         user: userId,
         items,
@@ -198,6 +210,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         status: 'Pending',
         paymentStatus: 'paid',
         paymentIntentId: paymentIntent.id,
+        shippingAddress,
         statusHistory: [],
       });
 
@@ -235,6 +248,69 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
       })();
 
+      // Auto-create matching orders on CJ (unpaid — payType "3") for any
+      // CJ-sourced item belonging to a professional vendor with CJ
+      // credentials connected. Never blocks order confirmation — failures
+      // are recorded on the item so the vendor can place it manually.
+      (async () => {
+        if (!shippingAddress) return;
+        try {
+          const vendorCache = {};
+          let changed = false;
+
+          for (const item of order.items) {
+            try {
+              const vendorIdStr = String(item.vendorId);
+              if (!(vendorIdStr in vendorCache)) {
+                vendorCache[vendorIdStr] = await Vendor.findById(item.vendorId).lean();
+              }
+              const vendor = vendorCache[vendorIdStr];
+              if (!vendor || vendor.type !== 'professional') continue;
+
+              const rawCred = vendor.supplierCredentials?.cjdropshipping;
+              if (!rawCred) continue;
+
+              const product = await Product.findById(item.productId).select('variants').lean();
+              const variants = product?.variants || [];
+              const matched = variants.find(v => v.sku && item.variantSku && v.sku.trim() === item.variantSku.trim());
+              const vid = matched?.cjVid || variants.find(v => v.cjVid)?.cjVid;
+              if (!vid) continue; // not a CJ-sourced item
+
+              const credential = decryptCredential(rawCred);
+              const result = await cjProvider.createOrder({
+                orderNumber: `${order.shortId || order._id}-${item._id}`,
+                vid,
+                quantity: item.quantity,
+                destinationCountry: shippingAddress.country || 'GB',
+                address: shippingAddress,
+              }, credential);
+
+              if (result?.error) {
+                item.cjOrderStatus = 'failed';
+                item.cjOrderError = result.error;
+                console.warn(`[cj-auto-order] failed for item ${item._id}:`, result.error);
+              } else {
+                item.cjOrderId = result.orderId || '';
+                item.cjOrderNumber = result.orderNumber || '';
+                item.cjOrderStatus = result.status || 'CREATED';
+                item.cjOrderCreatedAt = new Date();
+                console.log(`[cj-auto-order] created for item ${item._id}: ${result.orderId}`);
+              }
+              changed = true;
+            } catch (itemErr) {
+              console.warn('[cj-auto-order] item error:', itemErr.message);
+            }
+          }
+
+          if (changed) {
+            order.markModified('items');
+            await order.save();
+          }
+        } catch (err) {
+          console.warn('[cj-auto-order] failed:', err.message);
+        }
+      })();
+
       // Fire emails (non-blocking)
       (async () => {
         try {
@@ -248,7 +324,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
               items: items.map(i => ({ name: i.name, qty: i.quantity, price: i.subtotal })),
               total: order.total,
-              shippingAddress: paymentIntent.metadata.shippingAddress || '',
+              shippingAddress: shippingAddress
+                ? [shippingAddress.name, shippingAddress.address1, shippingAddress.address2, shippingAddress.city, shippingAddress.county, shippingAddress.postcode]
+                    .filter(Boolean).join(', ')
+                : '',
             });
             console.log('[email] Buyer confirmation sent to:', buyer.email);
           }

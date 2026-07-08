@@ -45,16 +45,20 @@ async function getAccessToken(email, apiKey) {
   return _accessToken;
 }
 
-async function throttledFetch(token, body) {
+async function throttledPost(url, token, body, extraHeaders = {}) {
   const gap = _lastCall + RATE_LIMIT_MS - Date.now();
   if (gap > 0) await new Promise(r => setTimeout(r, gap));
   _lastCall = Date.now();
 
-  return fetch(CJ_FREIGHT_URL, {
+  return fetch(url, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token },
+    headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': token, ...extraHeaders },
     body:    JSON.stringify(body),
   });
+}
+
+async function throttledFetch(token, body) {
+  return throttledPost(CJ_FREIGHT_URL, token, body);
 }
 
 const cjProvider = {
@@ -143,6 +147,82 @@ const cjProvider = {
       // Network / parse error — don't cache, allow retry on next request
       console.error('[cjdropshipping] freight lookup failed:', err.message);
       return null;
+    }
+  },
+
+  // Auto-creates the matching order on CJ's side when a buyer pays — unpaid
+  // (payType "3"), so the vendor just has to go pay for it in the CJ
+  // dashboard instead of re-entering it by hand.
+  // input: { orderNumber, vid, quantity, destinationCountry, address: { name, phone, address1, address2, city, county, postcode } }
+  // Returns: { orderId, orderNumber, status } | { error }
+  async createOrder(input, credential) {
+    const { orderNumber, vid, quantity = 1, destinationCountry = 'GB', address } = input;
+    if (!orderNumber || !vid || !address) return { error: 'Missing orderNumber, vid, or address' };
+
+    const accessToken = await resolveToken(credential);
+    if (!accessToken) return { error: 'Could not obtain CJ access token' };
+
+    // Need a valid logisticName for this destination — reuse the same
+    // cheapest-option lookup used for the shipping quote.
+    let logisticName;
+    try {
+      const freightResp = await throttledFetch(accessToken, {
+        startCountryCode: 'CN',
+        endCountryCode:   destinationCountry,
+        products:         [{ vid, quantity }],
+      });
+      const freightData = await freightResp.json().catch(() => ({}));
+      const options = freightData?.data;
+      if (Array.isArray(options) && options.length) {
+        const cheapest = options.reduce((a, b) =>
+          (a.logisticPrice ?? Infinity) <= (b.logisticPrice ?? Infinity) ? a : b
+        );
+        logisticName = cheapest.logisticName;
+      }
+    } catch (err) {
+      console.warn('[cjdropshipping] logistics lookup for order failed:', err.message);
+    }
+    if (!logisticName) return { error: 'No shipping option available for this destination' };
+
+    const body = {
+      orderNumber,
+      payType: '3', // create only — no payment initiated, paid manually in CJ dashboard
+      platform: 'Api',
+      fromCountryCode: 'CN',
+      logisticName,
+      shippingCountryCode: destinationCountry,
+      shippingCountry:     address.country || 'United Kingdom',
+      shippingProvince:    address.county || address.city || '',
+      shippingCity:        address.city || '',
+      shippingCustomerName: address.name || '',
+      shippingAddress:      address.address1 || '',
+      shippingAddress2:     address.address2 || '',
+      shippingPhone:        address.phone || '',
+      shippingZip:          address.postcode || '',
+      products: [{ vid, quantity }],
+    };
+
+    try {
+      const resp = await throttledPost(
+        `${CJ_BASE}/shopping/order/createOrderV2`,
+        accessToken,
+        body,
+        { platformToken: accessToken }
+      );
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || data?.code !== 200 || !data?.data) {
+        return { error: data?.message || `CJ order creation failed (HTTP ${resp.status})` };
+      }
+
+      return {
+        orderId:     data.data.orderId,
+        orderNumber: data.data.orderNumber,
+        status:      data.data.orderStatus || 'CREATED',
+      };
+    } catch (err) {
+      console.error('[cjdropshipping] createOrder failed:', err.message);
+      return { error: err.message };
     }
   },
 };
