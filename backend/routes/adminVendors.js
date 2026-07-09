@@ -2,6 +2,7 @@ import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 import { computeVendorBalance } from '../utils/vendorBalance.js';
 import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
+import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 
 import express from 'express';
@@ -499,7 +500,7 @@ router.get('/:id/transactions', async (req, res) => {
       if (type === 'sales') {
         const netAmount = itemsTotal - orderRefundTotal;
         if (isPaid && netAmount > 0) {
-          const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+          const commission = commissionAfterRefund(itemsTotal * COMMISSION_RATE, itemsTotal, orderRefundTotal);
           const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
           transactions.push({
             date: order.createdAt, orderId: order._id, displayId,
@@ -528,7 +529,7 @@ router.get('/:id/transactions', async (req, res) => {
 
           const netAmount = Math.max(0, itemsTotal - orderRefundTotal);
           if (netAmount > 0) {
-            const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+            const commission = commissionAfterRefund(itemsTotal * COMMISSION_RATE, itemsTotal, orderRefundTotal);
             const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
             transactions.push({
               date: order.createdAt, orderId: order._id, displayId,
@@ -746,11 +747,9 @@ router.get('/financials', async (req, res) => {
           refunded = Number(item.price || 0) * Number(item.returnQuantity);
         }
 
-        // Platform doesn't earn commission on money it didn't keep — scale commission
-        // down by the refunded fraction of this item (zero for a full refund/cancel).
-        if (refunded > 0 && gross > 0) {
-          commission = Math.round(commission * Math.max(0, (gross - refunded) / gross) * 100) / 100;
-        }
+        // Platform doesn't earn commission on money it didn't keep — shared rule
+        // (zero for a full refund/cancel, prorated for a partial one).
+        commission = commissionAfterRefund(commission, gross, refunded);
 
         totalGross += gross;
         totalRefunds += refunded;

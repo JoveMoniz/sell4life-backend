@@ -2,6 +2,7 @@ import Order  from '../models/order.js';
 import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from './feeConfig.js';
+import { commissionAfterRefund } from './commission.js';
 
 export const VENDOR_COMMISSION   = 0.08; // kept for external imports; runtime uses resolveCommissionRate
 export const HOLD_DAYS         = 30;
@@ -174,13 +175,12 @@ export async function computeVendorBalance(vendorId) {
   const commission   = Number((netSales * VENDOR_COMMISSION).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
-  // All-time commission: per-order rates summed, scaled proportionally to remove refund impact.
-  // Uses totalRefundsNonCancelled (not totalRefunds) because cancelled items were already
-  // excluded from totalGrossAllPaid/totalCommissionAllPaid above — including their refund
-  // here would subtract money that was never counted as gross in the first place.
+  // All-time commission: per-order rates summed, then scaled down via the shared
+  // refund-proration rule. Uses totalRefundsNonCancelled (not totalRefunds) because
+  // cancelled items were already excluded from totalGrossAllPaid/totalCommissionAllPaid
+  // above — including their refund here would subtract money never counted as gross.
   const netSalesAllTime     = Math.max(0, totalGrossAllPaid - totalRefundsNonCancelled);
-  const refundCommAdj       = totalGrossAllPaid > 0 ? totalRefundsNonCancelled * (totalCommissionAllPaid / totalGrossAllPaid) : 0;
-  const commissionAllTime   = Number(Math.max(0, totalCommissionAllPaid - refundCommAdj).toFixed(2));
+  const commissionAllTime   = commissionAfterRefund(totalCommissionAllPaid, totalGrossAllPaid, totalRefundsNonCancelled);
   const netAfterFeesAllTime = Number((netSalesAllTime - commissionAllTime).toFixed(2));
 
   let totalChargebacks = 0;
