@@ -117,10 +117,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           freeReturns = vendorFreeReturnsCache[vendorIdStr];
         }
 
+        // Resolve the actual variant sub-document the buyer selected (if any),
+        // so its attributes (color/size etc.) can be stamped on the order item —
+        // the same match is reused below for the CJ auto-order vid lookup.
+        const matchedVariant = raw.variantSku
+          ? (product.variants || []).find(v => v.sku && v.sku.trim() === String(raw.variantSku).trim())
+          : null;
+
         items.push({
           productId: product._id,
           vendorId: product.vendor,
           variantSku: raw.variantSku || '',
+          attributes: matchedVariant?.attributes || {},
           name: product.name || 'Unknown Product',
           price,
           quantity,
@@ -277,8 +285,19 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               const product = await Product.findById(item.productId).select('variants').lean();
               const variants = product?.variants || [];
               const matched = variants.find(v => v.sku && item.variantSku && v.sku.trim() === item.variantSku.trim());
-              const vid = matched?.cjVid || variants.find(v => v.cjVid)?.cjVid;
-              if (!vid) continue; // not a CJ-sourced item
+              // Only fall back to "any variant with a cjVid" when there's genuinely
+              // no choice to get wrong (0 or 1 variants total). For a real
+              // multi-variant product, guessing risks shipping the wrong
+              // color/size — skip and flag it for manual ordering instead.
+              const vid = matched?.cjVid || (variants.length <= 1 ? variants.find(v => v.cjVid)?.cjVid : null);
+              if (!vid) {
+                if (variants.length > 1 && !matched) {
+                  item.cjOrderStatus = 'failed';
+                  item.cjOrderError = 'Could not match the ordered variant to a CJ product — place this order manually';
+                  changed = true;
+                }
+                continue; // not a CJ-sourced item, or ambiguous variant match
+              }
 
               const credential = decryptCredential(rawCred);
               const result = await cjProvider.createOrder({
