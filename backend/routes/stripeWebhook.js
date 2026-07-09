@@ -291,12 +291,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               // color/size — skip and flag it for manual ordering instead.
               const vid = matched?.cjVid || (variants.length <= 1 ? variants.find(v => v.cjVid)?.cjVid : null);
               if (!vid) {
-                if (variants.length > 1 && !matched) {
+                // This vendor is already confirmed professional with CJ credentials
+                // connected, so a multi-variant item reaching here with no resolvable
+                // vid is worth surfacing — either the match failed, or the matched
+                // variant was never mapped to a CJ product during sync.
+                if (variants.length > 1) {
                   item.cjOrderStatus = 'failed';
-                  item.cjOrderError = 'Could not match the ordered variant to a CJ product — place this order manually';
+                  item.cjOrderError = matched
+                    ? 'Ordered variant has no CJ product mapping — place this order manually'
+                    : 'Could not match the ordered variant to a CJ product — place this order manually';
                   changed = true;
                 }
-                continue; // not a CJ-sourced item, or ambiguous variant match
+                continue; // not a CJ-sourced item, or ambiguous/unmapped variant
               }
 
               const credential = decryptCredential(rawCred);
