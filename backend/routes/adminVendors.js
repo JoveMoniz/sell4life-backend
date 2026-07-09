@@ -786,6 +786,12 @@ router.get('/financials', async (req, res) => {
           refunded = Number(item.price || 0) * Number(item.returnQuantity);
         }
 
+        // Platform doesn't earn commission on money it didn't keep — scale commission
+        // down by the refunded fraction of this item (zero for a full refund/cancel).
+        if (refunded > 0 && gross > 0) {
+          commission = Math.round(commission * Math.max(0, (gross - refunded) / gross) * 100) / 100;
+        }
+
         totalGross += gross;
         totalRefunds += refunded;
         totalCommission += commission;
