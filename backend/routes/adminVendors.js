@@ -67,33 +67,10 @@ router.get('/', async (req, res) => {
 
     /* ===============================
        ADD STATS (ORDERS / REVENUE)
+       Commission comes from computeVendorBalance() — the single source of
+       truth also used for real payouts — so this list always agrees with
+       the Financials page and the vendor's own payout balance.
     =============================== */
-    const feeCfg = await getFeeConfig();
-
-    // Sync rate resolver — mirrors resolveCommissionRateForOrder but uses pre-loaded feeCfg
-    function rateForOrder(vObj, orderCreatedAt) {
-      if (vObj.commissionOverride != null) {
-        if (!vObj.commissionOverrideSetAt) return Number(vObj.commissionOverride);
-        if (orderCreatedAt && new Date(orderCreatedAt) >= new Date(vObj.commissionOverrideSetAt)) {
-          return Number(vObj.commissionOverride);
-        }
-      }
-      const tierRate  = feeCfg.commissionByTier?.[vObj.type];
-      const tierSetAt = feeCfg.commissionByTierSetAt?.[vObj.type];
-      if (tierRate != null) {
-        if (!tierSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(tierSetAt)) {
-          return Number(tierRate);
-        }
-      }
-      const defaultSetAt = feeCfg.commissionDefaultSetAt;
-      if (!defaultSetAt || !orderCreatedAt || new Date(orderCreatedAt) >= new Date(defaultSetAt)) {
-        return Number(feeCfg.commissionDefault ?? 0.08);
-      }
-      return 0.08;
-    }
-
-    const PAID_STATUSES = new Set(['paid', 'refunded', 'refund_scheduled', 'partially_refunded']);
-
     const vendors = await Promise.all(
       vendorsRaw.map(async (v) => {
         const ordersRaw = await Order.find({
@@ -102,39 +79,14 @@ router.get('/', async (req, res) => {
 
         const metrics = calculateVendorMetrics(ordersRaw, v._id);
         const vObj = v.toObject();
-
-        // Current rate — for display and new orders
-        let commissionRate;
-        if (vObj.commissionOverride != null) {
-          commissionRate = Number(vObj.commissionOverride);
-        } else {
-          const tierRate = feeCfg.commissionByTier?.[vObj.type];
-          commissionRate = tierRate != null ? Number(tierRate) : Number(feeCfg.commissionDefault ?? 0.08);
-        }
-
-        // Actual commission charged — rate at time of each order
-        let totalCommission = 0;
-        for (const order of ordersRaw) {
-          if (!PAID_STATUSES.has((order.paymentStatus || '').toLowerCase())) continue;
-          const vendorItems = (order.items || []).filter(
-            item => String(item.vendorId) === String(v._id)
-          );
-          const itemsTotal = vendorItems.reduce(
-            (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0
-          );
-          if (itemsTotal > 0) {
-            totalCommission += itemsTotal * rateForOrder(vObj, order.createdAt);
-          }
-        }
-        const commission = Number(totalCommission.toFixed(2));
-        const netAfterCommission = Number((metrics.grossRevenue - metrics.refunds - commission).toFixed(2));
+        const balance = await computeVendorBalance(v._id).catch(() => null);
 
         return {
           ...vObj,
           ...metrics,
-          commissionRate,
-          commission,
-          netAfterCommission,
+          commissionRate: balance?.commissionRate ?? 0.08,
+          commission: balance?.commissionAllTime ?? 0,
+          netAfterCommission: balance?.netAfterFeesAllTime ?? Number((metrics.grossRevenue - metrics.refunds).toFixed(2)),
         };
       })
     );
@@ -567,20 +519,28 @@ router.get('/:id/transactions', async (req, res) => {
           if (!e.pending) totalRefunds += Math.abs(e.amount);
         });
       } else {
+        // Commission is charged on what the platform actually kept (net of
+        // refund/cancellation), same rule as the `sales`-only branch above —
+        // a fully refunded order suppresses the sale row's commission entirely
+        // and the separate refund row below tells the full story.
         if (isPaid && itemsTotal > 0) {
-          const commission = Number((itemsTotal * COMMISSION_RATE).toFixed(2));
-          const vatAmount  = isVatRegistered ? Number((itemsTotal * VAT_RATE).toFixed(2)) : 0;
-          transactions.push({
-            date: order.createdAt, orderId: order._id, displayId,
-            buyerEmail: order.user?.email || '—',
-            type: 'sale', description: 'Order received', itemName: null, qty: null,
-            amount: itemsTotal, commission, commissionRate: COMMISSION_RATE, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
-            shippingAmount: Number(orderShipping.toFixed(2)),
-          });
-          totalSales      += itemsTotal;
-          totalCommission += commission;
-          totalVat        += vatAmount;
-          totalStripeFees += vendorStripeFee;
+          totalSales += itemsTotal; // gross, before refunds — for the "Gross Sales" card
+
+          const netAmount = Math.max(0, itemsTotal - orderRefundTotal);
+          if (netAmount > 0) {
+            const commission = Number((netAmount * COMMISSION_RATE).toFixed(2));
+            const vatAmount  = isVatRegistered ? Number((netAmount * VAT_RATE).toFixed(2)) : 0;
+            transactions.push({
+              date: order.createdAt, orderId: order._id, displayId,
+              buyerEmail: order.user?.email || '—',
+              type: 'sale', description: 'Order received', itemName: null, qty: null,
+              amount: itemsTotal, commission, commissionRate: COMMISSION_RATE, vatAmount, stripeFee: vendorStripeFee, stripeIsEstimated,
+              shippingAmount: Number(orderShipping.toFixed(2)),
+            });
+            totalCommission += commission;
+            totalVat        += vatAmount;
+            totalStripeFees += vendorStripeFee;
+          }
         }
         refundEntries.forEach(e => {
           transactions.push(e);
