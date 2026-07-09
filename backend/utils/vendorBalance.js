@@ -53,6 +53,7 @@ export async function computeVendorBalance(vendorId) {
   let totalGrossAllPaid       = 0;
   let totalCommissionAllPaid  = 0; // per-order accumulated commission (respects rate-at-time)
   let totalRefunds            = 0;
+  let totalRefundsNonCancelled = 0; // excludes cancelled-item refunds — those items already contribute $0 to the gross totals above, so their refund must not be subtracted again
   let totalStripeFees         = 0;
   let totalShippingCleared    = 0;
   let nextClearanceMs         = null;
@@ -142,11 +143,18 @@ export async function computeVendorBalance(vendorId) {
       if (item.goodwillRefund && item.goodwillPaidBy === 'platform') return;
       const price = Number(item.price || 0);
       if (item.status === 'Cancelled') {
+        // Cancelled items already contribute $0 to totalGross/totalGrossAllPaid
+        // (excluded above), so their refund must NOT reduce those totals again —
+        // only totalRefundsNonCancelled feeds the netSales/commission formulas.
         totalRefunds += price * Number(item.quantity || 0);
       } else if (Number(item.refundedQuantity) > 0) {
-        totalRefunds += Number(item.refundedAmount) || price * Number(item.refundedQuantity);
+        const amt = Number(item.refundedAmount) || price * Number(item.refundedQuantity);
+        totalRefunds += amt;
+        totalRefundsNonCancelled += amt;
       } else if (Number(item.returnQuantity) > 0) {
-        totalRefunds += price * Number(item.returnQuantity);
+        const amt = price * Number(item.returnQuantity);
+        totalRefunds += amt;
+        totalRefundsNonCancelled += amt;
       }
     });
 
@@ -159,14 +167,19 @@ export async function computeVendorBalance(vendorId) {
     totalStripeFees      += Number((orderFee * vendorFraction).toFixed(2));
   }
 
-  // Cleared balance (payout-eligible)
-  const netSales     = Math.max(0, totalGross - totalRefunds);
+  // Cleared balance (payout-eligible) — totalGross is already net of each
+  // delivered item's own refund (see itemValue above), so it must NOT be
+  // reduced by totalRefunds again here.
+  const netSales     = Math.max(0, totalGross);
   const commission   = Number((netSales * VENDOR_COMMISSION).toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
-  // All-time commission: per-order rates summed, scaled proportionally to remove refund impact
-  const netSalesAllTime     = Math.max(0, totalGrossAllPaid - totalRefunds);
-  const refundCommAdj       = totalGrossAllPaid > 0 ? totalRefunds * (totalCommissionAllPaid / totalGrossAllPaid) : 0;
+  // All-time commission: per-order rates summed, scaled proportionally to remove refund impact.
+  // Uses totalRefundsNonCancelled (not totalRefunds) because cancelled items were already
+  // excluded from totalGrossAllPaid/totalCommissionAllPaid above — including their refund
+  // here would subtract money that was never counted as gross in the first place.
+  const netSalesAllTime     = Math.max(0, totalGrossAllPaid - totalRefundsNonCancelled);
+  const refundCommAdj       = totalGrossAllPaid > 0 ? totalRefundsNonCancelled * (totalCommissionAllPaid / totalGrossAllPaid) : 0;
   const commissionAllTime   = Number(Math.max(0, totalCommissionAllPaid - refundCommAdj).toFixed(2));
   const netAfterFeesAllTime = Number((netSalesAllTime - commissionAllTime).toFixed(2));
 
