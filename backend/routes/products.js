@@ -8,6 +8,8 @@ import Order from '../models/order.js'; // 🔥 needed for hard delete
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js'; // 🔥 THIS WAS MISSING
+import { decryptCredential } from '../utils/shippingProviders/registry.js';
+import { syncProductFromCj, looksCjSourced } from '../utils/cjProductSync.js';
 
 const router = Router();
 
@@ -445,6 +447,24 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     });
 
     await product.save();
+
+    // Auto-sync with CJ in the background if this update touched variants and
+    // the product looks CJ-sourced — keeps cjVid current without the vendor
+    // needing to remember a separate manual "sync" step. Never blocks the
+    // response; failures are logged only.
+    if ('variants' in updates && vendor.type === 'professional' && looksCjSourced(product)) {
+      const rawCred = vendor.supplierCredentials?.cjdropshipping;
+      if (rawCred) {
+        (async () => {
+          try {
+            const credential = decryptCredential(rawCred);
+            await syncProductFromCj(product, credential);
+          } catch (err) {
+            console.warn('[auto-cj-sync] failed for product', product._id.toString(), err.message);
+          }
+        })();
+      }
+    }
 
     res.json(product);
   } catch (err) {
