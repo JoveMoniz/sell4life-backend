@@ -370,6 +370,12 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       });
     }
 
+    if (product.adminSuspended) {
+      return res.status(403).json({
+        error: 'This listing was suspended by an admin and can’t be edited until it’s reinstated.',
+      });
+    }
+
     const updates = req.body;
 
     if ('price' in updates && Number(updates.price) < 0) {
@@ -724,6 +730,58 @@ router.delete('/:id/hard', authMiddleware, adminMiddleware, async (req, res) => 
     res.status(500).json({
       error: 'Failed to delete product',
     });
+  }
+});
+
+/* ======================================================
+   SUSPEND / REINSTATE A SINGLE LISTING (ADMIN ONLY)
+   Pulls one listing for cause without hard-deleting it (blocked once it
+   has orders) or suspending the vendor's whole account over one product.
+====================================================== */
+
+router.patch('/:id/suspend', authMiddleware, adminMiddleware, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    product.active = false;
+    product.adminSuspended = true;
+    product.adminSuspendedReason = (req.body?.reason || '').trim();
+    product.adminSuspendedAt = new Date();
+    await product.save();
+
+    res.json({ success: true, product });
+  } catch (err) {
+    console.error('PRODUCT SUSPEND ERROR:', err);
+    res.status(500).json({ error: 'Failed to suspend product' });
+  }
+});
+
+router.patch('/:id/reinstate', authMiddleware, adminMiddleware, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    product.adminSuspended = false;
+    product.adminSuspendedReason = '';
+    product.adminSuspendedAt = null;
+    product.active = true;
+    await product.save();
+
+    res.json({ success: true, product });
+  } catch (err) {
+    console.error('PRODUCT REINSTATE ERROR:', err);
+    res.status(500).json({ error: 'Failed to reinstate product' });
   }
 });
 

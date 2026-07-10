@@ -290,6 +290,25 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Admin takedown for cause (miscategorised, reported, policy violation) —
+    // distinct from the vendor's own `active` toggle. Forces active:false and,
+    // unlike a vendor-initiated unpublish, the vendor's own edit route refuses
+    // to clear this — only an admin can lift it. Avoids the previous all-or-
+    // nothing choice between hard-deleting an (unorderable) listing or
+    // suspending the vendor's entire account over one bad product.
+    adminSuspended: {
+      type: Boolean,
+      default: false,
+    },
+    adminSuspendedReason: {
+      type: String,
+      default: '',
+    },
+    adminSuspendedAt: {
+      type: Date,
+      default: null,
+    },
+
     /* ==============================
        REFURBISHED FIELDS
     ============================== */
