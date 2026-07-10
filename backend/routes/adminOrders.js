@@ -289,6 +289,56 @@ router.get('/:id/debug-cj-eligibility', authMiddleware, adminMiddleware, async (
 });
 
 /* ======================================================
+   DEBUG — RAW CJ VARIANT DATA FOR A PRODUCT
+   Temporary diagnostic: shows exactly what CJ's API returns for a
+   product's variantList, side by side with our own stored variant
+   SKUs — lets us see precisely why a SKU match is failing (case,
+   whitespace, wrong CJ product matched, etc.) instead of guessing.
+====================================================== */
+router.get('/product/:id/debug-cj-raw', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+    const Product = (await import('../models/product.js')).default;
+    const { decryptCredential } = await import('../utils/shippingProviders/registry.js');
+    const { getProductImages } = await import('../utils/shippingProviders/cjdropshipping.js');
+
+    const product = await Product.findById(req.params.id).lean();
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const vendor = await Vendor.findById(product.vendor).select('supplierCredentials').lean();
+    const rawCred = vendor?.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'Vendor has no CJ credentials' });
+
+    const credential = decryptCredential(rawCred);
+    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+    const urlMatch = product.supplierUrl && /cjdropshipping\.com/i.test(product.supplierUrl)
+      ? (product.supplierUrl.match(/[?&]id=([\w-]+)/) || product.supplierUrl.match(/-p-(\w+)\.html/i))
+      : null;
+    const pidOverride = urlMatch ? urlMatch[1] : null;
+
+    const result = await getProductImages(vid, product.name, credential, pidOverride);
+
+    res.json({
+      searchedWith: vid,
+      pidOverride,
+      supplierUrl: product.supplierUrl || null,
+      ourVariantSkus: (product.variants || []).map(v => ({ sku: v.sku, cjVid: v.cjVid || null })),
+      cjResult: result ? {
+        error: result.error || null,
+        supplier: result.supplier || null,
+        supplierUrl: result.supplierUrl || null,
+        cjVariants: result.cjVariants || [],
+      } : null,
+    });
+  } catch (err) {
+    console.error('CJ raw debug error:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
+});
+
+/* ======================================================
    CORRECT STALE ITEM SHIPPING COST (ADMIN)
    One-off data-correction tool for orders placed before the
    shipIncluded webhook fix, where item.shippingCost was
