@@ -26,6 +26,49 @@ router.use(authMiddleware);
 router.use(adminMiddleware);
 
 /* ======================================================
+   TEMP DIAGNOSTIC — launch-readiness check, remove after use.
+   Reports platform + connected-account Stripe payout schedules and
+   whether RESEND_API_KEY is configured. No secrets are exposed.
+====================================================== */
+router.get('/diagnostics/stripe-check', async (req, res) => {
+  try {
+    const platform = await stripe.accounts.retrieve();
+    const accounts = await stripe.accounts.list({ limit: 25 });
+
+    const connected = await Promise.all(accounts.data.map(async (acct) => {
+      let balance = null;
+      try {
+        const b = await stripe.balance.retrieve({ stripeAccount: acct.id });
+        balance = {
+          available: b.available.map(x => `${(x.amount / 100).toFixed(2)} ${x.currency}`),
+          pending: b.pending.map(x => `${(x.amount / 100).toFixed(2)} ${x.currency}`),
+        };
+      } catch (e) {
+        balance = { error: e.message };
+      }
+      return {
+        id: acct.id,
+        email: acct.email,
+        charges_enabled: acct.charges_enabled,
+        payouts_enabled: acct.payouts_enabled,
+        payoutSchedule: acct.settings?.payouts?.schedule || null,
+        balance,
+      };
+    }));
+
+    res.json({
+      stripeKeyMode: process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test',
+      resendConfigured: !!process.env.RESEND_API_KEY,
+      platformPayoutSchedule: platform.settings?.payouts?.schedule || null,
+      connectedAccountCount: accounts.data.length,
+      connected,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    GET ALL VENDORS
 ====================================================== */
 
