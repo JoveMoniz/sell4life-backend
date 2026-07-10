@@ -53,6 +53,18 @@ export function looksCjSourced(product) {
   return (product.variants || []).some(v => v.supplierVariantRef || v.sku);
 }
 
+// The base "from £X" price should always be the cheapest variant, never an
+// independently-maintained number that can silently drift away from what
+// the variants actually cost (that drift is what caused a real mispricing
+// bug — see cjProductSync commit history). Returns null if there's nothing
+// valid to derive from, so callers can leave the existing price untouched.
+export function deriveBasePriceFromVariants(variants) {
+  const prices = (variants || [])
+    .map(v => Number(v.price))
+    .filter(p => Number.isFinite(p) && p > 0);
+  return prices.length ? Math.min(...prices) : null;
+}
+
 // Full CJ sync for one product: images (replaced), videos (re-hosted on
 // Cloudinary), per-variant images + cjVid, supplier name + URL. Shared by
 // the manual bulk/single-product routes, the auto-sync-on-save hook, and
@@ -108,10 +120,18 @@ export async function syncProductFromCj(product, credential) {
     videosSaved = hosted.length;
   }
 
-  // Sync per-variant image + CJ vid from CJ variantList (stock not available via CJ API).
-  // The vid is CJ's internal variant id — needed for live freight quotes and CJ auto-ordering.
+  const usdGbp = Number(process.env.CJ_USD_GBP_RATE) || 0.79;
+
+  // Sync per-variant image + CJ vid + price from CJ variantList (stock not
+  // available via CJ API). The vid is CJ's internal variant id — needed for
+  // live freight quotes and CJ auto-ordering. Price is only recalculated
+  // when the vendor has a markup% configured (via the "Apply to Price" tool)
+  // — without that we have no basis for turning CJ's cost into a sell price,
+  // so an existing manually-set variant price is left alone in that case.
   let variantsSynced = 0;
+  let pricesSynced = 0;
   let firstCjVid = '';
+  const hasMarkup = Number.isFinite(Number(product.markupPct));
   if (result.cjVariants?.length) {
     const syncedVariants = (product.variants || []).map(ourV => {
       const ourSku = (ourV.sku ?? '').trim();
@@ -121,9 +141,23 @@ export async function syncProductFromCj(product, credential) {
       if (!cjV) return ourV;
       if (!firstCjVid && cjV.vid) firstCjVid = cjV.vid;
       variantsSynced++;
-      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid };
+
+      let priceUpdate = {};
+      if (hasMarkup && cjV.sellPriceUsd != null) {
+        const costGbp = cjV.sellPriceUsd * usdGbp;
+        const newPrice = Math.round(costGbp * (1 + Number(product.markupPct) / 100) * 100) / 100;
+        priceUpdate = { price: newPrice };
+        pricesSynced++;
+      }
+
+      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...priceUpdate };
     });
     if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+
+    // Keep the base "from £X" price honest — always the cheapest variant,
+    // never a stale independently-set number.
+    const derivedBase = deriveBasePriceFromVariants(syncedVariants);
+    if (derivedBase != null) updateDoc.price = derivedBase;
   }
 
   // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
@@ -131,7 +165,6 @@ export async function syncProductFromCj(product, credential) {
   // otherwise the existing (weight-estimated) value stays.
   let shippingGbp = null;
   if (firstCjVid) {
-    const usdGbp = Number(process.env.CJ_USD_GBP_RATE) || 0.79;
     const quote = await cjProvider.getShippingCost(
       { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1 },
       credential
@@ -143,5 +176,5 @@ export async function syncProductFromCj(product, credential) {
   }
 
   await Product.findByIdAndUpdate(product._id, updateDoc);
-  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, shipping: shippingGbp };
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp };
 }

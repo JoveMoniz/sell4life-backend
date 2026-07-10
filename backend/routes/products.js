@@ -9,7 +9,7 @@ import Order from '../models/order.js'; // 🔥 needed for hard delete
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js'; // 🔥 THIS WAS MISSING
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
-import { syncProductFromCj, looksCjSourced } from '../utils/cjProductSync.js';
+import { syncProductFromCj, looksCjSourced, deriveBasePriceFromVariants } from '../utils/cjProductSync.js';
 
 const router = Router();
 
@@ -445,6 +445,15 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
         product[field] = updates[field];
       }
     });
+
+    // Keep the base "from £X" price honest — always the cheapest variant,
+    // never an independently-maintained number that can silently drift away
+    // from what the variants actually cost (that drift caused a real
+    // mispricing bug: checkout charged one price, the page showed another).
+    if ('variants' in updates) {
+      const derivedBase = deriveBasePriceFromVariants(product.variants);
+      if (derivedBase != null) product.price = derivedBase;
+    }
 
     await product.save();
 

@@ -334,16 +334,18 @@ export async function getProductImages(vid, productName, credential, pidOverride
     return [];
   }
 
-  // Extract CJ variant data for syncing stock/image back to our DB.
+  // Extract CJ variant data for syncing stock/image/price back to our DB.
   // Store both vid (CJ internal ID) and variantSku (the human SKU like CJNS...)
   // so the route can match against whichever one our DB variant.sku holds.
+  // sellPriceUsd is CJ's price to us (our cost) — always USD, per CJ's docs.
   function extractCjVariants(productData) {
     if (!productData) return [];
     const list = productData.variantList ?? productData.variants ?? [];
     return list.map(v => ({
-      vid:        String(v.vid        ?? ''),
-      variantSku: String(v.variantSku ?? v.vid ?? ''),
-      image:      v.variantImage ?? v.image ?? '',
+      vid:         String(v.vid        ?? ''),
+      variantSku:  String(v.variantSku ?? v.vid ?? ''),
+      image:       v.variantImage ?? v.image ?? '',
+      sellPriceUsd: Number.isFinite(Number(v.variantSellPrice)) ? Number(v.variantSellPrice) : null,
     })).filter(v => v.vid || v.variantSku);
   }
 
