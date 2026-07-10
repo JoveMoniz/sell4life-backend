@@ -162,7 +162,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260710b';
+const APP_VERSION = '20260710c';
 
 // ======================================================
 // VERSION ENDPOINT
