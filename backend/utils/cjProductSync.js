@@ -44,13 +44,17 @@ export function cjPidFromUrl(url) {
   return m ? m[1] : null;
 }
 
-// True if this product looks CJ-sourced — has at least one variant carrying
-// a supplier reference/SKU, or a supplierUrl pointing at a CJ product page.
-// Used to decide whether auto-sync (on save, or the periodic sweep) should
-// bother attempting a CJ lookup at all.
+// True if this product looks CJ-sourced. Used to decide whether auto-sync
+// (on save, or the periodic sweep) should bother attempting a CJ lookup at
+// all — must be a real signal, not "has any SKU," which used to match every
+// product on the platform (CJ-sourced or not) and wasted rate-limit budget
+// on irrelevant products every time any vendor edited any variant.
 export function looksCjSourced(product) {
   if (cjPidFromUrl(product.supplierUrl)) return true;
-  return (product.variants || []).some(v => v.supplierVariantRef || v.sku);
+  if (product.supplier === 'CJdropshipping') return true;
+  // A cjVid already resolved, or a SKU following CJ's own naming convention
+  // (e.g. CJYD..., CJJS..., CJNS...) — not just any SKU at all.
+  return (product.variants || []).some(v => v.cjVid || (v.sku && /^CJ/i.test(v.sku.trim())));
 }
 
 // The base "from £X" price should always be the cheapest variant, never an

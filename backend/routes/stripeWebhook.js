@@ -213,19 +213,33 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         shippingAddress = undefined;
       }
 
-      const order = await Order.create({
-        user: userId,
-        items,
-        vendorOrders,
-        subtotal: orderSubtotal,
-        shippingAmount: orderShipping,
-        total: paymentIntent.amount / 100,
-        status: 'Pending',
-        paymentStatus: 'paid',
-        paymentIntentId: paymentIntent.id,
-        shippingAddress,
-        statusHistory: [],
-      });
+      let order;
+      try {
+        order = await Order.create({
+          user: userId,
+          items,
+          vendorOrders,
+          subtotal: orderSubtotal,
+          shippingAmount: orderShipping,
+          total: paymentIntent.amount / 100,
+          status: 'Pending',
+          paymentStatus: 'paid',
+          paymentIntentId: paymentIntent.id,
+          shippingAddress,
+          statusHistory: [],
+        });
+      } catch (createErr) {
+        // The existingOrder check above is check-then-act, not atomic — if Stripe
+        // redelivers this webhook while an earlier delivery's Order.create() is
+        // still in flight, both can pass that check. The unique index on
+        // paymentIntentId is the real guard: the loser hits a duplicate-key error
+        // here instead of creating a second Order (and a second CJ auto-order).
+        if (createErr?.code === 11000 && 'paymentIntentId' in (createErr?.keyPattern || {})) {
+          console.log('⚠ Duplicate order creation prevented for PaymentIntent:', paymentIntent.id);
+          return res.json({ received: true });
+        }
+        throw createErr;
+      }
 
       pushUniqueHistory(order, 'Pending', 'Payment successful');
 
@@ -293,10 +307,12 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               const vid = matched?.cjVid || (variants.length <= 1 ? variants.find(v => v.cjVid)?.cjVid : null);
               if (!vid) {
                 // This vendor is already confirmed professional with CJ credentials
-                // connected, so a multi-variant item reaching here with no resolvable
-                // vid is worth surfacing — either the match failed, or the matched
-                // variant was never mapped to a CJ product during sync.
-                if (variants.length > 1) {
+                // connected, so ANY item that looks CJ-sourced (has a real sku on at
+                // least one variant) but couldn't resolve a vid is worth surfacing —
+                // this used to only fire for multi-variant products, which silently
+                // dropped single-variant failures with no signal to the vendor at all.
+                const looksCjSourced = variants.some(v => v.sku);
+                if (looksCjSourced) {
                   item.cjOrderStatus = 'failed';
                   item.cjOrderError = matched
                     ? 'Ordered variant has no CJ product mapping — place this order manually'
@@ -329,6 +345,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               changed = true;
             } catch (itemErr) {
               console.warn('[cj-auto-order] item error:', itemErr.message);
+              // A thrown error (bad credentials, DB hiccup, etc.) used to leave the
+              // item with no status at all — same invisible failure as an unresolved
+              // vid. Surface it the same way so it's never silently unfulfilled.
+              try {
+                item.cjOrderStatus = 'failed';
+                item.cjOrderError = `Unexpected error creating CJ order — place this order manually (${itemErr.message})`;
+                changed = true;
+              } catch (_) { /* item itself unusable — nothing more we can do */ }
             }
           }
 

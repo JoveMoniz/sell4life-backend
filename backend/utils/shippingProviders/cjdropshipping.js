@@ -15,12 +15,15 @@ const CJ_FREIGHT_URL = `${CJ_BASE}/logistic/freightCalculate`;
 const RATE_LIMIT_MS = Number(process.env.CJ_RATE_LIMIT_MS) || 1100;
 let _lastCall = 0;
 
-// In-process access token cache (CJ tokens last ~15 days)
-let _accessToken   = null;
-let _tokenExpireAt = 0;
+// Per-vendor access token cache, keyed by CJ account email (CJ tokens last
+// ~15 days). MUST be keyed per-vendor — a single shared token would route
+// every vendor's shipping quotes and CJ auto-orders through whichever
+// vendor's credentials happened to authenticate first.
+const _tokenCache = new Map(); // email -> { accessToken, expireAt }
 
 async function getAccessToken(email, apiKey) {
-  if (_accessToken && Date.now() < _tokenExpireAt) return _accessToken;
+  const cached = _tokenCache.get(email);
+  if (cached && Date.now() < cached.expireAt) return cached.accessToken;
 
   const resp = await fetch(CJ_AUTH_URL, {
     method:  'POST',
@@ -36,13 +39,23 @@ async function getAccessToken(email, apiKey) {
     console.warn('[cjdropshipping] auth failed: code=%s msg=%s', data?.code, data?.message);
     return null;
   }
-  _accessToken = data.data.accessToken;
+  const accessToken = data.data.accessToken;
   const expiry = data.data.accessTokenExpiryDate
     ? new Date(data.data.accessTokenExpiryDate).getTime()
     : Date.now() + 14 * 24 * 60 * 60 * 1000;
-  _tokenExpireAt = expiry - 5 * 60 * 1000; // 5-min buffer before true expiry
-  console.log('[cjdropshipping] access token obtained, valid until ~%s', new Date(_tokenExpireAt).toISOString());
-  return _accessToken;
+  const expireAt = expiry - 5 * 60 * 1000; // 5-min buffer before true expiry
+  _tokenCache.set(email, { accessToken, expireAt });
+  console.log('[cjdropshipping] access token obtained for %s, valid until ~%s', email, new Date(expireAt).toISOString());
+  return accessToken;
+}
+
+// Clears a single vendor's cached token (e.g. after a 401) without
+// affecting any other vendor's cache entry.
+function invalidateToken(credential) {
+  try {
+    const creds = JSON.parse(credential);
+    if (creds?.email) _tokenCache.delete(creds.email);
+  } catch (_) { /* raw legacy token — nothing cached under an email to clear */ }
 }
 
 async function throttledPost(url, token, body, extraHeaders = {}) {
@@ -114,8 +127,8 @@ const cjProvider = {
         const errBody = await resp.json().catch(() => ({}));
         console.warn('[cjdropshipping] HTTP %s for vid=%s: code=%s msg=%s',
           resp.status, supplierVariantRef, errBody?.code, errBody?.message);
-        // 401 = token expired — clear cache so next call re-fetches
-        if (resp.status === 401) { _accessToken = null; _tokenExpireAt = 0; }
+        // 401 = token expired — clear this vendor's cached token so the next call re-fetches
+        if (resp.status === 401) invalidateToken(credential);
         return null;
       }
 
@@ -212,6 +225,7 @@ const cjProvider = {
       const data = await resp.json().catch(() => ({}));
 
       if (!resp.ok || data?.code !== 200 || !data?.data) {
+        if (resp.status === 401) invalidateToken(credential);
         return { error: data?.message || `CJ order creation failed (HTTP ${resp.status})` };
       }
 

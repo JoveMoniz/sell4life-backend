@@ -448,7 +448,13 @@ const orderSchema = new mongoose.Schema(
 
     paymentIntentId: {
       type: String,
-      index: true,
+      // unique + sparse: prevents two orders ever being created for the same
+      // PaymentIntent if Stripe redelivers payment_intent.succeeded while an
+      // earlier delivery's Order.create() is still in flight (a real race —
+      // the check-then-act existence check in the webhook isn't atomic on
+      // its own). sparse allows multiple documents with no paymentIntentId.
+      unique: true,
+      sparse: true,
     },
 
     paymentMethod: String,
@@ -638,7 +644,7 @@ orderSchema.index({ 'items.refundStatus': 1 });
 orderSchema.index({ 'vendorOrders.vendorId': 1 });
 orderSchema.index({ status: 1, paymentStatus: 1 });
 orderSchema.index({ paymentStatus: 1, createdAt: -1 });
-orderSchema.index({ paymentIntentId: 1 });
+// paymentIntentId's unique+sparse index is already declared on the field itself.
 
 /* ==============================
    SHORT ID + SUBTOTAL FIX
