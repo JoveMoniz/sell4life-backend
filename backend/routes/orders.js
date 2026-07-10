@@ -117,18 +117,28 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           throw new Error('Invalid quantity');
         }
 
-        if (product.trackInventory && product.stock < quantity) {
+        // Resolve the selected variant (if any) so price/stock reflect what
+        // the buyer actually saw and added to cart, not just the base
+        // product — variants can have their own price and stock, independent
+        // of the base product fields, and the charge must match the display.
+        const variantSku = item.variantSku || '';
+        const matchedVariant = variantSku
+          ? (product.variants || []).find(v => v.sku && v.sku.trim() === variantSku.trim())
+          : null;
+
+        const effectiveStock = (matchedVariant?.stock != null) ? matchedVariant.stock : product.stock;
+        if (product.trackInventory && effectiveStock < quantity) {
           throw new Error(`${product.name} is out of stock`);
         }
 
-        const price = Number(product.price);
+        const price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
         const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
         const subtotal = Number((price * quantity).toFixed(2));
         return {
           productId: product._id,
           vendorId: product.vendor,
 
-          variantSku: item.variantSku || '',
+          variantSku,
           sku: product.sku || '',
 
           name: product.name,

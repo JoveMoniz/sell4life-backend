@@ -96,7 +96,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         if (!Number.isFinite(quantity) || quantity <= 0) {
           throw new Error('Invalid quantity');
         }
-        const price = Number(product.price);
+        // Resolve the actual variant sub-document the buyer selected (if any),
+        // so its own price/attributes (not just the base product's) land on
+        // the order item — the same match is reused below for the CJ
+        // auto-order vid lookup.
+        const matchedVariant = raw.variantSku
+          ? (product.variants || []).find(v => v.sku && v.sku.trim() === String(raw.variantSku).trim())
+          : null;
+
+        const price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
         // Must match the same check used when the PaymentIntent amount was
         // calculated (orders.js) — otherwise a shipIncluded product ends up
         // with a non-zero shippingCost stamped on the order even though
@@ -116,13 +124,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           }
           freeReturns = vendorFreeReturnsCache[vendorIdStr];
         }
-
-        // Resolve the actual variant sub-document the buyer selected (if any),
-        // so its attributes (color/size etc.) can be stamped on the order item —
-        // the same match is reused below for the CJ auto-order vid lookup.
-        const matchedVariant = raw.variantSku
-          ? (product.variants || []).find(v => v.sku && v.sku.trim() === String(raw.variantSku).trim())
-          : null;
 
         items.push({
           productId: product._id,
