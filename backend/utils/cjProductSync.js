@@ -87,17 +87,36 @@ export async function syncProductFromCj(product, credential) {
     // CJ search failed or returned wrong product — fall back to per-variant images already stored
     const variantImgs = [...new Set((product.variants || []).map(v => v.image).filter(Boolean))];
     if (variantImgs.length) {
-      await Product.findByIdAndUpdate(product._id, { images: variantImgs });
+      // Same manual-reorder protection as the main path below — don't touch
+      // images if the fallback set matches what's already stored.
+      const currentSet = new Set(product.images || []);
+      const fallbackSet = new Set(variantImgs);
+      const sameSet = currentSet.size === fallbackSet.size &&
+        [...currentSet].every(img => fallbackSet.has(img));
+      if (!sameSet) {
+        await Product.findByIdAndUpdate(product._id, { images: variantImgs });
+      }
       return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback' };
     }
     return { status: 'failed', error: result?.error };
   }
 
   const updateDoc = {
-    images:   [...new Set(result.images)],
     supplier: result.supplier ?? 'CJdropshipping',
     ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
   };
+
+  // Only overwrite images when CJ's set actually changed (new/removed images) —
+  // never just to "correct" the order. Every sync used to reset images to CJ's
+  // raw order, silently undoing any manual drag-to-reorder the vendor had done
+  // on the product edit page.
+  const currentImageSet = new Set(product.images || []);
+  const incomingImageSet = new Set(result.images);
+  const sameImageSet = currentImageSet.size === incomingImageSet.size &&
+    [...currentImageSet].every(img => incomingImageSet.has(img));
+  if (!sameImageSet) {
+    updateDoc.images = [...incomingImageSet];
+  }
 
   // Save up to 5 video URLs. CJ's raw URLs don't stream in a browser, so
   // re-host each on Cloudinary first. Skip if this product already has a
