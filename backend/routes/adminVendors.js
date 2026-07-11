@@ -643,7 +643,11 @@ router.get('/financials', async (req, res) => {
       dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), 0, 1) } };
     }
 
-    const PAID = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled'];
+    // 'refund_processing' (the transient state while Stripe is actively working a
+    // refund, before it settles to 'refunded') was missing here — an order sitting
+    // in that state was excluded from Financials entirely, Stripe fee included,
+    // until the refund finished.
+    const PAID = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled', 'refund_processing'];
 
     const [orders, feeConfig, allVendorDocs] = await Promise.all([
       Order.find({ paymentStatus: { $in: PAID }, ...dateFilter })
@@ -694,6 +698,7 @@ router.get('/financials', async (req, res) => {
     let totalRefunds = 0;
     let totalCommission = 0;
     let totalStripe = 0;
+    let totalStripeOnRefundedOrders = 0;
     let totalShipping = 0;
     let totalGoodwillPlatform = 0;
     let totalGoodwillVendor = 0;
@@ -721,6 +726,13 @@ router.get('/financials', async (req, res) => {
           storedCommission[String(vo.vendorId)] = Number(vo.commissionAmount);
         }
       }
+
+      // Stripe never refunds its own processing fee when we refund a buyer —
+      // if any part of this order was refunded/cancelled, the fee we already
+      // paid Stripe on it is a sunk cost either way, so it's tracked as its
+      // own bucket for visibility into how much fee spend goes to waste on
+      // orders that don't end up keeping their revenue.
+      let orderRefundedTotal = 0;
 
       for (const item of order.items || []) {
         const gross = Number(item.price || 0) * Number(item.quantity || 0);
@@ -754,6 +766,7 @@ router.get('/financials', async (req, res) => {
         totalGross += gross;
         totalRefunds += refunded;
         totalCommission += commission;
+        orderRefundedTotal += refunded;
 
         // Goodwill refunds already executed (refundedAmount populated by the worker) —
         // split out by who actually absorbed the cost.
@@ -770,6 +783,8 @@ router.get('/financials', async (req, res) => {
           vendorMap[vid].orderIds.add(String(order._id));
         }
       }
+
+      if (orderRefundedTotal > 0) totalStripeOnRefundedOrders += stripeFee;
     }
 
     // Payout totals (always all-time so admin sees full picture)
@@ -825,6 +840,7 @@ router.get('/financials', async (req, res) => {
         totalRefunds:      Math.round(totalRefunds * 100) / 100,
         totalCommission:   Math.round(totalCommission * 100) / 100,
         totalStripe:       Math.round(totalStripe * 100) / 100,
+        totalStripeOnRefundedOrders: Math.round(totalStripeOnRefundedOrders * 100) / 100,
         totalGoodwillPlatform: Math.round(totalGoodwillPlatform * 100) / 100,
         totalGoodwillVendor:   Math.round(totalGoodwillVendor * 100) / 100,
         netProfit:         Math.round((totalCommission - totalStripe - totalGoodwillPlatform) * 100) / 100,
