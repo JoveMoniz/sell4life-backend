@@ -437,6 +437,19 @@ router.get('/:id/transactions', async (req, res) => {
       );
       if (isPaid) totalShipping += orderShipping;
 
+      // Computed before the refund-entries loop (rather than after) so each
+      // cancelled/returned line can carry its own share of the Stripe fee —
+      // Stripe charges this once per order and never returns it on a refund,
+      // so it's a real platform cost tied to that specific line, not just
+      // the surviving "sale" row.
+      const orderTotal = Number(order.total || 0);
+      const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
+      const rawStripeFee = Number(order.stripeFeeAmount || 0);
+      const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
+      const orderStripeFee = rawStripeFee > 0 ? rawStripeFee : estimatedFee;
+      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
+      const stripeIsEstimated = rawStripeFee === 0;
+
       let orderRefundTotal = 0;
       const refundEntries = [];
 
@@ -472,6 +485,13 @@ router.get('/:id/transactions', async (req, res) => {
         if (refundQty > 0) {
           const moneyMoved = refundType !== 'return_pending';
           if (moneyMoved) orderRefundTotal += refundAmount;
+          // This line's share of the order's Stripe fee, prorated by how much
+          // of the vendor's items-total this specific refund represents —
+          // Stripe keeps its fee regardless, so a cancelled/returned item
+          // still carries a real (non-refunded) platform cost.
+          const itemStripeFee = moneyMoved && itemsTotal > 0
+            ? Number((vendorStripeFee * (refundAmount / itemsTotal)).toFixed(2))
+            : 0;
           refundEntries.push({
             date:        refundDate,
             orderId:     order._id,
@@ -485,17 +505,11 @@ router.get('/:id/transactions', async (req, res) => {
             qty:         refundQty,
             amount:      -refundAmount,
             pending:     !moneyMoved,
+            stripeFee:   itemStripeFee,
+            stripeIsEstimated,
           });
         }
       });
-
-      const orderTotal = Number(order.total || 0);
-      const vendorShareFraction = (orderTotal > 0 && itemsTotal > 0) ? itemsTotal / orderTotal : 1;
-      const rawStripeFee = Number(order.stripeFeeAmount || 0);
-      const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
-      const orderStripeFee = rawStripeFee > 0 ? rawStripeFee : estimatedFee;
-      const vendorStripeFee = Number((orderStripeFee * vendorShareFraction).toFixed(2));
-      const stripeIsEstimated = rawStripeFee === 0;
 
       if (type === 'sales') {
         const netAmount = itemsTotal - orderRefundTotal;
