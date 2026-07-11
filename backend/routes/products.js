@@ -456,7 +456,13 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     // never an independently-maintained number that can silently drift away
     // from what the variants actually cost (that drift caused a real
     // mispricing bug: checkout charged one price, the page showed another).
-    if ('variants' in updates) {
+    // Deliberately NOT gated on `'variants' in updates` — a save that only
+    // touches pricing fields (e.g. editing Cost Price and hitting Save from
+    // the Pricing section) must still be forced to match the variants that
+    // already exist in the DB, otherwise the submitted `price` sticks even
+    // though it disagrees with variant prices set by an earlier CJ sync —
+    // exactly the drift this block exists to prevent.
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
       const derivedBase = deriveBasePriceFromVariants(product.variants);
       if (derivedBase != null) product.price = derivedBase;
     }
