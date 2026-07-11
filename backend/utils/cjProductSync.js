@@ -168,7 +168,15 @@ export async function syncProductFromCj(product, credential) {
       let priceUpdate = {};
       if (hasMarkup && cjV.sellPriceUsd != null) {
         const costGbp = cjV.sellPriceUsd * usdGbp;
-        const newPrice = Math.round(costGbp * (1 + Number(product.markupPct) / 100) * 100) / 100;
+        // Must match the frontend markup-calc.js formula exactly — (cost + ship
+        // when shipIncluded) * (1 + markup%) — otherwise this auto-sync (which
+        // runs on every save and every 12h via the periodic worker) silently
+        // reverts whatever price the vendor's own "Apply to Price" tool just
+        // set, because the two were computing different numbers for the same
+        // markupPct. That mismatch is what caused a real vendor-visible bug:
+        // the price kept drifting back down shortly after being fixed.
+        const shipGbp = product.shipIncluded ? (Number(product.shippingCost) || 0) : 0;
+        const newPrice = Math.round((costGbp + shipGbp) * (1 + Number(product.markupPct) / 100) * 100) / 100;
         priceUpdate = { price: newPrice };
         pricesSynced++;
       }
