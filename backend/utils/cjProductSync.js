@@ -154,6 +154,7 @@ export async function syncProductFromCj(product, credential) {
   let variantsSynced = 0;
   let pricesSynced = 0;
   let firstCjVid = '';
+  let minCostGbp = null;
   const hasMarkup = Number.isFinite(Number(product.markupPct));
   if (result.cjVariants?.length) {
     const syncedVariants = (product.variants || []).map(ourV => {
@@ -168,6 +169,7 @@ export async function syncProductFromCj(product, credential) {
       let priceUpdate = {};
       if (hasMarkup && cjV.sellPriceUsd != null) {
         const costGbp = cjV.sellPriceUsd * usdGbp;
+        if (minCostGbp == null || costGbp < minCostGbp) minCostGbp = costGbp;
         // Must match the frontend markup-calc.js formula exactly — (cost + ship
         // when shipIncluded) * (1 + markup%) — otherwise this auto-sync (which
         // runs on every save and every 12h via the periodic worker) silently
@@ -189,6 +191,14 @@ export async function syncProductFromCj(product, credential) {
     // never a stale independently-set number.
     const derivedBase = deriveBasePriceFromVariants(syncedVariants);
     if (derivedBase != null) updateDoc.price = derivedBase;
+
+    // The vendor-visible Cost Price field was never touched by this sync —
+    // it stayed at whatever was last manually typed while the price above
+    // was silently computed from CJ's real live cost instead, so "Apply to
+    // Price" (which reads from the Cost Price field) never matched the
+    // actual saved price and looked broken. Keep it honest the same way as
+    // the base price: reflect the cost basis that was actually used.
+    if (minCostGbp != null) updateDoc.costPrice = Math.round(minCostGbp * 100) / 100;
   }
 
   // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
