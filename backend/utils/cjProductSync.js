@@ -69,6 +69,28 @@ export function deriveBasePriceFromVariants(variants) {
   return prices.length ? Math.min(...prices) : null;
 }
 
+// Scales each variant's price by the ratio between a new target base price
+// and the variants' own current minimum — preserves relative differences
+// between variants (a genuinely pricier size/colour stays pricier) instead
+// of flattening every variant to the same number. Single source of truth
+// for this on the backend — used by both the single-product edit route and
+// the bulk price-edit route, which previously duplicated this same scaling
+// logic inline (and mirrors markup-calc.js's client-side preview version).
+// Mutates each variant's .price in place (works on plain objects and
+// Mongoose subdocuments alike) and returns the resulting base price.
+export function scaleVariantPricesToTarget(variants, targetPrice) {
+  if (!Array.isArray(variants) || !variants.length) return targetPrice;
+  const oldBase = deriveBasePriceFromVariants(variants);
+  const scale = oldBase > 0 ? targetPrice / oldBase : null;
+  variants.forEach((v) => {
+    const oldVariantPrice = Number(v.price) || 0;
+    v.price = (scale != null && oldVariantPrice > 0)
+      ? Math.round(oldVariantPrice * scale * 100) / 100
+      : targetPrice;
+  });
+  return deriveBasePriceFromVariants(variants);
+}
+
 // Full CJ sync for one product: images (replaced), videos (re-hosted on
 // Cloudinary), per-variant images + cjVid, supplier name + URL. Shared by
 // the manual bulk/single-product routes, the auto-sync-on-save hook, and

@@ -9,7 +9,7 @@ import Order from '../models/order.js'; // 🔥 needed for hard delete
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js'; // 🔥 THIS WAS MISSING
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
-import { syncProductFromCj, looksCjSourced, deriveBasePriceFromVariants } from '../utils/cjProductSync.js';
+import { syncProductFromCj, looksCjSourced, deriveBasePriceFromVariants, scaleVariantPricesToTarget } from '../utils/cjProductSync.js';
 
 const router = Router();
 
@@ -323,23 +323,47 @@ router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('profes
     }
 
     const update = {};
-    if (price        !== undefined && price        !== null && Number.isFinite(Number(price)))        update.price        = Number(price);
     if (stock        !== undefined && stock        !== null && Number.isFinite(Number(stock)))        update.stock        = Math.max(0, Math.round(Number(stock)));
     if (shippingCost !== undefined && shippingCost !== null && Number.isFinite(Number(shippingCost))) update.shippingCost = Math.max(0, Number(shippingCost));
     if (shipIncluded !== undefined) update.shipIncluded = !!shipIncluded;
     if (markupPct    !== undefined && markupPct    !== null && Number.isFinite(Number(markupPct)) && Number(markupPct) >= 0) update.markupPct = Number(markupPct);
     if (active !== undefined) update.active = !!active;
 
-    if (!Object.keys(update).length) {
+    const hasPriceUpdate = price !== undefined && price !== null && Number.isFinite(Number(price));
+
+    if (!Object.keys(update).length && !hasPriceUpdate) {
       return res.status(400).json({ error: 'Nothing to update' });
     }
 
-    const result = await Product.updateMany(
-      { _id: { $in: ids }, vendor: req.vendor._id },
-      { $set: update }
-    );
+    let modifiedCount = 0;
 
-    res.json({ success: true, updated: result.modifiedCount });
+    if (hasPriceUpdate) {
+      // Price can't be a blanket $set here — for a product with variants,
+      // price must stay derived from variant prices (the same invariant the
+      // single-product edit route enforces), so each variant's price needs
+      // to be scaled proportionally rather than overwritten only at the top
+      // level. Bulk-setting price alone used to leave variants untouched,
+      // so the very next save/CJ-sync would re-derive the base price back
+      // to the old (unscaled) variant prices — the bulk edit "not applying."
+      const newPrice = Number(price);
+      const products = await Product.find({ _id: { $in: ids }, vendor: req.vendor._id });
+      await Promise.all(products.map(async (p) => {
+        Object.assign(p, update);
+        p.price = (Array.isArray(p.variants) && p.variants.length > 0)
+          ? scaleVariantPricesToTarget(p.variants, newPrice)
+          : newPrice;
+        await p.save();
+        modifiedCount++;
+      }));
+    } else {
+      const result = await Product.updateMany(
+        { _id: { $in: ids }, vendor: req.vendor._id },
+        { $set: update }
+      );
+      modifiedCount = result.modifiedCount;
+    }
+
+    res.json({ success: true, updated: modifiedCount });
   } catch (err) {
     console.error('Bulk edit error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -459,12 +483,21 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     // Deliberately NOT gated on `'variants' in updates` — a save that only
     // touches pricing fields (e.g. editing Cost Price and hitting Save from
     // the Pricing section) must still be forced to match the variants that
-    // already exist in the DB, otherwise the submitted `price` sticks even
-    // though it disagrees with variant prices set by an earlier CJ sync —
-    // exactly the drift this block exists to prevent.
+    // already exist in the DB.
+    //
+    // If the vendor explicitly submitted a new `price` this request (e.g.
+    // typing directly into the Price field and hitting Save, rather than
+    // using the "Apply to Price" calculator, which already scales variant
+    // inputs client-side before submitting), scale the variants to match it
+    // instead of silently discarding their edit — same shared logic the
+    // bulk price-edit route uses.
     if (Array.isArray(product.variants) && product.variants.length > 0) {
-      const derivedBase = deriveBasePriceFromVariants(product.variants);
-      if (derivedBase != null) product.price = derivedBase;
+      if ('price' in updates && Number.isFinite(Number(updates.price))) {
+        product.price = scaleVariantPricesToTarget(product.variants, Number(updates.price));
+      } else {
+        const derivedBase = deriveBasePriceFromVariants(product.variants);
+        if (derivedBase != null) product.price = derivedBase;
+      }
     }
 
     await product.save();
