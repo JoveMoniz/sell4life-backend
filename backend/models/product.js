@@ -45,7 +45,7 @@ const variantSchema = new mongoose.Schema(
 
     image: String,
     color: { type: String, default: '' },
-    displayMode: { type: String, enum: ['color', 'image'], default: 'color' },
+    displayMode: { type: String, enum: ['color', 'image'], default: 'image' },
 
     // CJ's internal variant id (numeric), captured during CJ sync.
     // Required for freight quotes — CJ's freight API rejects human SKUs.
@@ -155,7 +155,7 @@ const productSchema = new mongoose.Schema(
     variantDisplay: {
       type: String,
       enum: ['color', 'image'],
-      default: 'color',
+      default: 'image',
     },
 
     /* ==============================
