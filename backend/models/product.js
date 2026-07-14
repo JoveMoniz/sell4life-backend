@@ -309,6 +309,20 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Simple condition grade for casual sellers (distinct from the refurbished
+    // tier's conditionGrade below, which carries its own warranty/testing fields).
+    condition: {
+      type: String,
+      enum: ['New', 'Like New', 'Very Good', 'Good', 'Fair', 'For Parts', ''],
+      default: '',
+    },
+
+    // Casual sellers default to accepting offers; buyers see an "Ask/Offer" affordance.
+    acceptOffers: {
+      type: Boolean,
+      default: false,
+    },
+
     /* ==============================
        REFURBISHED FIELDS
     ============================== */
