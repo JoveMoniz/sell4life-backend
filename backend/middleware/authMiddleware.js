@@ -39,7 +39,7 @@ export default async function authMiddleware(req, res, next) {
     ====================================================== */
 
     const user = await User.findById(decoded.id).select(
-      '_id name username email role active banned'
+      '_id name username email role active banned emailVerified createdAt'
     );
 
     if (!user) {
