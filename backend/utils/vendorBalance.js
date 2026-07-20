@@ -57,6 +57,7 @@ export async function computeVendorBalance(vendorId) {
   let totalRefundsNonCancelled = 0; // excludes cancelled-item refunds — those items already contribute $0 to the gross totals above, so their refund must not be subtracted again
   let totalStripeFees         = 0;
   let totalShippingCleared    = 0;
+  let totalShippingAllTime    = 0;
   let nextClearanceMs         = null;
   let nextReserveReleaseMs    = null;
   const reserveByDate         = {}; // stores net-of-commission amount per release date
@@ -109,6 +110,7 @@ export async function computeVendorBalance(vendorId) {
       const itemValue = Math.max(0, grossValue - refunded);
 
       totalGrossAllTime += grossValue;
+      totalShippingAllTime += shippingValue;
 
       if (now >= clearsAt) {
         totalShippingCleared += shippingValue;
@@ -215,6 +217,7 @@ export async function computeVendorBalance(vendorId) {
     shippingCleared,
     // All-time figures (for display — matches transactions page)
     grossRevenueAllTime:  Number(totalGrossAllTime.toFixed(2)),
+    shippingAllTime: Number(totalShippingAllTime.toFixed(2)),
     commissionAllTime,
     netAfterFeesAllTime,
     totalStripeFees: Number(totalStripeFees.toFixed(2)),
