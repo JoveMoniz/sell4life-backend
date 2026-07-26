@@ -2420,24 +2420,36 @@ router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprov
    REQUEST TIER UPGRADE
 ====================================================== */
 
+// Tiers a vendor may self-request from each current tier — Enterprise is
+// deliberately never listed: it's a different kind of business relationship
+// (manufacturers/wholesalers, custom terms), assigned by admins directly
+// rather than something a vendor graduates into by request.
+const SELF_SERVICE_UPGRADE_OPTIONS = {
+  casual:       ['refurbished', 'professional'],
+  refurbished:  ['professional'],
+  professional: [],
+  enterprise:   [],
+};
+
 router.post('/request-upgrade', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
-    const { message } = req.body;
+    const { message, requestedTier: nextTier } = req.body;
 
     if (!vendor || vendor.status !== 'approved') {
       return res.status(403).json({ error: 'Only approved vendors can request upgrades' });
     }
 
     const currentTier = vendor.type || 'casual';
-    const tierRank = { casual: 1, refurbished: 2, professional: 3, enterprise: 4 };
-    const currentRank = tierRank[currentTier] || 1;
+    const allowedTiers = SELF_SERVICE_UPGRADE_OPTIONS[currentTier] || [];
 
-    if (currentRank >= 4) {
-      return res.status(400).json({ error: 'Already at highest tier' });
+    if (!allowedTiers.length) {
+      return res.status(400).json({ error: 'No self-service upgrade available for your tier' });
     }
 
-    const nextTier = { casual: 'refurbished', refurbished: 'professional', professional: 'enterprise' }[currentTier];
+    if (!allowedTiers.includes(nextTier)) {
+      return res.status(400).json({ error: 'Invalid tier requested' });
+    }
 
     // Store upgrade request in database
     await Vendor.findByIdAndUpdate(vendor._id, {
