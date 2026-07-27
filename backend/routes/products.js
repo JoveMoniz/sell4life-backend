@@ -38,7 +38,7 @@ const tierFieldGuard = stripTierFields({
   warrantyPeriod:     'refurbished',
   testedStatus:       'refurbished',
   refurbishmentNotes: 'refurbished',
-  videoUrl3:          'refurbished',
+  videoUrl3:          'casual',
   videoUrl4:          'professional',
   videoUrl5:          'professional',
 });
