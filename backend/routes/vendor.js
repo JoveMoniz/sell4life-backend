@@ -2420,12 +2420,16 @@ router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprov
    REQUEST TIER UPGRADE
 ====================================================== */
 
-// Tiers a vendor may self-request from each current tier — Enterprise is
-// deliberately never listed: it's a different kind of business relationship
-// (manufacturers/wholesalers, custom terms), assigned by admins directly
-// rather than something a vendor graduates into by request.
+// Tiers a vendor may self-request from each current tier.
+// - Casual is never listed: it's non-trading personal selling, while every
+//   other tier is a registered business. Moving from casual into a business
+//   tier crosses a real tax boundary (a fresh "trading started" date matters
+//   for HMRC), so that's a new account, not an in-place upgrade.
+// - Enterprise is never listed either: it's a different kind of business
+//   relationship (manufacturers/wholesalers, custom terms), assigned by
+//   admins directly rather than something a vendor graduates into.
 const SELF_SERVICE_UPGRADE_OPTIONS = {
-  casual:       ['refurbished', 'professional'],
+  casual:       [],
   refurbished:  ['professional'],
   professional: [],
   enterprise:   [],
