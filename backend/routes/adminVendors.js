@@ -1146,6 +1146,16 @@ router.patch('/:id/upgrade', async (req, res) => {
     const requestedTier = vendor.upgradeRequest.requestedTier;
     const currentTier = vendor.type;
 
+    // Casual is non-trading personal selling; every other tier is a
+    // registered business. That boundary is a new account, not an in-place
+    // tier change — this guards against approving a stale pending request
+    // that was submitted before that policy existed.
+    if (action === 'approve' && currentTier === 'casual') {
+      return res.status(400).json({
+        error: 'Casual accounts can no longer be upgraded in place. Reject this request and ask the seller to sign up for a new account for Refurbished/Professional selling.',
+      });
+    }
+
     if (action === 'approve') {
       await Vendor.findByIdAndUpdate(vendorId, {
         type: requestedTier,
