@@ -24,6 +24,7 @@ import Product from '../models/product.js';
 import stripe from '../config/stripe.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
+import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 
 const router = express.Router();
 
@@ -131,7 +132,24 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           throw new Error(`${product.name} is out of stock`);
         }
 
-        const price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
+        // An accepted offer always wins over listed/variant price — it's a
+        // single-unit agreement, re-verified against our own stored message,
+        // never taken from the client. Offered items ignore variants (offers
+        // are only ever possible on casual/refurbished listings, which can't
+        // have variants at all).
+        let price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
+        let offerMessageId = null;
+        if (item.offerMessageId) {
+          const offer = await resolveAcceptedOffer({
+            offerMessageId: item.offerMessageId,
+            buyerId: req.user._id,
+            productId: product._id,
+          });
+          if (!offer) throw new Error('This offer is no longer valid.');
+          price = offer.amount;
+          offerMessageId = String(offer.msg._id);
+        }
+
         const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
         const subtotal = Number((price * quantity).toFixed(2));
         return {
@@ -150,6 +168,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
 
           attributes: item.attributes || {},
+          offerMessageId,
         };
       })
     );
@@ -170,6 +189,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
             productId: String(item.productId),
             quantity: item.quantity,
             variantSku: item.variantSku || '',
+            offerMessageId: item.offerMessageId || '',
           }))
         ),
       },

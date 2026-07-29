@@ -166,6 +166,160 @@ router.post('/:id/reply', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Submit an offer (buyer) ───────────────────────────────────
+// POST /api/messages/offer
+// Body: { productId, amount }
+// Only for products with acceptOffers=true, sold by a casual or
+// refurbished vendor — professional/enterprise are fixed-price.
+// Finds or creates the conversation, same as the base POST / route, so a
+// buyer can make an offer without having messaged the seller first.
+router.post('/offer', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.body || {};
+    const amount = Number(req.body?.amount);
+
+    if (!productId) return res.status(400).json({ error: 'productId is required.' });
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Enter a valid offer amount.' });
+    }
+
+    const product = await Product.findById(productId).lean();
+    if (!product) return res.status(404).json({ error: 'Product not found.' });
+    if (!product.acceptOffers) {
+      return res.status(400).json({ error: 'This seller is not accepting offers on this item.' });
+    }
+
+    const vendorId = product.vendor;
+    if (!vendorId) return res.status(400).json({ error: 'This product has no seller.' });
+
+    const vendor = await Vendor.findById(vendorId).lean();
+    if (!vendor) return res.status(404).json({ error: 'Seller not found.' });
+    if (!['casual', 'refurbished'].includes(vendor.type)) {
+      return res.status(400).json({ error: 'This seller does not accept offers.' });
+    }
+
+    if (String(vendor.userId) === String(req.user._id)) {
+      return res.status(400).json({ error: 'You cannot make an offer on your own product.' });
+    }
+
+    let convo = await Conversation.findOne({
+      buyer: req.user._id,
+      vendor: vendorId,
+      product: productId,
+    });
+
+    const isNew = !convo;
+
+    if (!convo) {
+      convo = new Conversation({
+        product:     productId,
+        productName: product.name,
+        productSlug: product.slug || '',
+        buyer:       req.user._id,
+        buyerName:   req.user.name || req.user.username || 'Buyer',
+        vendor:      vendorId,
+        vendorName:  vendor.storeName || 'Seller',
+      });
+    }
+
+    // Only one live offer per conversation at a time — supersede any earlier
+    // pending offer so the thread doesn't accumulate stale asks.
+    convo.messages.forEach((m) => {
+      if (m.type === 'offer' && m.offerStatus === 'pending') m.offerStatus = 'expired';
+    });
+
+    convo.messages.push({
+      sender:      req.user._id,
+      senderRole:  'buyer',
+      body:        `Offered £${amount.toFixed(2)}`,
+      type:        'offer',
+      offerAmount: amount,
+      offerStatus: 'pending',
+    });
+    convo.unreadVendor += 1;
+    convo.lastMessageAt = new Date();
+    await convo.save();
+
+    try {
+      const vendorUser = await User.findById(vendor.userId).lean();
+      if (vendorUser?.email) {
+        mailNewMessage({
+          to:          vendorUser.email,
+          senderName:  convo.buyerName,
+          productName: convo.productName,
+          role:        'vendor',
+          convoId:     convo._id.toString(),
+        });
+      }
+    } catch { /* non-fatal */ }
+
+    res.status(isNew ? 201 : 200).json({ conversation: convo });
+  } catch (err) {
+    console.error('[messages] offer error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// ── Respond to an offer (vendor) ──────────────────────────────
+// PATCH /api/messages/:id/offer/:msgId
+// Body: { action: 'accept' | 'reject' }
+router.patch('/:id/offer/:msgId', authMiddleware, async (req, res) => {
+  try {
+    const { action } = req.body || {};
+    if (!['accept', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action.' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid conversation ID.' });
+    }
+
+    const convo = await Conversation.findById(req.params.id);
+    if (!convo) return res.status(404).json({ error: 'Conversation not found.' });
+
+    const myVendor = await getMyVendor(req.user._id);
+    if (!myVendor || String(convo.vendor) !== String(myVendor._id)) {
+      return res.status(403).json({ error: 'Only the seller can respond to an offer.' });
+    }
+
+    const msg = convo.messages.id(req.params.msgId);
+    if (!msg || msg.type !== 'offer') {
+      return res.status(404).json({ error: 'Offer not found.' });
+    }
+    if (msg.offerStatus !== 'pending') {
+      return res.status(400).json({ error: 'This offer has already been responded to.' });
+    }
+
+    if (action === 'accept') {
+      msg.offerStatus = 'accepted';
+      msg.offerExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h to complete purchase
+    } else {
+      msg.offerStatus = 'rejected';
+    }
+
+    convo.unreadBuyer += 1;
+    convo.lastMessageAt = new Date();
+    await convo.save();
+
+    try {
+      const buyer = await User.findById(convo.buyer).lean();
+      if (buyer?.email) {
+        mailNewMessage({
+          to:          buyer.email,
+          senderName:  convo.vendorName,
+          productName: convo.productName,
+          role:        'buyer',
+          convoId:     convo._id.toString(),
+        });
+      }
+    } catch { /* non-fatal */ }
+
+    res.json({ conversation: convo });
+  } catch (err) {
+    console.error('[messages] offer response error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 // ── Unread count for current user ────────────────────────────
 // GET /api/messages/unread-count?view=buyer|vendor
 router.get('/unread-count', authMiddleware, async (req, res) => {

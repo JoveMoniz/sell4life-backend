@@ -4,6 +4,16 @@ const messageSchema = new mongoose.Schema({
   sender:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   senderRole: { type: String, enum: ['buyer', 'vendor'], required: true },
   body:       { type: String, required: true, maxlength: 2000, trim: true },
+
+  // Make-an-offer (casual/refurbished only, product.acceptOffers must be
+  // true) — an offer is just a specially-typed message so it renders inline
+  // in the existing thread. offerAmount is the buyer's proposed price;
+  // acceptance is server-verified again at checkout, never trusted from the
+  // client, so this record is the sole source of truth for that price.
+  type:            { type: String, enum: ['text', 'offer'], default: 'text' },
+  offerAmount:     { type: Number, min: 0.01 },
+  offerStatus:     { type: String, enum: ['pending', 'accepted', 'rejected', 'expired', 'completed'] },
+  offerExpiresAt:  { type: Date },
 }, { timestamps: true });
 
 const conversationSchema = new mongoose.Schema({
