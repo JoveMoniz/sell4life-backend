@@ -280,6 +280,30 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 /* ======================================================
+   HAS THE CURRENT USER BOUGHT THIS PRODUCT?
+   Lightweight existence check for the product page — lets a buyer
+   revisiting a sold-out casual listing see "You bought this item"
+   instead of a generic "Sold" state.
+====================================================== */
+
+router.get('/purchased/:productId', authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+    const exists = await Order.exists({
+      user: req.user._id,
+      'items.productId': req.params.productId,
+      paymentStatus: { $in: ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'] },
+    });
+    res.json({ purchased: !!exists });
+  } catch (err) {
+    console.error('CHECK PURCHASED ERROR:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    GET ORDER BY PAYMENT INTENT
 ====================================================== */
 
