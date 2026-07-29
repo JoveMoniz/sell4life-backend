@@ -10,6 +10,7 @@ import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
 import cjProvider from '../utils/shippingProviders/cjdropshipping.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
+import { resolveAcceptedOffer, markOfferCompleted } from '../utils/offerLogic.js';
 
 const router = express.Router();
 
@@ -77,6 +78,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       const items = [];
       const vendorFreeReturnsCache = {};
+      const acceptedOffersToComplete = [];
 
       // -----------------------------
       // BUILD ITEMS FROM DATABASE
@@ -104,7 +106,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           ? (product.variants || []).find(v => v.sku && v.sku.trim() === String(raw.variantSku).trim())
           : null;
 
-        const price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
+        // Re-verify an accepted offer the same way orders.js did when the
+        // PaymentIntent amount was calculated — never trust the metadata
+        // price, only the amount stored on our own message record.
+        let price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
+        if (raw.offerMessageId) {
+          const offer = await resolveAcceptedOffer({
+            offerMessageId: raw.offerMessageId,
+            buyerId: userId,
+            productId: product._id,
+          });
+          if (offer) {
+            price = offer.amount;
+            acceptedOffersToComplete.push(offer);
+          }
+        }
         // Must match the same check used when the PaymentIntent amount was
         // calculated (orders.js) — otherwise a shipIncluded product ends up
         // with a non-zero shippingCost stamped on the order even though
@@ -239,6 +255,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           return res.json({ received: true });
         }
         throw createErr;
+      }
+
+      // Only mark offers consumed once the order genuinely exists — an
+      // earlier throw (or the duplicate-order branch above) must leave them
+      // untouched so a retried webhook delivery can still complete safely.
+      for (const offer of acceptedOffersToComplete) {
+        try { await markOfferCompleted(offer.convo, offer.msg); }
+        catch (e) { console.error('Failed to mark offer completed:', e.message); }
       }
 
       pushUniqueHistory(order, 'Pending', 'Payment successful');
