@@ -222,6 +222,16 @@ router.post('/offer', authMiddleware, async (req, res) => {
       });
     }
 
+    // Block a new offer while a still-valid accepted one is sitting unpaid —
+    // otherwise a payable offer and a fresh pending one could coexist, which
+    // is just confusing (which price actually applies?).
+    const liveAccepted = convo.messages.find(
+      (m) => m.type === 'offer' && m.offerStatus === 'accepted' && m.offerExpiresAt && m.offerExpiresAt > new Date()
+    );
+    if (liveAccepted) {
+      return res.status(400).json({ error: `You already have an accepted offer of £${liveAccepted.offerAmount.toFixed(2)} on this item — pay it or let it expire before making a new one.` });
+    }
+
     // Only one live offer per conversation at a time — supersede any earlier
     // pending offer so the thread doesn't accumulate stale asks.
     convo.messages.forEach((m) => {
