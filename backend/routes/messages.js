@@ -260,13 +260,16 @@ router.post('/offer', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Respond to an offer (vendor) ──────────────────────────────
+// ── Respond to an offer (accept / reject / counter) ────────────
 // PATCH /api/messages/:id/offer/:msgId
-// Body: { action: 'accept' | 'reject' }
+// Body: { action: 'accept' | 'reject' | 'counter', amount? }
+// Whoever did NOT send the pending offer is the one who may respond to it —
+// vendor responds to the buyer's original offer, then the buyer can accept/
+// reject/counter the vendor's counter, and so on back and forth.
 router.patch('/:id/offer/:msgId', authMiddleware, async (req, res) => {
   try {
     const { action } = req.body || {};
-    if (!['accept', 'reject'].includes(action)) {
+    if (!['accept', 'reject', 'counter'].includes(action)) {
       return res.status(400).json({ error: 'Invalid action.' });
     }
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -277,8 +280,10 @@ router.patch('/:id/offer/:msgId', authMiddleware, async (req, res) => {
     if (!convo) return res.status(404).json({ error: 'Conversation not found.' });
 
     const myVendor = await getMyVendor(req.user._id);
-    if (!myVendor || String(convo.vendor) !== String(myVendor._id)) {
-      return res.status(403).json({ error: 'Only the seller can respond to an offer.' });
+    const isBuyer   = String(convo.buyer) === String(req.user._id);
+    const isVendor  = myVendor && String(convo.vendor) === String(myVendor._id);
+    if (!isBuyer && !isVendor) {
+      return res.status(403).json({ error: 'Access denied.' });
     }
 
     const msg = convo.messages.id(req.params.msgId);
@@ -289,27 +294,67 @@ router.patch('/:id/offer/:msgId', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'This offer has already been responded to.' });
     }
 
+    // Only the other party may respond — you can't accept/reject/counter
+    // your own ask, whichever side originally sent it.
+    const myRole = isVendor ? 'vendor' : 'buyer';
+    if (msg.senderRole === myRole) {
+      return res.status(403).json({ error: 'Waiting for the other side to respond to this offer.' });
+    }
+
+    let counterAmount = null;
+    if (action === 'counter') {
+      counterAmount = Number(req.body?.amount);
+      if (!Number.isFinite(counterAmount) || counterAmount <= 0) {
+        return res.status(400).json({ error: 'Enter a valid counter-offer amount.' });
+      }
+    }
+
     if (action === 'accept') {
       msg.offerStatus = 'accepted';
       msg.offerExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h to complete purchase
-    } else {
+    } else if (action === 'reject') {
       msg.offerStatus = 'rejected';
+    } else {
+      msg.offerStatus = 'countered';
+      convo.messages.push({
+        sender:      req.user._id,
+        senderRole:  myRole,
+        body:        `Countered £${counterAmount.toFixed(2)}`,
+        type:        'offer',
+        offerAmount: counterAmount,
+        offerStatus: 'pending',
+      });
     }
 
-    convo.unreadBuyer += 1;
+    if (myRole === 'vendor') convo.unreadBuyer += 1;
+    else                     convo.unreadVendor += 1;
     convo.lastMessageAt = new Date();
     await convo.save();
 
     try {
-      const buyer = await User.findById(convo.buyer).lean();
-      if (buyer?.email) {
-        mailNewMessage({
-          to:          buyer.email,
-          senderName:  convo.vendorName,
-          productName: convo.productName,
-          role:        'buyer',
-          convoId:     convo._id.toString(),
-        });
+      if (myRole === 'vendor') {
+        const buyer = await User.findById(convo.buyer).lean();
+        if (buyer?.email) {
+          mailNewMessage({
+            to:          buyer.email,
+            senderName:  convo.vendorName,
+            productName: convo.productName,
+            role:        'buyer',
+            convoId:     convo._id.toString(),
+          });
+        }
+      } else {
+        const vendor = await Vendor.findById(convo.vendor).lean();
+        const vendorUser = vendor ? await User.findById(vendor.userId).lean() : null;
+        if (vendorUser?.email) {
+          mailNewMessage({
+            to:          vendorUser.email,
+            senderName:  convo.buyerName,
+            productName: convo.productName,
+            role:        'vendor',
+            convoId:     convo._id.toString(),
+          });
+        }
       }
     } catch { /* non-fatal */ }
 
