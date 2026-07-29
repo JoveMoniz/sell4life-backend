@@ -12,7 +12,7 @@ const messageSchema = new mongoose.Schema({
   // client, so this record is the sole source of truth for that price.
   type:            { type: String, enum: ['text', 'offer'], default: 'text' },
   offerAmount:     { type: Number, min: 0.01 },
-  offerStatus:     { type: String, enum: ['pending', 'accepted', 'rejected', 'expired', 'completed'] },
+  offerStatus:     { type: String, enum: ['pending', 'accepted', 'rejected', 'countered', 'expired', 'completed'] },
   offerExpiresAt:  { type: Date },
 }, { timestamps: true });
 
