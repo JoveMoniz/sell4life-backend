@@ -34,6 +34,7 @@ import Product from '../models/product.js';
 import Order from '../models/order.js';
 import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
+import Conversation from '../models/conversation.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailOrderShipped } from '../utils/email.js';
@@ -2409,6 +2410,38 @@ router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprov
         }
       } catch (e) {
         console.error('Shipped email error:', e.message);
+      }
+    })();
+
+    // Also post it as an in-app message — same buyer<->vendor conversation
+    // the offers/Ask Seller feature uses, auto-created if this pair never
+    // messaged before this order, so it's persistent and not email-only.
+    (async () => {
+      try {
+        let convo = await Conversation.findOne({ buyer: order.user, vendor: vendor._id, product: item.productId });
+        if (!convo) {
+          const product = await Product.findById(item.productId).select('name slug').lean();
+          const buyerUser = await User.findById(order.user).select('name username').lean();
+          convo = new Conversation({
+            product:     item.productId,
+            productName: product?.name || item.name || 'Product',
+            productSlug: product?.slug || '',
+            buyer:       order.user,
+            buyerName:   buyerUser?.name || buyerUser?.username || 'Buyer',
+            vendor:      vendor._id,
+            vendorName:  vendor.storeName || 'Seller',
+          });
+        }
+        convo.messages.push({
+          sender:     vendor.userId,
+          senderRole: 'vendor',
+          body:       `📦 Shipped — tracking ${trackNum}${carrierStr ? ` via ${carrierStr}` : ''}`,
+        });
+        convo.unreadBuyer += 1;
+        convo.lastMessageAt = new Date();
+        await convo.save();
+      } catch (e) {
+        console.error('Shipped message error:', e.message);
       }
     })();
 
