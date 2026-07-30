@@ -127,7 +127,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // Only customers who have actually received the product may review it
     const deliveredOrder = await Order.findOne({
-      userId: req.user._id,
+      user: req.user._id,
       items: {
         $elemMatch: {
           productId: new mongoose.Types.ObjectId(productId),
