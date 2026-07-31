@@ -414,6 +414,7 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
 
       order.items.forEach((item) => {
         if (['Pending', 'Processing', 'Cancel Requested'].includes(item.status)) {
+          item.statusBeforeCancel = item.status;
           item.status = 'Cancelled';
           item.cancelledAt = now;
         }
@@ -574,26 +575,35 @@ router.patch('/:id/cancel-refund', authMiddleware, adminMiddleware, async (req, 
       order.paymentStatus = 'paid';
     }
 
-    // clear vendor-level refund schedules
-    if (Array.isArray(order.vendorOrders)) {
-      order.vendorOrders.forEach((vo) => {
-        vo.refundScheduledAt = null;
-
-        if (vo.status === 'Refund Scheduled') {
-          vo.status = 'Returned';
-        }
-      });
-    }
-
+    // Reverse the fulfillment cancellation itself, not just the refund —
+    // otherwise the order is left permanently dead-ended at Cancelled with
+    // no way for the vendor to keep processing it, even though the money
+    // never actually left.
     order.items.forEach((item) => {
       item.refundScheduledAt = null;
 
       if (item.refundStatus === 'scheduled') {
         item.refundStatus = 'none';
       }
+
+      if (item.status === 'Cancelled' && item.statusBeforeCancel) {
+        item.status = item.statusBeforeCancel;
+        item.statusBeforeCancel = '';
+        item.cancelledAt = undefined;
+      }
     });
 
-    pushUniqueHistory(order, 'Refund Schedule Cancelled', 'Scheduled refund cancelled by admin');
+    // clear vendor-level refund schedules and re-derive status from the
+    // now-reverted items instead of assuming a fixed end state
+    if (Array.isArray(order.vendorOrders)) {
+      order.vendorOrders.forEach((vo) => {
+        vo.refundScheduledAt = null;
+        if (vo.refundStatus === 'scheduled') vo.refundStatus = 'none';
+        vo.status = getDerivedVendorStatus(vo, order.items);
+      });
+    }
+
+    pushUniqueHistory(order, 'Refund Schedule Cancelled', 'Scheduled refund cancelled by admin — order reactivated');
 
     // keep parent fulfillment status derived from vendor orders
     order.status = getDerivedOrderStatus(order);

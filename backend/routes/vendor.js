@@ -1802,6 +1802,8 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
     const now = new Date();
 
     vendorItems.forEach((item) => {
+      const wasStatus = item.status || 'Pending';
+
       if (!item.status || ['Pending', 'Processing', 'Shipped'].includes(item.status)) {
         item.status = status;
       }
@@ -1812,6 +1814,7 @@ router.patch('/orders/:id/status', authMiddleware, requireApprovedVendor, async 
 
       if (status === 'Cancelled') {
         item.cancelledAt = now;
+        item.statusBeforeCancel = wasStatus;
 
         item.refundStatus = 'scheduled';
       }
