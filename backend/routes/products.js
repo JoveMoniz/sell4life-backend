@@ -473,7 +473,24 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
     ];
 
     allowedFields.forEach((field) => {
-      if (field in updates) {
+      if (!(field in updates)) return;
+
+      if (field === 'variants') {
+        // The edit form never sends cjVid back (it's not a vendor-editable
+        // field), so a plain overwrite here would silently erase CJ's
+        // internal variant id on every save — breaking CJ auto-ordering
+        // until the background re-sync below happens to repair it (which
+        // isn't guaranteed: it can fail silently, e.g. rate limit or SKU
+        // mismatch). Carry the existing cjVid forward by matching on SKU,
+        // falling back to position for newly-added/unmatched rows.
+        const existingVariants = product.variants || [];
+        product.variants = (updates.variants || []).map((incoming, idx) => {
+          const sku = (incoming.sku || '').trim();
+          const existing = (sku && existingVariants.find(v => (v.sku || '').trim() === sku))
+            || existingVariants[idx];
+          return { ...incoming, cjVid: incoming.cjVid || existing?.cjVid || '' };
+        });
+      } else {
         product[field] = updates[field];
       }
     });
