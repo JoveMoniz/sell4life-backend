@@ -2,7 +2,11 @@ import stripe from '../config/stripe.js';
 import { pushUniqueHistory, pushItemHistory } from './historyLogic.js';
 import { calculateItemRefundAmount } from './returnLogic.js';
 
-const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 15000);
+// Default gives a real same-day safety window (long enough to catch an
+// accidental order cancel and hit "Cancel Refund") without holding a
+// genuine cancellation's refund back meaningfully — override via env var
+// if a different window is ever needed.
+const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 2 * 60 * 60 * 1000);
 
 export function scheduleRefund(order) {
   // 🚫 Prevent duplicate scheduling FIRST
