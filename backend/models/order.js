@@ -243,6 +243,11 @@ const orderItemSchema = new mongoose.Schema({
   deliveredAt: Date,
   cancelledAt: Date,
 
+  // What this item's status was right before an order-level cancel
+  // overwrote it — lets admin's "Cancel Refund" genuinely undo the
+  // cancellation (revert fulfillment) rather than just stopping the money.
+  statusBeforeCancel: { type: String, default: '' },
+
   archived: {
     type: Boolean,
     default: false,
