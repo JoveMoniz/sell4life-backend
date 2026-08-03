@@ -281,4 +281,51 @@ router.get('/countries', async (req, res) => {
   }
 });
 
+/* ======================================================
+   GET /funnel — visitors -> product views -> add to cart ->
+   checkout started -> purchase, with drop-off % per stage
+====================================================== */
+const FUNNEL_STAGES = [
+  { key: 'visitors', label: 'Visitors', type: null },
+  { key: 'productViews', label: 'Product Views', type: 'product_view' },
+  { key: 'addToCart', label: 'Add to Cart', type: 'add_to_cart' },
+  { key: 'checkoutStart', label: 'Checkout Started', type: 'checkout_start' },
+  { key: 'purchases', label: 'Purchases', type: 'purchase' },
+];
+
+router.get('/funnel', async (req, res) => {
+  try {
+    const period = req.query.period;
+    const sessionMatch = { isBot: false, ...dateFilterFor('startedAt', period) };
+    const eventMatch = { isBot: false, ...dateFilterFor('timestamp', period) };
+
+    const [visitorCount, eventCounts] = await Promise.all([
+      AnalyticsSession.countDocuments(sessionMatch),
+      AnalyticsEvent.aggregate([
+        { $match: { ...eventMatch, type: { $in: FUNNEL_STAGES.filter((s) => s.type).map((s) => s.type) } } },
+        { $group: { _id: { type: '$type', sessionId: '$sessionId' } } },
+        { $group: { _id: '$_id.type', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const countByType = {};
+    eventCounts.forEach((r) => { countByType[r._id] = r.count; });
+
+    let prevCount = null;
+    const stages = FUNNEL_STAGES.map((stage) => {
+      const count = stage.type ? (countByType[stage.type] || 0) : visitorCount;
+      const dropOffPct = prevCount != null && prevCount > 0
+        ? Math.round((1 - count / prevCount) * 1000) / 10
+        : null;
+      prevCount = count;
+      return { key: stage.key, label: stage.label, count, dropOffPct };
+    });
+
+    res.json({ stages });
+  } catch (err) {
+    console.error('[admin-analytics] funnel error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
