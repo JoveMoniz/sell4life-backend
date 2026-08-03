@@ -42,7 +42,7 @@ import passwordResetRoute from './routes/passwordReset.js';
 import messagesRoute from './routes/messages.js';
 import trackRoute from './routes/track.js';
 import adminAnalyticsRoute from './routes/adminAnalytics.js';
-import { initGeoIp } from './utils/geoip.js';
+import { initGeoIp, isGeoIpLoaded } from './utils/geoip.js';
 
 // ======================================================
 // APP INITIALIZATION
@@ -210,6 +210,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     time: new Date().toISOString(),
+    geoIpLoaded: isGeoIpLoaded(),
   });
 });
 
