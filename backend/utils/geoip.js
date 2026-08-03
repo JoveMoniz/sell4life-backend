@@ -25,6 +25,10 @@ export async function initGeoIp() {
   }
 }
 
+export function isGeoIpLoaded() {
+  return !!lookup;
+}
+
 export function lookupCountry(ip) {
   if (!lookup || !ip) return '';
   try {
