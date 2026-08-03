@@ -56,7 +56,7 @@ const app = express();
 // hop resolves req.ip to Render's own internal address instead of the
 // real visitor, silently breaking GeoIP country lookups.
 // ======================================================
-app.set('trust proxy', 2);
+app.set('trust proxy', 3);
 
 // ======================================================
 // SECURITY HEADERS
