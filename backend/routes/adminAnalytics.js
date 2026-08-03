@@ -16,7 +16,7 @@ router.use(adminMiddleware);
    paths, and the synthetic sessionIds/visitorIds used for curl
    tests). Safe to remove this route once run.
 ====================================================== */
-const TEST_PATHS = ['/test-page', '/cors-test', '/inline-static-test', '/final-verify'];
+const TEST_PATHS = ['/test-page', '/cors-test', '/inline-static-test', '/final-verify', '/referrer-test'];
 const TEST_IDS = ['test-session-001', 'test-visitor-001', 'test-session-bot-001', 'test-visitor-bot-001', 'inline-test', 'cors-test', 'final-verify'];
 
 router.delete('/test-data', async (req, res) => {
