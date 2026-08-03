@@ -78,7 +78,7 @@ const apiLimiter = rateLimit({
   // visitor already fires several beacons per pageview, and shared-IP
   // scenarios (offices, mobile carrier NAT) would otherwise exhaust this
   // limit almost immediately.
-  skip: (req) => req.path.startsWith('/track'),
+  skip: (req) => req.path.startsWith('/interactions'),
 });
 
 const authLimiter = rateLimit({
@@ -96,7 +96,7 @@ const trackLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
-app.use('/api/track', trackLimiter);
+app.use('/api/interactions', trackLimiter);
 app.post('/api/auth/login', authLimiter);
 app.post('/api/auth/register', authLimiter);
 app.post('/api/auth/forgot-password', authLimiter);
@@ -234,7 +234,7 @@ app.use('/api/reviews', reviewsRoute);
 app.use('/api/stores', storesRoute);
 app.use('/api/account', accountRoute);
 app.use('/api/messages', messagesRoute);
-app.use('/api/track', trackRoute);
+app.use('/api/interactions', trackRoute);
 app.use('/api/admin/analytics', adminAnalyticsRoute);
 
 // ======================================================
