@@ -4,6 +4,7 @@ import AnalyticsSession from '../models/analyticsSession.js';
 import AnalyticsEvent from '../models/analyticsEvent.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
+import { processAnalyticsRollup } from '../jobs/analyticsRollupWorker.js';
 
 const router = express.Router();
 
@@ -36,6 +37,21 @@ router.delete('/test-data', async (req, res) => {
     });
   } catch (err) {
     console.error('[admin-analytics] test-data cleanup error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   MANUAL TRIGGER — runs the same rollup/retention job the nightly
+   worker runs, on demand. Useful for verifying it works without
+   waiting for the next scheduled tick.
+====================================================== */
+router.post('/run-rollup', async (req, res) => {
+  try {
+    const summary = await processAnalyticsRollup();
+    res.json({ ok: true, ...summary });
+  } catch (err) {
+    console.error('[admin-analytics] manual rollup error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
