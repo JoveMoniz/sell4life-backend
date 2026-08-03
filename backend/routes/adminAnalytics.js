@@ -282,6 +282,34 @@ router.get('/countries', async (req, res) => {
 });
 
 /* ======================================================
+   GET /searches — top on-site search terms
+====================================================== */
+router.get('/searches', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const match = { isBot: false, type: 'search', ...dateFilterFor('timestamp', req.query.period) };
+
+    const rows = await AnalyticsEvent.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $toLower: { $trim: { input: { $ifNull: ['$metadata.query', ''] } } } },
+          count: { $sum: 1 },
+        },
+      },
+      { $match: { _id: { $ne: '' } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+    ]);
+
+    res.json(rows.map((r) => ({ query: r._id, count: r.count })));
+  } catch (err) {
+    console.error('[admin-analytics] searches error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    GET /funnel — visitors -> product views -> add to cart ->
    checkout started -> purchase, with drop-off % per stage
 ====================================================== */
