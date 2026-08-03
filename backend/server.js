@@ -25,6 +25,7 @@ import cookieParser from 'cookie-parser';
 import { startRefundWorker } from './jobs/refundWorker.js';
 import { startVendorPayoutWorker } from './jobs/vendorPayoutWorker.js';
 import { startCjProductSyncWorker } from './jobs/cjProductSyncWorker.js';
+import { startAnalyticsRollupWorker } from './jobs/analyticsRollupWorker.js';
 import authRoute from './routes/auth.js';
 import vendorRoutes from './routes/vendor.js';
 import ordersRoute from './routes/orders.js';
@@ -322,4 +323,5 @@ mongoose
     startRefundWorker();
     startVendorPayoutWorker();
     startCjProductSyncWorker();
+    startAnalyticsRollupWorker();
   });
