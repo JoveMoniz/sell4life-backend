@@ -77,7 +77,7 @@ function dateFilterFor(field, period) {
 ====================================================== */
 router.get('/summary', async (req, res) => {
   try {
-    const match = { isBot: false, ...dateFilterFor('startedAt', req.query.period) };
+    const match = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', req.query.period) };
 
     const [agg] = await AnalyticsSession.aggregate([
       { $match: match },
@@ -117,7 +117,7 @@ router.get('/summary', async (req, res) => {
 router.get('/timeseries', async (req, res) => {
   try {
     const period = req.query.period || 'week';
-    const match = { isBot: false, ...dateFilterFor('startedAt', period) };
+    const match = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', period) };
     const granularity = period === 'today' ? 'hour' : 'day';
 
     const dateFormat = granularity === 'hour' ? '%Y-%m-%dT%H:00' : '%Y-%m-%d';
@@ -148,7 +148,7 @@ router.get('/realtime', async (req, res) => {
   try {
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
     const activeVisitors = await AnalyticsSession.countDocuments({
-      isBot: false,
+      isBot: false, isInternal: false,
       lastSeenAt: { $gte: fiveMinAgo },
     });
     res.json({ activeVisitors });
@@ -164,7 +164,7 @@ router.get('/realtime', async (req, res) => {
 router.get('/top-pages', async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const match = { isBot: false, type: 'pageview', ...dateFilterFor('timestamp', req.query.period) };
+    const match = { isBot: false, isInternal: false, type: 'pageview', ...dateFilterFor('timestamp', req.query.period) };
 
     const rows = await AnalyticsEvent.aggregate([
       { $match: match },
@@ -195,7 +195,7 @@ router.get('/top-pages', async (req, res) => {
 ====================================================== */
 router.get('/sources', async (req, res) => {
   try {
-    const match = { isBot: false, ...dateFilterFor('startedAt', req.query.period) };
+    const match = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', req.query.period) };
 
     const [breakdown, topReferrers, topCampaigns] = await Promise.all([
       AnalyticsSession.aggregate([
@@ -240,7 +240,7 @@ router.get('/sources', async (req, res) => {
 ====================================================== */
 router.get('/devices', async (req, res) => {
   try {
-    const match = { isBot: false, ...dateFilterFor('startedAt', req.query.period) };
+    const match = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', req.query.period) };
 
     const [devices, browsers, os] = await Promise.all([
       AnalyticsSession.aggregate([{ $match: match }, { $group: { _id: '$device', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
@@ -265,7 +265,7 @@ router.get('/devices', async (req, res) => {
 router.get('/countries', async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const match = { isBot: false, country: { $ne: '' }, ...dateFilterFor('startedAt', req.query.period) };
+    const match = { isBot: false, isInternal: false, country: { $ne: '' }, ...dateFilterFor('startedAt', req.query.period) };
 
     const rows = await AnalyticsSession.aggregate([
       { $match: match },
@@ -287,7 +287,7 @@ router.get('/countries', async (req, res) => {
 router.get('/searches', async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const match = { isBot: false, type: 'search', ...dateFilterFor('timestamp', req.query.period) };
+    const match = { isBot: false, isInternal: false, type: 'search', ...dateFilterFor('timestamp', req.query.period) };
 
     const rows = await AnalyticsEvent.aggregate([
       { $match: match },
@@ -324,8 +324,8 @@ const FUNNEL_STAGES = [
 router.get('/funnel', async (req, res) => {
   try {
     const period = req.query.period;
-    const sessionMatch = { isBot: false, ...dateFilterFor('startedAt', period) };
-    const eventMatch = { isBot: false, ...dateFilterFor('timestamp', period) };
+    const sessionMatch = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', period) };
+    const eventMatch = { isBot: false, isInternal: false, ...dateFilterFor('timestamp', period) };
 
     const [visitorCount, eventCounts] = await Promise.all([
       AnalyticsSession.countDocuments(sessionMatch),
