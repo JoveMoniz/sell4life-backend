@@ -38,7 +38,7 @@ router.post('/event', async (req, res) => {
     const now = new Date();
     const path = String(body.path || '').slice(0, 500);
 
-    let session = await AnalyticsSession.findOne({ sessionId }).select('_id');
+    let session = await AnalyticsSession.findOne({ sessionId }).select('_id startedAt');
 
     if (!session) {
       const { device, browser, os } = parseUserAgent(ua);
@@ -77,10 +77,11 @@ router.post('/event', async (req, res) => {
         eventCount: 1,
       });
     } else {
+      const durationSec = Math.max(0, Math.round((now - session.startedAt) / 1000));
       await AnalyticsSession.updateOne(
         { sessionId },
         {
-          $set: { lastSeenAt: now, exitPage: path },
+          $set: { lastSeenAt: now, exitPage: path, durationSec },
           $inc: { pageViewCount: type === 'pageview' ? 1 : 0, eventCount: 1 },
         }
       );
