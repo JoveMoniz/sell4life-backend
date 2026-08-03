@@ -15,20 +15,6 @@ const EVENT_TYPES = [
 ];
 
 /* ======================================================
-   TEMPORARY DIAGNOSTIC — remove once the staging GeoIP gap is
-   root-caused. Shows exactly what IP Express resolves (and what it
-   geolocates to) behind Render's proxy, for a given request.
-====================================================== */
-router.get('/debug-ip', (req, res) => {
-  res.json({
-    ip: req.ip,
-    ips: req.ips,
-    xForwardedFor: req.headers['x-forwarded-for'],
-    country: lookupCountry(req.ip),
-  });
-});
-
-/* ======================================================
    POST /api/track/event
    Public, unauthenticated — most visitors aren't logged in.
    Never errors out to the client; a tracking failure must never
