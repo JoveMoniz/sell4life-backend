@@ -40,6 +40,9 @@ import accountRoute from './routes/account.js';
 import stripeWebhookRoute from './routes/stripeWebhook.js';
 import passwordResetRoute from './routes/passwordReset.js';
 import messagesRoute from './routes/messages.js';
+import trackRoute from './routes/track.js';
+import adminAnalyticsRoute from './routes/adminAnalytics.js';
+import { initGeoIp } from './utils/geoip.js';
 
 // ======================================================
 // APP INITIALIZATION
@@ -71,6 +74,11 @@ const apiLimiter = rateLimit({
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  // Tracking gets its own, more generous limiter below — a single active
+  // visitor already fires several beacons per pageview, and shared-IP
+  // scenarios (offices, mobile carrier NAT) would otherwise exhaust this
+  // limit almost immediately.
+  skip: (req) => req.path.startsWith('/track'),
 });
 
 const authLimiter = rateLimit({
@@ -80,7 +88,15 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const trackLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api', apiLimiter);
+app.use('/api/track', trackLimiter);
 app.post('/api/auth/login', authLimiter);
 app.post('/api/auth/register', authLimiter);
 app.post('/api/auth/forgot-password', authLimiter);
@@ -218,6 +234,8 @@ app.use('/api/reviews', reviewsRoute);
 app.use('/api/stores', storesRoute);
 app.use('/api/account', accountRoute);
 app.use('/api/messages', messagesRoute);
+app.use('/api/track', trackRoute);
+app.use('/api/admin/analytics', adminAnalyticsRoute);
 
 // ======================================================
 // 404 HANDLER
@@ -249,6 +267,8 @@ app.listen(PORT, () => {
   console.log(`🚀 Sell4Life backend running on port ${PORT}`);
 
   // 🔥 START WORKER HERE
+
+  initGeoIp();
 });
 
 // ======================================================
