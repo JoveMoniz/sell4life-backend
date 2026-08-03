@@ -11,6 +11,36 @@ router.use(authMiddleware);
 router.use(adminMiddleware);
 
 /* ======================================================
+   ONE-OFF: purge known test data generated while diagnosing
+   the tracking pipeline (test-page/cors-test/inline-static-test
+   paths, and the synthetic sessionIds/visitorIds used for curl
+   tests). Safe to remove this route once run.
+====================================================== */
+const TEST_PATHS = ['/test-page', '/cors-test', '/inline-static-test', '/final-verify'];
+const TEST_IDS = ['test-session-001', 'test-visitor-001', 'test-session-bot-001', 'test-visitor-bot-001', 'inline-test', 'cors-test', 'final-verify'];
+
+router.delete('/test-data', async (req, res) => {
+  try {
+    const eventFilter = { $or: [{ path: { $in: TEST_PATHS } }, { sessionId: { $in: TEST_IDS } }, { visitorId: { $in: TEST_IDS } }] };
+    const sessionFilter = { $or: [{ entryPage: { $in: TEST_PATHS } }, { sessionId: { $in: TEST_IDS } }, { visitorId: { $in: TEST_IDS } }] };
+
+    const [eventsResult, sessionsResult] = await Promise.all([
+      AnalyticsEvent.deleteMany(eventFilter),
+      AnalyticsSession.deleteMany(sessionFilter),
+    ]);
+
+    res.json({
+      ok: true,
+      eventsDeleted: eventsResult.deletedCount,
+      sessionsDeleted: sessionsResult.deletedCount,
+    });
+  } catch (err) {
+    console.error('[admin-analytics] test-data cleanup error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    DATE-RANGE FILTER
    Same period convention used across the admin panel
    (adminVendors.js /financials) — today|week|month|quarter|
