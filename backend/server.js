@@ -74,11 +74,14 @@ const apiLimiter = rateLimit({
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
-  // Tracking gets its own, more generous limiter below — a single active
-  // visitor already fires several beacons per pageview, and shared-IP
-  // scenarios (offices, mobile carrier NAT) would otherwise exhaust this
-  // limit almost immediately.
-  skip: (req) => req.path.startsWith('/interactions'),
+  // Tracking and the admin analytics dashboard get their own, more
+  // generous limiters below — a single active visitor already fires
+  // several beacons per pageview (shared-IP scenarios like offices or
+  // mobile carrier NAT would otherwise exhaust this limit almost
+  // immediately), and the dashboard's 20s realtime poll plus its
+  // multi-endpoint page load adds up fast under normal, legitimate use
+  // by an already-authenticated admin.
+  skip: (req) => req.path.startsWith('/interactions') || req.path.startsWith('/admin/analytics'),
 });
 
 const authLimiter = rateLimit({
@@ -95,8 +98,19 @@ const trackLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Authenticated-admin-only route — abuse risk is much lower than a public
+// endpoint, and the dashboard genuinely needs the headroom (7 requests per
+// load, plus a 20s realtime poll for as long as the tab stays open).
+const adminAnalyticsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api', apiLimiter);
 app.use('/api/interactions', trackLimiter);
+app.use('/api/admin/analytics', adminAnalyticsLimiter);
 app.post('/api/auth/login', authLimiter);
 app.post('/api/auth/register', authLimiter);
 app.post('/api/auth/forgot-password', authLimiter);
