@@ -51,9 +51,12 @@ const app = express();
 
 // ======================================================
 // TRUST PROXY
-// Important for Render / reverse proxies
+// Render sits behind two proxy hops (an edge/CDN layer, then its own
+// internal load balancer) before reaching this app — trusting only 1
+// hop resolves req.ip to Render's own internal address instead of the
+// real visitor, silently breaking GeoIP country lookups.
 // ======================================================
-app.set('trust proxy', 1);
+app.set('trust proxy', 2);
 
 // ======================================================
 // SECURITY HEADERS
