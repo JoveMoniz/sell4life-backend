@@ -347,7 +347,9 @@ router.get('/verify-email', async (req, res) => {
     if (!record) return res.status(400).json({ ok: false, msg: 'Invalid or expired link' });
 
     await User.findByIdAndUpdate(record.userId, { emailVerified: true });
-    await EmailVerification.deleteMany({ userId: record.userId });
+    // Don't delete the token on success — leave it valid until its natural
+    // expiry so a second visit (e.g. the real user clicking after a security
+    // scanner already hit the link once) still succeeds instead of failing.
 
     res.json({ ok: true });
   } catch (err) {
