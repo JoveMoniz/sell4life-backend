@@ -107,11 +107,17 @@ app.options('*', cors(corsOptions));
 // RATE LIMITERS
 // General API limiter + stricter auth limiter
 // ======================================================
+// A plain string `message` makes express-rate-limit call res.send() with
+// text/html, which breaks any frontend code that assumes every API response
+// is JSON (res.json() throws, masking the real "too many requests" reason
+// behind a generic parse-error message) — so every limiter below gets a
+// JSON-shaped message instead.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Too many requests — please try again shortly.' },
   // Tracking and the admin analytics dashboard get their own, more
   // generous limiters below — a single active visitor already fires
   // several beacons per pageview (shared-IP scenarios like offices or
@@ -127,6 +133,7 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Too many attempts — please wait a few minutes and try again.' },
 });
 
 const trackLimiter = rateLimit({
@@ -134,6 +141,7 @@ const trackLimiter = rateLimit({
   max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Too many requests — please try again shortly.' },
 });
 
 // Authenticated-admin-only route — abuse risk is much lower than a public
@@ -144,6 +152,7 @@ const adminAnalyticsLimiter = rateLimit({
   max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Too many requests — please try again shortly.' },
 });
 
 app.use('/api', apiLimiter);
@@ -200,7 +209,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260810a';
+const APP_VERSION = '20260810b';
 
 // ======================================================
 // VERSION ENDPOINT
