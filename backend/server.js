@@ -70,6 +70,40 @@ app.use(helmet());
 app.use(cookieParser());
 
 // ======================================================
+// CORS CONFIGURATION
+// Registered before the rate limiters below so that a 429 response still
+// carries proper CORS headers — otherwise a rate-limited request looks to
+// the browser like an opaque "blocked by CORS policy" error instead of a
+// readable "too many requests", which is what it actually is.
+// ======================================================
+const allowedOrigins = [
+  'https://sell4life.com',
+  'https://www.sell4life.com',
+  'https://staging.sell4life.com',
+  'http://127.0.0.1:8080',
+  'http://localhost:8080',
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// ======================================================
 // RATE LIMITERS
 // General API limiter + stricter auth limiter
 // ======================================================
@@ -122,36 +156,6 @@ app.post('/api/auth/reset-password', authLimiter);
 app.post('/api/auth/resend-verification', authLimiter);
 
 // ======================================================
-// CORS CONFIGURATION
-// ======================================================
-const allowedOrigins = [
-  'https://sell4life.com',
-  'https://www.sell4life.com',
-  'https://staging.sell4life.com',
-  'http://127.0.0.1:8080',
-  'http://localhost:8080',
-];
-
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('Not allowed by CORS'));
-  },
-
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
-// ======================================================
 // REQUEST LOGGER
 // Simple request log for debugging
 // ======================================================
@@ -196,7 +200,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260715c';
+const APP_VERSION = '20260810a';
 
 // ======================================================
 // VERSION ENDPOINT
