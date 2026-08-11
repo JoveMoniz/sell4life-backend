@@ -448,6 +448,8 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'tags',
       'shippingCost',
       'shipIncluded',
+      'condition',
+      'acceptOffers',
       'variants',
       'addOns',
       'videoUrl',
