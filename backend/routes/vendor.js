@@ -2094,6 +2094,60 @@ router.patch(
 );
 
 /* ======================================================
+   RETRY A FAILED AUTO-REFUND
+   Re-runs triggerItemRefund for whatever quantity is still
+   unrefunded — safe to call repeatedly, since it's the same
+   function the original cancel/return action already used.
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/retry-refund',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item = findOrderItem(order, itemId);
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({ error: 'Not your item' });
+      }
+
+      if (item.refundStatus !== 'failed') {
+        return res.status(400).json({ error: `Nothing to retry — refund status is "${item.refundStatus}"` });
+      }
+
+      const outstandingQty = Number(item.quantity) - Number(item.refundedQuantity || 0);
+      if (outstandingQty <= 0) {
+        return res.status(400).json({ error: 'Nothing left to refund on this item' });
+      }
+
+      const result = await triggerItemRefund(order, item, outstandingQty, vendor._id);
+
+      await order.save();
+
+      if (!result.success) {
+        return res.status(502).json({ error: result.error || 'Refund retry failed', refundStatus: item.refundStatus });
+      }
+
+      res.json({ success: true, refundStatus: item.refundStatus, refundedAmount: result.refundedAmount });
+    } catch (err) {
+      console.error('Vendor retry refund error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/* ======================================================
    APPROVE ITEM RETURN
 ====================================================== */
 
