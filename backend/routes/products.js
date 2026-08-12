@@ -47,7 +47,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, collectionOnly, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -91,6 +91,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       slug: uniqueSlug,
       vendor: vendor._id,
       shippingCost: Number(shippingCost) >= 0 ? Number(shippingCost) : 0,
+      collectionOnly: !!collectionOnly,
       videoUrl:  videoUrl  || '',
       videoUrl2: videoUrl2 || '',
       videoUrl3: videoUrl3 || '',
@@ -448,6 +449,7 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'tags',
       'shippingCost',
       'shipIncluded',
+      'collectionOnly',
       'condition',
       'acceptOffers',
       'variants',
