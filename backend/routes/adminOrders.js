@@ -374,6 +374,50 @@ router.patch('/:id/items/:itemId/correct-shipping-cost', authMiddleware, adminMi
 });
 
 /* ======================================================
+   BACKFILL MISSING refundedAmount (ADMIN)
+   One-off data-correction tool for items refunded via the old
+   full-order refund worker path, which flipped refundStatus to
+   'processed' without ever recording refundedAmount/refundedQuantity
+   (fixed going forward in jobs/refundWorker.js). Only touches items
+   that are actually 'processed' but still show 0 refunded — recomputes
+   using the same formula the code now applies automatically.
+====================================================== */
+router.patch('/:id/items/:itemId/backfill-refunded-amount', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (item.refundStatus !== 'processed') {
+      return res.status(400).json({ error: `Item refundStatus is "${item.refundStatus}", not "processed" — nothing to backfill` });
+    }
+    if (Number(item.refundedAmount || 0) > 0) {
+      return res.status(400).json({ error: `refundedAmount is already £${Number(item.refundedAmount).toFixed(2)} — not zero, refusing to overwrite` });
+    }
+
+    const qty = Number(item.quantity || 0);
+    const amount = calculateItemRefundAmount(item, qty).total;
+
+    item.refundedQuantity = qty;
+    item.refundedAmount = amount;
+    item.refundedAt = item.refundedAt || new Date();
+    order.markModified('items');
+    await order.save();
+
+    console.log(`[admin] Backfilled refundedAmount on order ${order._id} item ${item._id}: 0 -> ${amount} (by ${req.user._id})`);
+    res.json({ success: true, itemId: item._id, refundedAmount: amount, refundedQuantity: qty });
+  } catch (err) {
+    console.error('Backfill refunded amount error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    PER-ITEM CANCEL (ADMIN — TOTAL OVERRIDE)
    Unlike the vendor's own cancel action (Pending/Processing only),
    admin can cancel an item from ANY non-cancelled state — full
