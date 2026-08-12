@@ -107,6 +107,14 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Buyer must collect in person — distinct from shippingCost:0, which
+    // means the seller ships it themselves at no charge. Both look like
+    // "£0.00" on shippingCost alone, so this needs its own flag.
+    collectionOnly: {
+      type: Boolean,
+      default: false,
+    },
+
     shipIncluded: {
       type: Boolean,
       default: false,
