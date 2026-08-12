@@ -374,6 +374,62 @@ router.patch('/:id/items/:itemId/correct-shipping-cost', authMiddleware, adminMi
 });
 
 /* ======================================================
+   PER-ITEM CANCEL (ADMIN — TOTAL OVERRIDE)
+   Unlike the vendor's own cancel action (Pending/Processing only),
+   admin can cancel an item from ANY non-cancelled state — full
+   override power. Refunds whatever quantity is still unrefunded;
+   triggerItemRefund's own safety cap protects against a stale
+   shippingCost ever requesting more than Stripe actually holds.
+====================================================== */
+router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (item.status === 'Cancelled') {
+      return res.status(400).json({ error: 'Item is already cancelled' });
+    }
+
+    item.statusBeforeCancel = item.status;
+    item.status = 'Cancelled';
+    item.cancelledAt = new Date();
+
+    const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
+    const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+
+    let refundResult = null;
+    if (isPaid && order.paymentIntentId && outstandingQty > 0 && item.refundStatus !== 'processed') {
+      refundResult = await triggerItemRefund(order, item, outstandingQty, req.user._id);
+    }
+
+    pushUniqueHistory(
+      order,
+      'Cancelled',
+      `Admin cancelled item: "${item.name}"${refundResult && !refundResult.success ? ' (refund failed — see below)' : ''}`
+    );
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({
+      success: true,
+      refunded: !!(refundResult && refundResult.success),
+      refundedAmount: refundResult?.refundedAmount,
+    });
+  } catch (err) {
+    console.error('Admin item cancel error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    UPDATE ORDER STATUS (ADMIN)
 ====================================================== */
 router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
