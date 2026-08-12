@@ -3,6 +3,7 @@
 // ======================================================
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
 import { getDerivedOrderStatus } from '../utils/orderLogic.js';
+import { calculateItemRefundAmount } from '../utils/returnLogic.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
@@ -227,6 +228,18 @@ export function startRefundWorker() {
             item.refundScheduledAt = null;
 
             if (item.refundStatus === 'scheduled') {
+              // This full-order refund only ever flipped refundStatus to
+              // 'processed' without recording what each item actually got
+              // back — leaving item.refundedAmount at 0 forever, which made
+              // goodwill's maxGoodwill calc (price - refundedAmount) think
+              // nothing had been refunded and kept offering the full price.
+              const outstandingQty = Number(item.quantity || 0) - Number(item.refundedQuantity || 0);
+              if (outstandingQty > 0) {
+                const amount = calculateItemRefundAmount(item, outstandingQty).total;
+                item.refundedQuantity = Number(item.refundedQuantity || 0) + outstandingQty;
+                item.refundedAmount   = Number(item.refundedAmount   || 0) + amount;
+                item.refundedAt       = new Date();
+              }
               item.refundStatus = 'processed';
             }
 
