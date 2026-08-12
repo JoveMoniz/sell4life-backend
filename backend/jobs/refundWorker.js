@@ -27,10 +27,34 @@ async function processGoodwillRefunds(now) {
       changed = true;
 
       try {
-        const amount = Number(item.goodwillRefundAmount || 0);
+        let amount = Number(item.goodwillRefundAmount || 0);
 
         if (amount <= 0 || !order.paymentIntentId) {
           throw new Error('Invalid goodwill refund amount or missing payment intent');
+        }
+
+        // The amount was validated at scheduling time against a ceiling built
+        // from item.shippingCost, which can be stale — re-check against the
+        // real remaining charge balance right before sending to Stripe, so a
+        // stale-data mismatch degrades to "refund what's available" instead
+        // of failing silently 24h after the vendor scheduled it.
+        const pi = await stripe.paymentIntents.retrieve(order.paymentIntentId, {
+          expand: ['latest_charge'],
+        });
+        const charge = pi.latest_charge;
+        let cappedFrom = null;
+
+        if (charge && typeof charge === 'object') {
+          const remaining = (charge.amount - charge.amount_refunded) / 100;
+
+          if (amount > remaining + 0.005) {
+            cappedFrom = amount;
+            amount = Math.max(0, remaining);
+          }
+        }
+
+        if (amount <= 0) {
+          throw new Error('Nothing left unrefunded on this charge');
         }
 
         console.log('🎁 Processing goodwill refund:', item._id, amount);
@@ -56,10 +80,18 @@ async function processGoodwillRefunds(now) {
           stripeRefundId: stripeRefund.id,
           status: 'processed',
           amount,
-          note: 'Goodwill refund processed (24h review window elapsed)',
+          note: cappedFrom
+            ? `Goodwill refund processed (24h review window elapsed, capped from £${cappedFrom.toFixed(2)} to remaining charge balance)`
+            : 'Goodwill refund processed (24h review window elapsed)',
         });
 
-        pushUniqueHistory(order, 'Goodwill Refund Processed', `Goodwill refund of £${amount.toFixed(2)} processed for ${item.name}`);
+        pushUniqueHistory(
+          order,
+          'Goodwill Refund Processed',
+          cappedFrom
+            ? `Goodwill refund of £${amount.toFixed(2)} processed for ${item.name} (capped from £${cappedFrom.toFixed(2)} — only that much remained unrefunded on the charge)`
+            : `Goodwill refund of £${amount.toFixed(2)} processed for ${item.name}`
+        );
       } catch (err) {
         console.error('💥 Goodwill refund error:', err.message);
         item.refundStatus = 'failed';

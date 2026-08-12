@@ -54,7 +54,8 @@ export function scheduleRefund(order) {
 export async function triggerItemRefund(order, item, refundQty, actorId) {
   try {
     const qty = Number(refundQty);
-    const refundTotal = calculateItemRefundAmount(item, qty).total;
+    let refundTotal = calculateItemRefundAmount(item, qty).total;
+    let cappedFrom = null;
 
     let stripeRefundId = null;
 
@@ -62,6 +63,31 @@ export async function triggerItemRefund(order, item, refundQty, actorId) {
       // Worker already issued a full Stripe refund — money is back; just record DB entries.
       stripeRefundId = order.stripeRefundId;
     } else if (order.paymentIntentId) {
+      // item.shippingCost is a checkout-time snapshot that can go stale (e.g. the
+      // historical shipIncluded bug, or a product's free-shipping setting changing
+      // after the order was placed) — rather than trust it blindly and let Stripe
+      // hard-reject an over-large request, cap against what's actually still
+      // unrefunded on the real charge before calling Stripe. This makes any future
+      // stale-data case degrade to "refund what's available" instead of a failure
+      // that needs a manual admin data patch.
+      const pi = await stripe.paymentIntents.retrieve(order.paymentIntentId, {
+        expand: ['latest_charge'],
+      });
+      const charge = pi.latest_charge;
+
+      if (charge && typeof charge === 'object') {
+        const remaining = (charge.amount - charge.amount_refunded) / 100;
+
+        if (refundTotal > remaining + 0.005) {
+          cappedFrom = refundTotal;
+          refundTotal = Math.max(0, remaining);
+        }
+      }
+
+      if (refundTotal <= 0) {
+        throw new Error('Nothing left unrefunded on this charge');
+      }
+
       const stripeRefund = await stripe.refunds.create({
         payment_intent: order.paymentIntentId,
         amount: Math.round(refundTotal * 100),
@@ -88,7 +114,9 @@ export async function triggerItemRefund(order, item, refundQty, actorId) {
     pushUniqueHistory(
       order,
       item.refundStatus === 'processed' ? 'Refunded' : 'Partially Refunded',
-      `Auto-refund: ${item.name} x${qty}`
+      cappedFrom
+        ? `Auto-refund: ${item.name} x${qty} (£${refundTotal.toFixed(2)} — capped from £${cappedFrom.toFixed(2)}, only that much remained unrefunded on the charge)`
+        : `Auto-refund: ${item.name} x${qty}`
     );
 
     pushItemHistory(item, {
@@ -97,11 +125,13 @@ export async function triggerItemRefund(order, item, refundQty, actorId) {
       status:        item.refundStatus,
       quantity:      qty,
       amount:        refundTotal,
-      note:          'Automatic refund on cancel/return',
+      note:          cappedFrom
+        ? `Automatic refund on cancel/return (capped from £${cappedFrom.toFixed(2)} to remaining charge balance)`
+        : 'Automatic refund on cancel/return',
       by:            actorId,
     });
 
-    return { success: true, stripeRefundId, refundedAmount: refundTotal };
+    return { success: true, stripeRefundId, refundedAmount: refundTotal, cappedFrom };
   } catch (err) {
     console.error('triggerItemRefund error:', err);
     item.refundStatus = 'failed';
