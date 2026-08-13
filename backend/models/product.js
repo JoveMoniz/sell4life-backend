@@ -396,6 +396,19 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
+    // CJ has no freight route to the UK for this product's variant(s) —
+    // set by checkUkShippingForAllProducts() (utils/cjProductSync.js),
+    // called both on-demand (admin route) and by the periodic sync worker.
+    // null = never checked; true/false = last known result.
+    shippingUnavailableUK: {
+      type: Boolean,
+      default: null,
+    },
+    shippingCheckedAt: {
+      type: Date,
+      default: null,
+    },
+
     /* ==============================
        ANALYTICS
     ============================== */

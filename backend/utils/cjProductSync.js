@@ -3,7 +3,9 @@
 // the auto-sync-on-save hook, and the periodic sweep worker
 // ======================================================
 import Product from '../models/product.js';
+import Vendor from '../models/vendor.js';
 import cjProvider, { getProductImages as cjGetProductImages } from './shippingProviders/cjdropshipping.js';
+import { decryptCredential } from './shippingProviders/registry.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
 // Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
@@ -240,4 +242,68 @@ export async function syncProductFromCj(product, credential) {
 
   await Product.findByIdAndUpdate(product._id, updateDoc);
   return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp };
+}
+
+// ======================================================
+// CHECK UK SHIPPING AVAILABILITY — ALL PRODUCTS
+// Sweeps every professional vendor's CJ-connected products and records
+// whether CJ currently has a freight route to the UK for each, using the
+// same getShippingCost() call checkout/sync already rely on — so a broken
+// route can be found proactively instead of only surfacing when a real
+// order fails with "No shipping option available for this destination".
+// Only checks the first variant with a cjVid per product, matching
+// syncProductFromCj's existing "shipping is roughly product-level" treatment.
+// ======================================================
+export async function checkUkShippingForAllProducts() {
+  const summary = { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, details: [] };
+
+  const vendors = await Vendor.find({
+    type: 'professional',
+    'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+  });
+
+  for (const vendor of vendors) {
+    summary.vendorsChecked++;
+    let credential;
+    try {
+      credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+    } catch (err) {
+      summary.errors++;
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
+      continue;
+    }
+
+    const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
+
+    for (const product of products) {
+      summary.productsChecked++;
+      try {
+        const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+        if (!cjVid) { summary.skipped++; continue; }
+
+        const quote = await cjProvider.getShippingCost(
+          { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
+          credential
+        );
+        const unavailable = !quote;
+
+        await Product.findByIdAndUpdate(product._id, {
+          shippingUnavailableUK: unavailable,
+          shippingCheckedAt: new Date(),
+        });
+
+        if (unavailable) {
+          summary.unavailable++;
+          summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
+        } else {
+          summary.available++;
+        }
+      } catch (err) {
+        summary.errors++;
+        summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
+      }
+    }
+  }
+
+  return summary;
 }

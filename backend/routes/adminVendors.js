@@ -4,6 +4,7 @@ import { computeVendorBalance } from '../utils/vendorBalance.js';
 import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
 import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
+import { checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -1331,6 +1332,21 @@ router.get('/hmrc-export', async (req, res) => {
     res.send(csv);
   } catch (err) {
     console.error('HMRC export error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   CHECK UK SHIPPING AVAILABILITY — ALL CJ-CONNECTED PRODUCTS
+   On-demand trigger for checkUkShippingForAllProducts(); the periodic
+   CJ sync worker also runs this automatically so results stay current.
+====================================================== */
+router.post('/check-cj-shipping', async (req, res) => {
+  try {
+    const summary = await checkUkShippingForAllProducts();
+    res.json(summary);
+  } catch (err) {
+    console.error('Check CJ shipping error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

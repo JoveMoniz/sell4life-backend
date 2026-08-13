@@ -11,7 +11,7 @@
 import Vendor from '../models/vendor.js';
 import Product from '../models/product.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
-import { syncProductFromCj, looksCjSourced } from '../utils/cjProductSync.js';
+import { syncProductFromCj, looksCjSourced, checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
 
 export async function processCjProductSync() {
   const summary = { vendorsChecked: 0, productsChecked: 0, synced: 0, skipped: 0, errors: 0, details: [] };
@@ -73,4 +73,21 @@ export function startCjProductSyncWorker() {
       console.error('💥 CJ PRODUCT SYNC WORKER ERROR:', err.message);
     }
   }, INTERVAL_MS);
+
+  // Separate, longer cycle — UK shipping availability doesn't drift as
+  // often as images/prices, and this is one extra CJ API call per product,
+  // so it doesn't need to ride the same 12h tick as the heavier sync above.
+  const SHIPPING_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // every 24 hours
+
+  setInterval(async () => {
+    console.log('⏱ CJ UK shipping check tick:', new Date().toISOString());
+    try {
+      const summary = await checkUkShippingForAllProducts();
+      if (summary.unavailable > 0) {
+        console.log(`🚫 CJ UK shipping check: ${summary.unavailable} product(s) with no UK route, across ${summary.vendorsChecked} vendor(s)`);
+      }
+    } catch (err) {
+      console.error('💥 CJ UK SHIPPING CHECK ERROR:', err.message);
+    }
+  }, SHIPPING_CHECK_INTERVAL_MS);
 }
