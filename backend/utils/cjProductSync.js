@@ -4,7 +4,7 @@
 // ======================================================
 import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
-import cjProvider, { getProductImages as cjGetProductImages } from './shippingProviders/cjdropshipping.js';
+import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth } from './shippingProviders/cjdropshipping.js';
 import { decryptCredential } from './shippingProviders/registry.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
@@ -255,7 +255,7 @@ export async function syncProductFromCj(product, credential) {
 // syncProductFromCj's existing "shipping is roughly product-level" treatment.
 // ======================================================
 export async function checkUkShippingForAllProducts() {
-  const summary = { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, details: [] };
+  const summary = { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, details: [] };
 
   const vendors = await Vendor.find({
     type: 'professional',
@@ -270,6 +270,18 @@ export async function checkUkShippingForAllProducts() {
     } catch (err) {
       summary.errors++;
       summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
+      continue;
+    }
+
+    // Test auth once per vendor before looping products — getShippingCost()
+    // collapses "auth failed" and "genuinely no freight options" into the
+    // same null return, which would otherwise make every single product
+    // for this vendor look like it lost UK shipping when the real problem
+    // is the credential itself (expired key, changed password, etc.).
+    const authCheck = await testCredentialAuth(credential);
+    if (!authCheck.ok) {
+      summary.authFailed++;
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
       continue;
     }
 

@@ -244,6 +244,24 @@ const cjProvider = {
 registerProvider(cjProvider);
 export default cjProvider;
 
+// ── Test whether a credential currently authenticates ─
+// getShippingCost() collapses "auth failed" and "genuinely no freight
+// options" into the same `null` return, which makes a bulk sweep unable
+// to tell a broken credential from 18 products that all lost their UK
+// route simultaneously — this lets a caller check auth in isolation first.
+export async function testCredentialAuth(credential) {
+  try {
+    const creds = JSON.parse(credential);
+    if (creds?.email && creds?.apiKey) {
+      const token = await getAccessToken(creds.email, creds.apiKey);
+      return { ok: !!token };
+    }
+  } catch (_) {
+    // Not JSON — raw legacy token, nothing to authenticate ahead of time.
+  }
+  return { ok: !!credential };
+}
+
 // ── Resolve credential string → access token ──────────
 async function resolveToken(credential) {
   try {
