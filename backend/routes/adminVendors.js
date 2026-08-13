@@ -5,6 +5,8 @@ import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } fr
 import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 import { checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
+import { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
+import { decryptCredential } from '../utils/shippingProviders/registry.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -13,6 +15,7 @@ import Vendor from '../models/vendor.js';
 import User from '../models/user.js';
 import Order from '../models/order.js';
 import Payout from '../models/payout.js';
+import Product from '../models/product.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
@@ -1348,6 +1351,31 @@ router.post('/check-cj-shipping', async (req, res) => {
   } catch (err) {
     console.error('Check CJ shipping error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   DIAGNOSTIC — raw CJ freight response for one product
+   Temporary: investigating why checkUkShippingForAllProducts is
+   returning 0 available. Not linked from any UI.
+====================================================== */
+router.get('/check-cj-shipping/:productId/diagnostic', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const vendor = await Vendor.findById(product.vendor);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+    const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+    if (!cjVid) return res.status(400).json({ error: 'No cjVid on this product' });
+    const diag = await getShippingCostDiagnostic(
+      { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
+      credential
+    );
+    res.json({ productId: product._id, name: product.name, cjVid, diag });
+  } catch (err) {
+    console.error('Shipping diagnostic error:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
   }
 });
 
