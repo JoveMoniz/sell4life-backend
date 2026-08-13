@@ -244,6 +244,36 @@ const cjProvider = {
 registerProvider(cjProvider);
 export default cjProvider;
 
+// ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
+//    raw code/message instead of collapsing every failure mode to null.
+//    Bypasses the cache deliberately — used to investigate why a product
+//    is coming back with no freight options, not for production traffic.
+export async function getShippingCostDiagnostic(input, credential) {
+  const { supplierVariantRef, destinationCountry = 'GB', quantity = 1 } = input;
+  let accessToken = credential;
+  try {
+    const creds = JSON.parse(credential);
+    if (creds?.email && creds?.apiKey) {
+      accessToken = await getAccessToken(creds.email, creds.apiKey);
+      if (!accessToken) return { ok: false, reason: 'auth-failed' };
+    }
+  } catch (_) { /* raw legacy token */ }
+
+  const resp = await throttledFetch(accessToken, {
+    startCountryCode: 'CN',
+    endCountryCode:   destinationCountry,
+    products:         [{ vid: supplierVariantRef, quantity }],
+  });
+  const body = await resp.json().catch(() => ({}));
+  return {
+    ok: resp.ok,
+    httpStatus: resp.status,
+    code: body?.code,
+    message: body?.message,
+    optionsCount: Array.isArray(body?.data) ? body.data.length : null,
+  };
+}
+
 // ── Test whether a credential currently authenticates ─
 // getShippingCost() collapses "auth failed" and "genuinely no freight
 // options" into the same `null` return, which makes a bulk sweep unable
