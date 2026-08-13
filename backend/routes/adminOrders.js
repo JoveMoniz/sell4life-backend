@@ -362,6 +362,23 @@ router.patch('/:id/items/:itemId/correct-shipping-cost', authMiddleware, adminMi
 
     const before = item.shippingCost;
     item.shippingCost = Number(shippingCost);
+
+    // vendorOrders[].shipping/.total are a separate snapshot taken at order
+    // creation (subtotal + sum of that vendor's items' shippingCost, see
+    // stripeWebhook.js) — correcting only item.shippingCost silently leaves
+    // these stale, which is exactly what produced the "Items: £X + Shipping:
+    // £Y = Total: £Z" summary still showing the old, wrong charge even after
+    // the item-level fix. Recompute the affected vendor's entry to match.
+    const vendorOrder = order.vendorOrders.find((vo) => String(vo.vendorId) === String(item.vendorId));
+    if (vendorOrder) {
+      const vendorItems = order.items.filter((i) => String(i.vendorId) === String(item.vendorId));
+      const vendorSubtotal = vendorItems.reduce((s, i) => s + Number(i.subtotal || 0), 0);
+      const vendorShipping = vendorItems.reduce((s, i) => s + Number(i.shippingCost || 0), 0);
+      vendorOrder.shipping = vendorShipping;
+      vendorOrder.total = vendorSubtotal + vendorShipping;
+      order.markModified('vendorOrders');
+    }
+
     order.markModified('items');
     await order.save();
 
