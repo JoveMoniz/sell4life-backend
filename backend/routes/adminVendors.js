@@ -5,7 +5,7 @@ import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } fr
 import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 import { checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
-import { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
+import { getShippingCostDiagnostic, debugCjVariantData } from '../utils/shippingProviders/cjdropshipping.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
 
 import express from 'express';
@@ -1375,6 +1375,24 @@ router.get('/check-cj-shipping/:productId/diagnostic', async (req, res) => {
     res.json({ productId: product._id, name: product.name, cjVid, diag });
   } catch (err) {
     console.error('Shipping diagnostic error:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
+  }
+});
+
+// Temporary — inspect CJ's raw variantList shape for a product's SKU.
+router.get('/debug-cj-variants/:productId', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const vendor = await Vendor.findById(product.vendor);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+    const sku = (product.variants || []).map(v => v.sku).find(Boolean);
+    if (!sku) return res.status(400).json({ error: 'No SKU on this product' });
+    const result = await debugCjVariantData(sku, credential);
+    res.json({ productId: product._id, name: product.name, sku, result });
+  } catch (err) {
+    console.error('Debug CJ variants error:', err);
     res.status(500).json({ error: 'Server error', message: err.message });
   }
 });

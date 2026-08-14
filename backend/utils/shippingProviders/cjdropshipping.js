@@ -301,6 +301,44 @@ async function resolveToken(credential) {
   return credential; // raw token (legacy)
 }
 
+// ── Temporary diagnostic — inspect CJ's raw /product/list + /product/detail
+// response shape for a given SKU, to see whether variantList actually comes
+// back with data (as opposed to the extracted/normalised shape everything
+// else in this file works with). Not part of the normal sync path.
+export async function debugCjVariantData(productSku, credential) {
+  const token = await resolveToken(credential);
+  if (!token) return { error: 'Could not obtain CJ access token' };
+
+  const listResp = await fetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, productSku })}`, {
+    headers: { 'CJ-Access-Token': token },
+  });
+  const listData = listResp.ok ? await listResp.json() : null;
+  const first = listData?.data?.list?.[0];
+
+  const out = {
+    listCode: listData?.code,
+    listTotal: listData?.data?.total,
+    listFirstPid: first?.pid ?? null,
+    listFirstName: first?.productNameEn ?? null,
+    listFirstHasVariantList: Array.isArray(first?.variantList),
+    listFirstVariantListLen: first?.variantList?.length ?? null,
+  };
+
+  if (first?.pid) {
+    const detailResp = await fetch(`${CJ_BASE}/product/detail?pid=${encodeURIComponent(first.pid)}`, {
+      headers: { 'CJ-Access-Token': token },
+    });
+    const detailData = detailResp.ok ? await detailResp.json() : null;
+    out.detailCode = detailData?.code;
+    out.detailKeys = detailData?.data ? Object.keys(detailData.data) : null;
+    out.detailHasVariantList = Array.isArray(detailData?.data?.variantList);
+    out.detailVariantListLen = detailData?.data?.variantList?.length ?? null;
+    out.detailVariantListSample = (detailData?.data?.variantList || []).slice(0, 3);
+  }
+
+  return out;
+}
+
 // ── Parse a CJ field that might be a JSON-serialised array or plain string ──
 function parseCjField(val) {
   if (!val) return null;
