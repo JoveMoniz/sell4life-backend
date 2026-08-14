@@ -183,9 +183,24 @@ export async function syncProductFromCj(product, credential) {
   if (result.cjVariants?.length) {
     const syncedVariants = (product.variants || []).map(ourV => {
       const ourSku = (ourV.sku ?? '').trim();
-      const cjV = result.cjVariants.find(cv =>
+      let cjV = result.cjVariants.find(cv =>
         ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
       );
+
+      // Fallback: our SKU sometimes has a hand-appended attribute suffix that
+      // isn't part of CJ's real SKU (e.g. "CJJSPBPB01209-White" vs CJ's own
+      // "CJJSPBPB01209") — an exact match will never happen. If exactly one
+      // CJ variant's SKU contains this variant's own attribute value (colour,
+      // size, etc.), that's an unambiguous match.
+      if (!cjV) {
+        const attrVal = Object.values(ourV.attributes || {}).find(Boolean);
+        if (attrVal) {
+          const needle = String(attrVal).trim().toLowerCase();
+          const candidates = result.cjVariants.filter(cv => cv.variantSku.toLowerCase().includes(needle));
+          if (candidates.length === 1) cjV = candidates[0];
+        }
+      }
+
       if (!cjV) return ourV;
       if (!firstCjVid && cjV.vid) firstCjVid = cjV.vid;
       variantsSynced++;
