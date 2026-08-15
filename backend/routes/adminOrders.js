@@ -31,6 +31,7 @@ import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
 import User from '../models/user.js';
 import Vendor from '../models/vendor.js';
+import Product from '../models/product.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
@@ -1097,6 +1098,43 @@ router.patch('/:id/items/:itemId/mark-returned', authMiddleware, adminMiddleware
   } catch (err) {
     console.error('Admin mark returned error:', err);
     res.status(500).json({ error: 'Failed to mark item returned' });
+  }
+});
+
+// Temporary — one-off correction for order items snapshotted with the
+// product's generic main image instead of the purchased variant's own
+// image (bug fixed in orders.js/cart.js/stripeWebhook.js; this repairs
+// items that were saved before that fix went live).
+router.post('/:id/items/:itemId/fix-image', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { id, itemId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid order id' });
+    if (!mongoose.Types.ObjectId.isValid(itemId)) return res.status(400).json({ error: 'Invalid item id' });
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = findOrderItem(order, itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    const product = await Product.findById(item.productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const variantSku = item.variantSku || '';
+    const matchedVariant = variantSku
+      ? (product.variants || []).find(v => v.sku && v.sku.trim() === variantSku.trim())
+      : null;
+
+    const oldImage = item.image;
+    item.image = matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png';
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({ orderId: order._id, itemId: item._id, oldImage, newImage: item.image });
+  } catch (err) {
+    console.error('Fix item image error:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
   }
 });
 
