@@ -7,6 +7,7 @@ import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 import { checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
 import { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
+import { generateSlug } from './products.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -1375,6 +1376,35 @@ router.get('/check-cj-shipping/:productId/diagnostic', async (req, res) => {
     res.json({ productId: product._id, name: product.name, cjVid, diag });
   } catch (err) {
     console.error('Shipping diagnostic error:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
+  }
+});
+
+// Temporary — one-off correction for products whose slug went stale under
+// the now-fixed "regenerated slug silently discarded on edit" bug. Reuses
+// the exact same generate + uniqueness-check logic as the real PATCH route,
+// rather than writing an arbitrary slug string directly.
+router.post('/products/:productId/regenerate-slug', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const oldSlug = product.slug;
+    let baseSlug = generateSlug(product.name);
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+
+    while (await Product.findOne({ slug: uniqueSlug, _id: { $ne: product._id } })) {
+      uniqueSlug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    product.slug = uniqueSlug;
+    await product.save();
+
+    res.json({ productId: product._id, name: product.name, oldSlug, newSlug: product.slug });
+  } catch (err) {
+    console.error('Regenerate slug error:', err);
     res.status(500).json({ error: 'Server error', message: err.message });
   }
 });
