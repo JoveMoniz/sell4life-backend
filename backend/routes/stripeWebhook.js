@@ -154,7 +154,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           freeReturns,
           supplier: product.supplier || '',
           supplierUrl: product.supplierUrl || '',
-          image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+          image: matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
         });
       }
 
