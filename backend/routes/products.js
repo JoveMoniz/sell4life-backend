@@ -17,7 +17,7 @@ const router = Router();
    🔥 SLUG GENERATOR (NEW)
 ====================================================== */
 
-function generateSlug(text) {
+export function generateSlug(text) {
   return text
     .toLowerCase()
     .trim()
