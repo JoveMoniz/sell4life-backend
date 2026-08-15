@@ -1409,4 +1409,33 @@ router.post('/products/:productId/regenerate-slug', async (req, res) => {
   }
 });
 
+// Temporary — one-off correction for a variant's attribute value (e.g. a
+// Colour label that was mismatched to the wrong SKU at creation time and
+// never touched by sync, since sync only ever updates image/price/cjVid).
+// Matches by SKU, not array index, so order doesn't matter.
+router.post('/products/:productId/set-variant-attribute', async (req, res) => {
+  try {
+    const { sku, key, value } = req.body;
+    if (!sku || !key) return res.status(400).json({ error: 'sku and key are required' });
+
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const variant = (product.variants || []).find(v => v.sku && v.sku.trim() === sku.trim());
+    if (!variant) return res.status(404).json({ error: `No variant with sku "${sku}"` });
+
+    const oldValue = variant.attributes?.[key];
+    if (!variant.attributes) variant.attributes = {};
+    variant.attributes[key] = value;
+
+    product.markModified('variants');
+    await product.save();
+
+    res.json({ productId: product._id, sku, key, oldValue, newValue: value });
+  } catch (err) {
+    console.error('Set variant attribute error:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
+  }
+});
+
 export default router;
