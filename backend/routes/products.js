@@ -420,12 +420,20 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       let uniqueSlug = baseSlug;
       let counter = 1;
 
-      while (await Product.findOne({ slug: uniqueSlug })) {
+      // Exclude this product's own current slug from the collision check —
+      // otherwise a trivial name tweak that regenerates to the same slug
+      // it already has gets needlessly bumped to "-1".
+      while (await Product.findOne({ slug: uniqueSlug, _id: { $ne: product._id } })) {
         uniqueSlug = `${baseSlug}-${counter}`;
         counter++;
       }
 
-      updates.slug = uniqueSlug;
+      // Assigned directly on the product, not via `updates` — slug is a
+      // server-derived field and must never be settable through the generic
+      // allowedFields pass-through below (that would let a client submit an
+      // arbitrary/colliding slug directly, bypassing the uniqueness check
+      // above entirely).
+      product.slug = uniqueSlug;
     }
 
     const allowedFields = [
