@@ -84,6 +84,13 @@ router.post('/validate', async (req, res) => {
 
       total = Number((total + subtotal).toFixed(2));
 
+      // Show the selected variant's own photo (e.g. the actual colour
+      // chosen), not just the product's generic main image.
+      const variantSku = item.variantSku || '';
+      const matchedVariant = variantSku
+        ? (product.variants || []).find(v => v.sku && v.sku.trim() === variantSku.trim())
+        : null;
+
       // =====================================
       // NORMALIZED ITEM
       // =====================================
@@ -93,7 +100,7 @@ router.post('/validate', async (req, res) => {
 
         vendorId: product.vendor,
 
-        variantSku: item.variantSku || '',
+        variantSku,
 
         name: product.name,
 
@@ -103,7 +110,7 @@ router.post('/validate', async (req, res) => {
 
         subtotal,
 
-        image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+        image: matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
       });
     }
 

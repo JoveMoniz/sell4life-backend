@@ -165,7 +165,7 @@ router.post('/create-payment-intent', authMiddleware, async (req, res) => {
           subtotal,
           shippingCost,
 
-          image: product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+          image: matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
 
           attributes: item.attributes || {},
           offerMessageId,
