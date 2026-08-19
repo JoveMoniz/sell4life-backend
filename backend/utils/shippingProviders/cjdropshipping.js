@@ -244,6 +244,61 @@ const cjProvider = {
 registerProvider(cjProvider);
 export default cjProvider;
 
+// ── Order status/tracking lookup, batched ─────────────
+// Refreshes real shipment status for orders already created via createOrder()
+// above — that function only ever captures a one-time snapshot at creation,
+// it never gets updated on its own. Batches up to 100 orders per call (CJ's
+// documented max for this endpoint) so a worker checking many orders doesn't
+// burn through the 1 req/sec rate limit one order at a time.
+// cjOrderIds: array of CJ orderId strings (not our own order/item ids).
+// Returns: array of { orderId, orderStatus, trackNumber, trackingProvider,
+// trackingUrl } | { error }
+export async function getOrderStatusBatch(cjOrderIds, credential) {
+  if (!Array.isArray(cjOrderIds) || !cjOrderIds.length) return [];
+
+  const accessToken = await resolveToken(credential);
+  if (!accessToken) return { error: 'Could not obtain CJ access token' };
+
+  // Chunk to CJ's documented 100-per-call max.
+  const chunks = [];
+  for (let i = 0; i < cjOrderIds.length; i += 100) chunks.push(cjOrderIds.slice(i, i + 100));
+
+  const results = [];
+  for (const chunk of chunks) {
+    try {
+      const resp = await throttledPost(
+        `${CJ_BASE}/shopping/order/getOrderDetailBatch`,
+        accessToken,
+        { orderIds: chunk }
+      );
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || data?.code !== 200) {
+        if (resp.status === 401) invalidateToken(credential);
+        console.warn('[cjdropshipping] getOrderStatusBatch HTTP %s code=%s msg=%s',
+          resp.status, data?.code, data?.message);
+        continue; // skip this chunk, still return whatever other chunks succeeded
+      }
+
+      const list = Array.isArray(data?.data) ? data.data : [];
+      for (const o of list) {
+        results.push({
+          orderId:          o.orderId,
+          orderStatus:      o.orderStatus || '',
+          trackNumber:      o.trackNumber || '',
+          trackingProvider: o.trackingProvider || '',
+          trackingUrl:      o.trackingUrl || '',
+        });
+      }
+    } catch (err) {
+      console.error('[cjdropshipping] getOrderStatusBatch failed:', err.message);
+      // Continue with remaining chunks rather than losing the whole batch
+      // over one network blip.
+    }
+  }
+  return results;
+}
+
 // ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
 //    raw code/message instead of collapsing every failure mode to null.
 //    Bypasses the cache deliberately — used to investigate why a product
