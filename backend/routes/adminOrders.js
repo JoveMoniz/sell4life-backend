@@ -290,6 +290,24 @@ router.get('/:id/debug-cj-eligibility', authMiddleware, adminMiddleware, async (
 });
 
 /* ======================================================
+   TEMPORARY — MANUALLY TRIGGER THE CJ ORDER STATUS SYNC
+   Runs the same sync the cjOrderStatusSyncWorker's 2h interval
+   calls, on demand — for verifying a specific test order's
+   status/tracking updates without waiting for the next tick.
+   Remove once the worker has been confirmed working for a while.
+====================================================== */
+router.post('/cj-status-sync-run', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { processCjOrderStatusSync } = await import('../jobs/cjOrderStatusSyncWorker.js');
+    const summary = await processCjOrderStatusSync();
+    res.json(summary);
+  } catch (err) {
+    console.error('Manual CJ order status sync error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    DEBUG — RAW CJ VARIANT DATA FOR A PRODUCT
    Temporary diagnostic: shows exactly what CJ's API returns for a
    product's variantList, side by side with our own stored variant
