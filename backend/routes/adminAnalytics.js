@@ -2,6 +2,7 @@ import express from 'express';
 
 import AnalyticsSession from '../models/analyticsSession.js';
 import AnalyticsEvent from '../models/analyticsEvent.js';
+import Order from '../models/order.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import { processAnalyticsRollup } from '../jobs/analyticsRollupWorker.js';
@@ -56,6 +57,12 @@ router.post('/run-rollup', async (req, res) => {
   }
 });
 
+// Same "counts as real revenue" status list adminVendors.js /financials
+// uses — a paid order stays counted through refund_scheduled/processing
+// (the sale genuinely happened; only 'refunded'/'partially_refunded'
+// reduce the total, which this route doesn't attempt to net out here).
+const PAID = ['paid', 'refunded', 'partially_refunded', 'refund_scheduled', 'refund_processing'];
+
 /* ======================================================
    DATE-RANGE FILTER
    Same period convention used across the admin panel
@@ -94,24 +101,37 @@ function dateFilterFor(field, period) {
 router.get('/summary', async (req, res) => {
   try {
     const match = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', req.query.period) };
+    // Orders/revenue come straight from Order, not from any client-fired
+    // event — the funnel's old 'purchase' AnalyticsEvent was never
+    // actually fired anywhere in checkout.js, so it undercounted every
+    // real order (see below too). Querying Order directly is also
+    // retroactively correct for orders placed before this existed.
+    const orderMatch = { paymentStatus: { $in: PAID }, ...dateFilterFor('createdAt', req.query.period) };
 
-    const [agg] = await AnalyticsSession.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalVisits: { $sum: 1 },
-          uniqueVisitors: { $addToSet: '$visitorId' },
-          pageViews: { $sum: '$pageViewCount' },
-          avgSessionDurationSec: { $avg: '$durationSec' },
-          bounces: { $sum: { $cond: [{ $lte: ['$pageViewCount', 1] }, 1, 0] } },
-          newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } },
+    const [[agg], [orderAgg]] = await Promise.all([
+      AnalyticsSession.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            totalVisits: { $sum: 1 },
+            uniqueVisitors: { $addToSet: '$visitorId' },
+            pageViews: { $sum: '$pageViewCount' },
+            avgSessionDurationSec: { $avg: '$durationSec' },
+            bounces: { $sum: { $cond: [{ $lte: ['$pageViewCount', 1] }, 1, 0] } },
+            newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } },
+          },
         },
-      },
+      ]),
+      Order.aggregate([
+        { $match: orderMatch },
+        { $group: { _id: null, orders: { $sum: 1 }, revenue: { $sum: '$total' } } },
+      ]),
     ]);
 
     const totalVisits = agg?.totalVisits || 0;
     const uniqueVisitors = agg?.uniqueVisitors?.length || 0;
+    const orders = orderAgg?.orders || 0;
 
     res.json({
       totalVisits,
@@ -120,6 +140,9 @@ router.get('/summary', async (req, res) => {
       avgSessionDurationSec: Math.round(agg?.avgSessionDurationSec || 0),
       bounceRate: totalVisits ? Math.round(((agg?.bounces || 0) / totalVisits) * 1000) / 10 : 0,
       newVisitorPct: totalVisits ? Math.round(((agg?.newVisitors || 0) / totalVisits) * 1000) / 10 : 0,
+      orders,
+      revenue: Math.round((orderAgg?.revenue || 0) * 100) / 100,
+      conversionRate: totalVisits ? Math.round((orders / totalVisits) * 1000) / 10 : 0,
     });
   } catch (err) {
     console.error('[admin-analytics] summary error:', err);
@@ -330,11 +353,11 @@ router.get('/searches', async (req, res) => {
    checkout started -> purchase, with drop-off % per stage
 ====================================================== */
 const FUNNEL_STAGES = [
-  { key: 'visitors', label: 'Visitors', type: null },
-  { key: 'productViews', label: 'Product Views', type: 'product_view' },
-  { key: 'addToCart', label: 'Add to Cart', type: 'add_to_cart' },
-  { key: 'checkoutStart', label: 'Checkout Started', type: 'checkout_start' },
-  { key: 'purchases', label: 'Purchases', type: 'purchase' },
+  { key: 'visitors', label: 'Visitors', source: 'session' },
+  { key: 'productViews', label: 'Product Views', source: 'event', type: 'product_view' },
+  { key: 'addToCart', label: 'Add to Cart', source: 'event', type: 'add_to_cart' },
+  { key: 'checkoutStart', label: 'Checkout Started', source: 'event', type: 'checkout_start' },
+  { key: 'purchases', label: 'Purchases', source: 'order' },
 ];
 
 router.get('/funnel', async (req, res) => {
@@ -342,14 +365,21 @@ router.get('/funnel', async (req, res) => {
     const period = req.query.period;
     const sessionMatch = { isBot: false, isInternal: false, ...dateFilterFor('startedAt', period) };
     const eventMatch = { isBot: false, isInternal: false, ...dateFilterFor('timestamp', period) };
+    const orderMatch = { paymentStatus: { $in: PAID }, ...dateFilterFor('createdAt', period) };
+    const eventTypes = FUNNEL_STAGES.filter((s) => s.source === 'event').map((s) => s.type);
 
-    const [visitorCount, eventCounts] = await Promise.all([
+    const [visitorCount, eventCounts, orderCount] = await Promise.all([
       AnalyticsSession.countDocuments(sessionMatch),
       AnalyticsEvent.aggregate([
-        { $match: { ...eventMatch, type: { $in: FUNNEL_STAGES.filter((s) => s.type).map((s) => s.type) } } },
+        { $match: { ...eventMatch, type: { $in: eventTypes } } },
         { $group: { _id: { type: '$type', sessionId: '$sessionId' } } },
         { $group: { _id: '$_id.type', count: { $sum: 1 } } },
       ]),
+      // Real purchases from Order — the 'purchase' AnalyticsEvent this
+      // used to read from is never actually fired anywhere in
+      // checkout.js, so it silently undercounted (always to zero) every
+      // real order. See /summary's orders/revenue fields for the same fix.
+      Order.countDocuments(orderMatch),
     ]);
 
     const countByType = {};
@@ -357,7 +387,9 @@ router.get('/funnel', async (req, res) => {
 
     let prevCount = null;
     const stages = FUNNEL_STAGES.map((stage) => {
-      const count = stage.type ? (countByType[stage.type] || 0) : visitorCount;
+      const count = stage.source === 'order' ? orderCount
+        : stage.source === 'session' ? visitorCount
+        : (countByType[stage.type] || 0);
       const dropOffPct = prevCount != null && prevCount > 0
         ? Math.round((1 - count / prevCount) * 1000) / 10
         : null;
