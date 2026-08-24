@@ -251,10 +251,15 @@ export default cjProvider;
 // documented max for this endpoint) so a worker checking many orders doesn't
 // burn through the 1 req/sec rate limit one order at a time.
 // cjOrderIds: array of CJ orderId strings (not our own order/item ids).
-// Returns: array of { orderId, orderStatus, trackNumber, trackingProvider,
-// trackingUrl } | { error }
+// Returns: { results: [{ orderId, orderStatus, trackNumber, trackingProvider,
+// trackingUrl }], warnings: [string] } | { error }
+// warnings surfaces per-chunk failures (bad HTTP status, CJ error code, network
+// error) that would otherwise be silently dropped — a caller that only looks
+// at `results` being empty can't tell "nothing to report" apart from "CJ's
+// call failed", which is exactly what let this worker look like it was
+// running clean while every request against real CJ orders was failing.
 export async function getOrderStatusBatch(cjOrderIds, credential) {
-  if (!Array.isArray(cjOrderIds) || !cjOrderIds.length) return [];
+  if (!Array.isArray(cjOrderIds) || !cjOrderIds.length) return { results: [], warnings: [] };
 
   const accessToken = await resolveToken(credential);
   if (!accessToken) return { error: 'Could not obtain CJ access token' };
@@ -264,6 +269,7 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
   for (let i = 0; i < cjOrderIds.length; i += 100) chunks.push(cjOrderIds.slice(i, i + 100));
 
   const results = [];
+  const warnings = [];
   for (const chunk of chunks) {
     try {
       const resp = await throttledPost(
@@ -275,8 +281,9 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
 
       if (!resp.ok || data?.code !== 200) {
         if (resp.status === 401) invalidateToken(credential);
-        console.warn('[cjdropshipping] getOrderStatusBatch HTTP %s code=%s msg=%s',
-          resp.status, data?.code, data?.message);
+        const msg = `HTTP ${resp.status} code=${data?.code} msg=${data?.message}`;
+        console.warn('[cjdropshipping] getOrderStatusBatch', msg);
+        warnings.push(msg);
         continue; // skip this chunk, still return whatever other chunks succeeded
       }
 
@@ -292,11 +299,12 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
       }
     } catch (err) {
       console.error('[cjdropshipping] getOrderStatusBatch failed:', err.message);
+      warnings.push('Network error: ' + err.message);
       // Continue with remaining chunks rather than losing the whole batch
       // over one network blip.
     }
   }
-  return results;
+  return { results, warnings };
 }
 
 // ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
