@@ -331,7 +331,7 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
 
     const results = [];
     for (const item of order.items) {
-      const trace = { itemId: item._id, name: item.name, cjOrderId: item.cjOrderId || null, status: item.status };
+      const trace = { itemId: item._id, name: item.name, cjOrderId: item.cjOrderId || null, cjOrderNumber: item.cjOrderNumber || null, status: item.status };
 
       const vendor = await Vendor.findById(item.vendorId);
       if (!vendor) { trace.result = 'no vendor found for item.vendorId'; results.push(trace); continue; }
@@ -388,6 +388,20 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
             trace.result = returnedIds.includes(item.cjOrderId)
               ? 'CJ returned this order — sync should update it on next run'
               : `CJ returned data but under a DIFFERENT orderId (got: ${JSON.stringify(returnedIds)}, expected: ${item.cjOrderId}) — this is the mismatch breaking the sync`;
+          }
+
+          // CJ's docs say the status/detail endpoint accepts EITHER their own
+          // orderId OR the custom orderNumber we originally submitted at
+          // creation — test the second one too, since the SD-prefixed value
+          // we're storing as cjOrderId looks like it may actually be CJ's
+          // "cjOrderCode" (a logistics-only id), not the real lookup key.
+          if (item.cjOrderNumber) {
+            try {
+              const byNumber = await getOrderStatusBatch([item.cjOrderNumber], credential);
+              trace.cjRawResponseByOrderNumber = byNumber;
+            } catch (err) {
+              trace.cjRawResponseByOrderNumber = { error: err.message };
+            }
           }
         } catch (err) {
           trace.result = 'getOrderStatusBatch threw: ' + err.message;
