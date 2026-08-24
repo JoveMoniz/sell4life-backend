@@ -308,6 +308,80 @@ router.post('/cj-status-sync-run', authMiddleware, adminMiddleware, async (req, 
 });
 
 /* ======================================================
+   TEMPORARY — TRACE WHY ONE ORDER DID/DIDN'T GET PICKED UP
+   BY THE CJ ORDER STATUS SYNC
+   Walks the exact same vendor-lookup / query / matching logic
+   processCjOrderStatusSync() uses, scoped to a single order, so we
+   can see which specific check silently excludes it instead of
+   guessing from the worker's aggregate summary. Never exposes the
+   decrypted credential itself. Remove once the worker is confirmed
+   working for a while.
+====================================================== */
+router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    const { decryptCredential } = await import('../utils/shippingProviders/registry.js');
+    const { TOUCHABLE_STATUSES } = await import('../jobs/cjOrderStatusSyncWorker.js');
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const results = [];
+    for (const item of order.items) {
+      const trace = { itemId: item._id, name: item.name, cjOrderId: item.cjOrderId || null, status: item.status };
+
+      const vendor = await Vendor.findById(item.vendorId);
+      if (!vendor) { trace.result = 'no vendor found for item.vendorId'; results.push(trace); continue; }
+
+      trace.vendorType = vendor.type;
+      trace.hasCjCredentials = !!vendor?.supplierCredentials?.cjdropshipping;
+
+      // Mirrors the worker's Vendor.find({ type: 'professional', 'supplierCredentials.cjdropshipping': { $exists: true, $ne: null } })
+      trace.wouldBeInWorkerVendorList = vendor.type === 'professional' && !!vendor.supplierCredentials?.cjdropshipping;
+
+      if (!trace.wouldBeInWorkerVendorList) { trace.result = 'excluded before credential decrypt — worker never even looks at this vendor'; results.push(trace); continue; }
+
+      try {
+        decryptCredential(vendor.supplierCredentials.cjdropshipping);
+        trace.credentialDecrypts = true;
+      } catch (err) {
+        trace.credentialDecrypts = false;
+        trace.decryptError = err.message;
+        trace.result = 'credential fails to decrypt — worker would count this as an error and skip the vendor entirely';
+        results.push(trace);
+        continue;
+      }
+
+      trace.cjOrderIdNonEmpty = !!item.cjOrderId;
+      trace.statusIsTouchable = TOUCHABLE_STATUSES.has(item.status);
+
+      // Mirrors the worker's Order.find({ 'items.vendorId', 'items.cjOrderId': {$ne:''}, 'items.status': {$in: TOUCHABLE_STATUSES} })
+      const matchingOrder = await Order.findOne({
+        _id: order._id,
+        'items.vendorId': vendor._id,
+        'items.cjOrderId': { $ne: '' },
+        'items.status': { $in: Array.from(TOUCHABLE_STATUSES) },
+      }).select('_id');
+      trace.orderLevelQueryMatches = !!matchingOrder;
+
+      trace.wouldBeIncludedInByOrderId = trace.cjOrderIdNonEmpty && trace.statusIsTouchable && trace.orderLevelQueryMatches;
+      trace.result = trace.wouldBeIncludedInByOrderId
+        ? 'would reach getOrderStatusBatch — if the sync still reports 0 for this item, the CJ API call itself is the problem'
+        : 'excluded before ever calling CJ — this is why itemsChecked stayed 0';
+
+      results.push(trace);
+    }
+
+    res.json({ orderId: order._id, items: results });
+  } catch (err) {
+    console.error('CJ sync match trace error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    DEBUG — RAW CJ VARIANT DATA FOR A PRODUCT
    Temporary diagnostic: shows exactly what CJ's API returns for a
    product's variantList, side by side with our own stored variant
