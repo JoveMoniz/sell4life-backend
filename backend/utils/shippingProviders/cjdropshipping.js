@@ -293,7 +293,10 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
           orderId:          o.orderId,
           orderStatus:      o.orderStatus || '',
           trackNumber:      o.trackNumber || '',
-          trackingProvider: o.trackingProvider || '',
+          // CJ's own trackingProvider field is unreliable (often empty even
+          // when a real carrier is assigned) — logisticName is what's
+          // actually populated in practice, so prefer it.
+          trackingProvider: o.trackingProvider || o.logisticName || '',
           trackingUrl:      o.trackingUrl || '',
         });
       }
