@@ -324,6 +324,7 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
     }
     const { decryptCredential } = await import('../utils/shippingProviders/registry.js');
     const { TOUCHABLE_STATUSES } = await import('../jobs/cjOrderStatusSyncWorker.js');
+    const { getOrderStatusBatch } = await import('../utils/shippingProviders/cjdropshipping.js');
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -343,8 +344,9 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
 
       if (!trace.wouldBeInWorkerVendorList) { trace.result = 'excluded before credential decrypt — worker never even looks at this vendor'; results.push(trace); continue; }
 
+      let credential;
       try {
-        decryptCredential(vendor.supplierCredentials.cjdropshipping);
+        credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
         trace.credentialDecrypts = true;
       } catch (err) {
         trace.credentialDecrypts = false;
@@ -367,9 +369,32 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
       trace.orderLevelQueryMatches = !!matchingOrder;
 
       trace.wouldBeIncludedInByOrderId = trace.cjOrderIdNonEmpty && trace.statusIsTouchable && trace.orderLevelQueryMatches;
-      trace.result = trace.wouldBeIncludedInByOrderId
-        ? 'would reach getOrderStatusBatch — if the sync still reports 0 for this item, the CJ API call itself is the problem'
-        : 'excluded before ever calling CJ — this is why itemsChecked stayed 0';
+
+      if (trace.wouldBeIncludedInByOrderId) {
+        // Actually call CJ for just this one order's status, and show exactly
+        // what comes back — this is the step the worker's aggregate summary
+        // can't show us (it only surfaces a match, never a raw miss).
+        try {
+          const batchResult = await getOrderStatusBatch([item.cjOrderId], credential);
+          trace.cjRawResponse = batchResult;
+          if (batchResult?.error) {
+            trace.result = 'CJ call errored: ' + batchResult.error;
+          } else if (batchResult.warnings?.length) {
+            trace.result = 'CJ call returned warnings: ' + batchResult.warnings.join(' | ');
+          } else if (!batchResult.results?.length) {
+            trace.result = 'CJ call succeeded but returned NO entry for this cjOrderId — CJ does not recognise/return this order';
+          } else {
+            const returnedIds = batchResult.results.map(r => r.orderId);
+            trace.result = returnedIds.includes(item.cjOrderId)
+              ? 'CJ returned this order — sync should update it on next run'
+              : `CJ returned data but under a DIFFERENT orderId (got: ${JSON.stringify(returnedIds)}, expected: ${item.cjOrderId}) — this is the mismatch breaking the sync`;
+          }
+        } catch (err) {
+          trace.result = 'getOrderStatusBatch threw: ' + err.message;
+        }
+      } else {
+        trace.result = 'excluded before ever calling CJ — this is why itemsChecked stayed 0';
+      }
 
       results.push(trace);
     }
