@@ -352,6 +352,40 @@ router.post('/:id/items/:itemId/backfill-cj-carrier', authMiddleware, adminMiddl
 });
 
 /* ======================================================
+   TEMPORARY — MANUALLY RE-SEND THE "SHIPPED" BUYER NOTIFICATION
+   The sync only ever calls this once per item (guarded by
+   wasAlreadyTracked), so an item that already shipped before we could
+   see whether the email/message actually succeeded won't get a retry
+   from the regular sync. Surfaces the real per-step result instead of
+   only a server log.
+   Remove once no more affected orders remain.
+====================================================== */
+router.post('/:id/items/:itemId/resend-shipped-notification', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!item.trackingNumber) return res.status(400).json({ error: 'Item has no tracking number yet' });
+
+    const vendor = await Vendor.findById(item.vendorId);
+    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+    const { notifyBuyerShipped } = await import('../jobs/cjOrderStatusSyncWorker.js');
+    const result = await notifyBuyerShipped(order, item, vendor, item.trackingNumber, item.carrier || '');
+
+    res.json(result);
+  } catch (err) {
+    console.error('Resend shipped notification error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    TEMPORARY — TRACE WHY ONE ORDER DID/DIDN'T GET PICKED UP
    BY THE CJ ORDER STATUS SYNC
    Walks the exact same vendor-lookup / query / matching logic
