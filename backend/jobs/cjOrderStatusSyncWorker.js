@@ -30,11 +30,15 @@ const CJ_IN_FLIGHT = new Set(['CREATED', 'UNPAID', 'PENDING', 'PROCESSING', 'UNS
 // be overwritten by an out-of-band CJ update.
 export const TOUCHABLE_STATUSES = new Set(['Pending', 'Processing']);
 
-async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
+export async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
   // Mirrors vendor.js's PATCH /orders/:id/items/:itemId/tracking route —
   // same two side effects (email + in-app message) a vendor's manual
   // "Save & Notify Buyer" action triggers, so the buyer experience is
   // identical whether a human or this sync flipped the tracking info.
+  // Returns per-step results so a caller can surface real failures instead
+  // of them only ever reaching a server log nobody's watching.
+  const result = { emailSent: false, emailError: null, messageSent: false, messageError: null };
+
   try {
     const buyer = await User.findById(order.user).lean();
     if (buyer?.email) {
@@ -45,9 +49,13 @@ async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
         carrier: carrierStr,
         storeName: vendor.storeName,
       });
+      result.emailSent = true;
+    } else {
+      result.emailError = 'buyer has no email on file';
     }
   } catch (e) {
     console.error('[cj-order-status-sync] shipped email error:', e.message);
+    result.emailError = e.message;
   }
 
   try {
@@ -73,9 +81,13 @@ async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
     convo.unreadBuyer += 1;
     convo.lastMessageAt = new Date();
     await convo.save();
+    result.messageSent = true;
   } catch (e) {
     console.error('[cj-order-status-sync] shipped message error:', e.message);
+    result.messageError = e.message;
   }
+
+  return result;
 }
 
 export async function processCjOrderStatusSync() {
@@ -191,7 +203,13 @@ export async function processCjOrderStatusSync() {
           // a re-poll after that would otherwise re-send the email/message
           // on every tick until CJ reports DELIVERED.
           if (!wasAlreadyTracked) {
-            await notifyBuyerShipped(order, item, vendor, s.trackNumber, s.trackingProvider || '');
+            const notifyResult = await notifyBuyerShipped(order, item, vendor, s.trackNumber, s.trackingProvider || '');
+            if (notifyResult.emailError || notifyResult.messageError) {
+              summary.details.push({
+                vendorId: String(vendor._id), storeName: vendor.storeName, orderId: String(order._id),
+                error: `Shipped notification partially failed — email: ${notifyResult.emailError || 'ok'}, message: ${notifyResult.messageError || 'ok'}`,
+              });
+            }
           }
           continue;
         }
