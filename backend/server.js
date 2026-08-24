@@ -44,6 +44,7 @@ import passwordResetRoute from './routes/passwordReset.js';
 import messagesRoute from './routes/messages.js';
 import trackRoute from './routes/track.js';
 import adminAnalyticsRoute from './routes/adminAnalytics.js';
+import sitemapRoute from './routes/sitemap.js';
 import { initGeoIp, isGeoIpLoaded } from './utils/geoip.js';
 
 // ======================================================
@@ -269,6 +270,7 @@ app.use('/api/account', accountRoute);
 app.use('/api/messages', messagesRoute);
 app.use('/api/interactions', trackRoute);
 app.use('/api/admin/analytics', adminAnalyticsRoute);
+app.use('/api', sitemapRoute);
 
 // ======================================================
 // 404 HANDLER
