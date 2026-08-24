@@ -156,7 +156,15 @@ export async function processCjOrderStatusSync() {
       summary.itemsChecked++;
 
       try {
-        item.cjOrderStatus = s.orderStatus || item.cjOrderStatus;
+        // Track this in-memory change so it still gets saved even when
+        // nothing below crosses a buyer-facing status transition — previously
+        // a cjOrderStatus refresh (e.g. CREATED -> PENDING, still no buyer-
+        // visible change) was silently dropped because only a status
+        // transition added the order to touchedOrders.
+        if (s.orderStatus && s.orderStatus !== item.cjOrderStatus) {
+          item.cjOrderStatus = s.orderStatus;
+          touchedOrders.add(order);
+        }
         if (CJ_IN_FLIGHT.has(s.orderStatus)) {
           if (s.orderStatus === 'PROCESSING' || s.orderStatus === 'UNSHIPPED') {
             if (item.status === 'Pending') {
