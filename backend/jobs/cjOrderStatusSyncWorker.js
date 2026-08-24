@@ -118,18 +118,23 @@ export async function processCjOrderStatusSync() {
     }
     if (!byOrderId.size) continue;
 
-    let statuses;
+    let batchResult;
     try {
-      statuses = await getOrderStatusBatch(Array.from(byOrderId.keys()), credential);
+      batchResult = await getOrderStatusBatch(Array.from(byOrderId.keys()), credential);
     } catch (err) {
       summary.errors++;
       summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'getOrderStatusBatch failed: ' + err.message });
       continue;
     }
-    if (statuses?.error) {
+    if (batchResult?.error) {
       summary.errors++;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: statuses.error });
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: batchResult.error });
       continue;
+    }
+    const { results: statuses, warnings } = batchResult;
+    if (warnings?.length) {
+      summary.errors += warnings.length;
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: warnings.join(' | ') });
     }
 
     const touchedOrders = new Set();
