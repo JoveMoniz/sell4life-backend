@@ -118,31 +118,41 @@ export async function processCjOrderStatusSync() {
     }
     if (!byOrderId.size) continue;
 
-    let batchResult;
-    try {
-      batchResult = await getOrderStatusBatch(Array.from(byOrderId.keys()), credential);
-    } catch (err) {
-      summary.errors++;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'getOrderStatusBatch failed: ' + err.message });
-      continue;
-    }
-    if (batchResult?.error) {
-      summary.errors++;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: batchResult.error });
-      continue;
-    }
-    const { results: statuses, warnings } = batchResult;
-    if (warnings?.length) {
-      summary.errors += warnings.length;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: warnings.join(' | ') });
-    }
-
     const touchedOrders = new Set();
 
-    for (const s of statuses) {
-      const match = byOrderId.get(s.orderId);
-      if (!match) continue;
-      const { order, item } = match;
+    // Queried one cjOrderId at a time, deliberately NOT batched. CJ's
+    // getOrderDetailBatch DOES resolve our stored cjOrderId correctly, but
+    // echoes back a different internal numeric id in each result's own
+    // `orderId` field — so matching results back to requests by that field
+    // (the natural way to consume a batch response) silently drops every
+    // item, 100% of the time, no matter how many orders are in flight.
+    // Confirmed directly against CJ's own dashboard on 2026-08-24: a stored
+    // cjOrderId that's genuinely "Dispatched" on CJ's side still came back
+    // from the batched call as an unmatched/dropped entry. Querying one id
+    // per call means whatever CJ returns MUST belong to that id, sidestepping
+    // the mismatch entirely — the throttled 1 req/sec limit makes this fine
+    // at the order volumes this worker actually deals with.
+    for (const [cjOrderId, { order, item }] of byOrderId) {
+      let batchResult;
+      try {
+        batchResult = await getOrderStatusBatch([cjOrderId], credential);
+      } catch (err) {
+        summary.errors++;
+        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, orderId: String(order._id), error: 'getOrderStatusBatch failed: ' + err.message });
+        continue;
+      }
+      if (batchResult?.error) {
+        summary.errors++;
+        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, orderId: String(order._id), error: batchResult.error });
+        continue;
+      }
+      const { results, warnings } = batchResult;
+      if (warnings?.length) {
+        summary.errors += warnings.length;
+        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, orderId: String(order._id), error: warnings.join(' | ') });
+      }
+      const s = results?.[0];
+      if (!s) continue; // CJ genuinely has nothing to report for this order yet
       summary.itemsChecked++;
 
       try {
