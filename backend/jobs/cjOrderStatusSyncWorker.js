@@ -28,7 +28,7 @@ const CJ_IN_FLIGHT = new Set(['CREATED', 'UNPAID', 'PENDING', 'PROCESSING', 'UNS
 // Never touch an item outside these buyer-facing states — an active
 // cancel/return flow (or an item already Shipped/Delivered) must never
 // be overwritten by an out-of-band CJ update.
-const TOUCHABLE_STATUSES = new Set(['Pending', 'Processing']);
+export const TOUCHABLE_STATUSES = new Set(['Pending', 'Processing']);
 
 async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
   // Mirrors vendor.js's PATCH /orders/:id/items/:itemId/tracking route —
