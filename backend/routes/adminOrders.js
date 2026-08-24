@@ -308,6 +308,50 @@ router.post('/cj-status-sync-run', authMiddleware, adminMiddleware, async (req, 
 });
 
 /* ======================================================
+   TEMPORARY — BACKFILL MISSING CARRIER ON AN ALREADY-SHIPPED
+   CJ ITEM
+   Items that got marked Shipped before the logisticName fallback
+   fix (2026-08-24) landed have an empty carrier field the regular
+   sync will never revisit, since it only touches Pending/Processing
+   items. Re-fetches just the carrier/tracking-url for one item and
+   fills it in — never re-sends the "shipped" buyer notification.
+   Remove once no more affected orders remain.
+====================================================== */
+router.post('/:id/items/:itemId/backfill-cj-carrier', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!item.cjOrderId) return res.status(400).json({ error: 'Item has no cjOrderId' });
+
+    const { decryptCredential } = await import('../utils/shippingProviders/registry.js');
+    const { getOrderStatusBatch } = await import('../utils/shippingProviders/cjdropshipping.js');
+
+    const vendor = await Vendor.findById(item.vendorId);
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const batchResult = await getOrderStatusBatch([item.cjOrderId], credential);
+    if (batchResult?.error) return res.status(502).json({ error: batchResult.error });
+    const s = batchResult.results?.[0];
+    if (!s) return res.status(404).json({ error: 'CJ returned nothing for this order' });
+
+    const before = item.carrier || null;
+    if (s.trackingProvider) item.carrier = s.trackingProvider;
+    await order.save();
+
+    res.json({ before, after: item.carrier || null, cjRaw: s });
+  } catch (err) {
+    console.error('CJ carrier backfill error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    TEMPORARY — TRACE WHY ONE ORDER DID/DIDN'T GET PICKED UP
    BY THE CJ ORDER STATUS SYNC
    Walks the exact same vendor-lookup / query / matching logic
