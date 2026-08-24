@@ -384,24 +384,13 @@ router.get('/:id/debug-cj-sync-match', authMiddleware, adminMiddleware, async (r
           } else if (!batchResult.results?.length) {
             trace.result = 'CJ call succeeded but returned NO entry for this cjOrderId — CJ does not recognise/return this order';
           } else {
-            const returnedIds = batchResult.results.map(r => r.orderId);
-            trace.result = returnedIds.includes(item.cjOrderId)
-              ? 'CJ returned this order — sync should update it on next run'
-              : `CJ returned data but under a DIFFERENT orderId (got: ${JSON.stringify(returnedIds)}, expected: ${item.cjOrderId}) — this is the mismatch breaking the sync`;
-          }
-
-          // CJ's docs say the status/detail endpoint accepts EITHER their own
-          // orderId OR the custom orderNumber we originally submitted at
-          // creation — test the second one too, since the SD-prefixed value
-          // we're storing as cjOrderId looks like it may actually be CJ's
-          // "cjOrderCode" (a logistics-only id), not the real lookup key.
-          if (item.cjOrderNumber) {
-            try {
-              const byNumber = await getOrderStatusBatch([item.cjOrderNumber], credential);
-              trace.cjRawResponseByOrderNumber = byNumber;
-            } catch (err) {
-              trace.cjRawResponseByOrderNumber = { error: err.message };
-            }
+            // Confirmed 2026-08-24: CJ resolves our stored cjOrderId correctly
+            // but echoes back a DIFFERENT internal numeric id in the result's
+            // own orderId field. A single-id query's result is trusted as
+            // belonging to that id regardless of what's in this field — the
+            // worker no longer tries to match on it (see cjOrderStatusSyncWorker.js).
+            const s = batchResult.results[0];
+            trace.result = `CJ resolved this order: status=${s.orderStatus}, tracking=${s.trackNumber || '(none yet)'} — the worker will now apply this correctly`;
           }
         } catch (err) {
           trace.result = 'getOrderStatusBatch threw: ' + err.message;
