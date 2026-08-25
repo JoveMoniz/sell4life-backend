@@ -230,6 +230,47 @@ router.get('/top-pages', async (req, res) => {
 });
 
 /* ======================================================
+   GET /top-products — most-viewed products, from product_view events.
+   product.js already sends productId/name/price in metadata on every
+   view; this just aggregates what's already being collected rather than
+   needing any new tracking.
+====================================================== */
+router.get('/top-products', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const match = {
+      isBot: false, isInternal: false, type: 'product_view',
+      'metadata.productId': { $exists: true, $ne: '' },
+      ...dateFilterFor('timestamp', req.query.period),
+    };
+
+    const rows = await AnalyticsEvent.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$metadata.productId',
+          name: { $last: '$metadata.name' },
+          price: { $last: '$metadata.price' },
+          views: { $sum: 1 },
+        },
+      },
+      { $sort: { views: -1 } },
+      { $limit: limit },
+    ]);
+
+    res.json(rows.map((r) => ({
+      productId: r._id,
+      name: r.name || '(unknown product)',
+      price: typeof r.price === 'number' ? r.price : null,
+      views: r.views,
+    })));
+  } catch (err) {
+    console.error('[admin-analytics] top-products error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    GET /sources
 ====================================================== */
 router.get('/sources', async (req, res) => {
