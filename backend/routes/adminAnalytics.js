@@ -369,7 +369,12 @@ router.get('/countries', async (req, res) => {
 router.get('/top-cities', async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const match = { isBot: false, isInternal: false, city: { $ne: '' }, ...dateFilterFor('startedAt', req.query.period) };
+    // $exists is required alongside $ne — Mongo's $ne treats a genuinely
+    // missing field as "not equal", so without it every session recorded
+    // before city/region existed on the schema (i.e. all of it, until
+    // just now) would slip through as a single blank-city bucket that
+    // pools every historical visit's country/visit count together.
+    const match = { isBot: false, isInternal: false, city: { $exists: true, $ne: '' }, ...dateFilterFor('startedAt', req.query.period) };
 
     const rows = await AnalyticsSession.aggregate([
       { $match: match },
