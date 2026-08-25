@@ -33,9 +33,13 @@ const analyticsSessionSchema = new mongoose.Schema(
     screenWidth:  { type: Number, default: null },
     screenHeight: { type: Number, default: null },
 
-    // ISO country code resolved from IP via local MaxMind lookup at ingest
-    // time — the raw IP itself is never persisted.
+    // Resolved from IP via local MaxMind GeoLite2-City lookup at ingest
+    // time — the raw IP itself is never persisted. region/city are
+    // directional, not precise (free-tier IP geolocation accuracy drops a
+    // lot below country level, especially on mobile carrier/VPN traffic).
     country: { type: String, default: '' },
+    region:  { type: String, default: '' },
+    city:    { type: String, default: '' },
 
     isNewVisitor: { type: Boolean, default: true },
     isBot:        { type: Boolean, default: false },

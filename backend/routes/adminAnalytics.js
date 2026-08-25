@@ -362,6 +362,32 @@ router.get('/countries', async (req, res) => {
 });
 
 /* ======================================================
+   GET /top-cities — city/region resolved via GeoLite2-City. Directional,
+   not precise (free-tier IP geolocation is noticeably less accurate at
+   city level than country level).
+====================================================== */
+router.get('/top-cities', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const match = { isBot: false, isInternal: false, city: { $ne: '' }, ...dateFilterFor('startedAt', req.query.period) };
+
+    const rows = await AnalyticsSession.aggregate([
+      { $match: match },
+      { $group: { _id: { city: '$city', region: '$region', country: '$country' }, visits: { $sum: 1 } } },
+      { $sort: { visits: -1 } },
+      { $limit: limit },
+    ]);
+
+    res.json(rows.map((r) => ({
+      city: r._id.city, region: r._id.region, country: r._id.country, visits: r.visits,
+    })));
+  } catch (err) {
+    console.error('[admin-analytics] top-cities error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    GET /searches — top on-site search terms
 ====================================================== */
 router.get('/searches', async (req, res) => {
