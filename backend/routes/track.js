@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import AnalyticsSession from '../models/analyticsSession.js';
 import AnalyticsEvent from '../models/analyticsEvent.js';
 import { isBotUserAgent, parseUserAgent } from '../utils/uaParser.js';
-import { lookupCountry } from '../utils/geoip.js';
+import { lookupGeo } from '../utils/geoip.js';
 import { classifyTrafficSource, referrerDomainOf } from '../utils/trafficSource.js';
 
 const router = express.Router();
@@ -42,7 +42,7 @@ router.post('/event', async (req, res) => {
 
     if (!session) {
       const { device, browser, os } = parseUserAgent(ua);
-      const country = lookupCountry(req.ip);
+      const { country, region, city } = lookupGeo(req.ip);
       const referrer = String(body.referrer || '').slice(0, 500);
       const utm = body.utm || {};
 
@@ -70,6 +70,8 @@ router.post('/event', async (req, res) => {
         screenWidth: Number.isFinite(body.screen?.width) ? body.screen.width : null,
         screenHeight: Number.isFinite(body.screen?.height) ? body.screen.height : null,
         country,
+        region,
+        city,
         isNewVisitor,
         isBot,
         isInternal,
