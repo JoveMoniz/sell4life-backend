@@ -46,6 +46,7 @@ import { getProductImages as cjGetProductImages } from '../utils/shippingProvide
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj } from '../utils/cjProductSync.js';
+import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 
 const router = express.Router();
 
@@ -766,7 +767,7 @@ router.get('/stripe/status', authMiddleware, requireApprovedVendor, async (req, 
     const vendor = req.vendor;
 
     if (!vendor.stripeAccountId) {
-      return res.json({ connected: false, payoutEnabled: false });
+      return res.json({ connected: false, payoutEnabled: false, country: vendor.country || null });
     }
 
     const account = await stripe.accounts.retrieve(vendor.stripeAccountId);
@@ -782,11 +783,19 @@ router.get('/stripe/status', authMiddleware, requireApprovedVendor, async (req, 
       payoutEnabled,
       detailsSubmitted: !!account.details_submitted,
       requirementsDue: account.requirements?.currently_due || [],
+      country: vendor.country || null,
     });
   } catch (err) {
     console.error('Stripe status error:', err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Static list of countries we currently support for vendor payouts — the
+// settings page uses this to populate the country picker. Extending
+// payouts to a new country is a one-line change in stripeConnectCountries.js.
+router.get('/stripe-connect-countries', authMiddleware, requireApprovedVendor, async (req, res) => {
+  res.json({ countries: STRIPE_CONNECT_COUNTRIES });
 });
 
 const STRIPE_CONNECT_ALLOWED_ORIGINS = [
@@ -804,9 +813,22 @@ router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req
 
     let accountId = vendor.stripeAccountId;
     if (!accountId) {
+      // Stripe fixes an Express account's country permanently at creation —
+      // it decides the expected bank-account format and ID-verification
+      // rules, so we can't default this to GB for a non-UK vendor. Require
+      // the vendor's real, validated country to be set first (via
+      // PATCH /vendor/settings).
+      if (!isStripeConnectCountry(vendor.country)) {
+        return res.status(400).json({
+          error: vendor.country
+            ? `Payouts aren't set up for ${vendor.country} yet — please contact us.`
+            : 'Please set your business country in Store Settings before connecting a bank account.',
+        });
+      }
+
       const account = await stripe.accounts.create({
         type: 'express',
-        country: 'GB',
+        country: vendor.country,
         email: req.user.email,
         capabilities: { transfers: { requested: true } },
         business_type: 'individual',
@@ -1658,7 +1680,7 @@ router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
 router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
-    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, freeReturns } = req.body;
+    const { storeName, storeSlug, storeDescription, storeLogo, storeBanner, freeReturns, country } = req.body;
 
     const update = {};
 
@@ -1684,6 +1706,20 @@ router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
     // request-upgrade flow — never directly by the vendor, since it gates
     // tier-restricted features and determines the commission rate.
     if (freeReturns !== undefined) update.freeReturns = !!freeReturns;
+
+    if (country !== undefined) {
+      // Locked once a Stripe account exists — Stripe fixes an Express
+      // account's country permanently at creation, so changing it here
+      // afterward wouldn't do anything and would just be misleading.
+      if (vendor.stripeAccountId) {
+        return res.status(400).json({ error: 'Your business country is locked once a bank account is connected.' });
+      }
+      const code = String(country).trim().toUpperCase();
+      if (!isStripeConnectCountry(code)) {
+        return res.status(400).json({ error: `We don't yet support payouts to ${code || 'that country'}.` });
+      }
+      update.country = code;
+    }
 
     if (!Object.keys(update).length) {
       return res.status(400).json({ error: 'No fields to update' });

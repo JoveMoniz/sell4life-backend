@@ -62,6 +62,18 @@ const vendorSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Business/residency country used for Stripe Connect payouts — separate
+    // from taxInfo.addrCountry (free-text, HMRC-specific). Must be one of
+    // stripeConnectCountries.STRIPE_CONNECT_COUNTRIES before the vendor can
+    // connect Stripe; locked once stripeAccountId is set since Stripe fixes
+    // an account's country permanently at creation.
+    country: {
+      type: String,
+      default: null,
+      uppercase: true,
+      trim: true,
+    },
+
     stripeAccountId: String,
 
     payoutEnabled: {
