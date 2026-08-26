@@ -8,8 +8,9 @@
 const UK_CODE = 'GB';
 
 // EU member states, ISO 3166-1 alpha-2 — used for the 'uk_eu' preset so a
-// seller doesn't have to hand-pick all 27 countries individually.
-const EU_CODES = [
+// seller doesn't have to hand-pick all 27 countries individually. Exported
+// since currency.js also needs the same list (EU countries display EUR).
+export const EU_CODES = [
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
   'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
   'SI', 'ES', 'SE',
