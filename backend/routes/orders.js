@@ -25,6 +25,7 @@ import stripe from '../config/stripe.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import { resolveAcceptedOffer } from '../utils/offerLogic.js';
+import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 
 const router = express.Router();
 
@@ -238,11 +239,40 @@ router.post('/shipping-address', authMiddleware, async (req, res) => {
       city: String(city).trim(),
       county: String(county || '').trim(),
       postcode: String(postcode).trim(),
-      // Platform is UK-only for now (shipping quotes, HMRC reporting, CJ
-      // freight all assume GB) — store the real ISO code regardless of
-      // whatever the free-text country field on checkout says.
-      country: 'GB',
+      // Checkout's country field is now a real <select> of ISO 3166-1
+      // alpha-2 codes (frontend/assets/js/countries.js) — trust it, just
+      // sanity-check the shape. This used to be unconditionally forced to
+      // 'GB' regardless of what the buyer picked, silently mislabeling
+      // every non-UK order's real destination (CJ auto-order creation,
+      // HMRC reporting, and the shipping-scope check below all read this
+      // field) — see project memory for the incident this caused.
+      country: /^[A-Z]{2}$/.test(String(country || '').toUpperCase())
+        ? String(country).toUpperCase()
+        : 'GB',
     };
+
+    // Real enforcement of each item's seller-set shipping scope — this is
+    // the authoritative check (the product page's own check is browse-time
+    // UI only, never trust that alone). Runs here specifically because
+    // it's the earliest point the real destination country is known, and
+    // it's before stripe.confirmPayment ever runs client-side, so a reject
+    // here means no money has moved yet.
+    try {
+      const items = JSON.parse(paymentIntent.metadata?.items || '[]');
+      const productIds = [...new Set(items.map(i => i.productId))];
+      const products = await Product.find({ _id: { $in: productIds } }).select('name shippingScope shippingCountries');
+      const blocked = products.find(p => !isCountryAllowedByScope(p, address.country));
+      if (blocked) {
+        return res.status(400).json({
+          error: `"${blocked.name}" isn't available for delivery to the selected country. Please remove it from your cart or choose a different delivery address.`,
+        });
+      }
+    } catch (err) {
+      // A malformed/missing items list shouldn't block a legitimate
+      // checkout — this check is a safety net, not the primary validation
+      // (create-payment-intent already validated the cart itself).
+      console.warn('shipping-scope check skipped:', err.message);
+    }
 
     await stripe.paymentIntents.update(paymentIntentId, {
       metadata: { shippingAddress: JSON.stringify(address) },

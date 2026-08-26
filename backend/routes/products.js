@@ -10,6 +10,8 @@ import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js'; // 🔥 THIS WAS MISSING
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { syncProductFromCj, looksCjSourced, deriveBasePriceFromVariants, scaleVariantPricesToTarget } from '../utils/cjProductSync.js';
+import { lookupGeo } from '../utils/geoip.js';
+import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 
 const router = Router();
 
@@ -47,7 +49,9 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, collectionOnly, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, collectionOnly, shippingScope, shippingCountries, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
+
+    const VALID_SHIPPING_SCOPES = ['worldwide', 'uk', 'uk_eu', 'custom'];
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -92,6 +96,10 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       vendor: vendor._id,
       shippingCost: Number(shippingCost) >= 0 ? Number(shippingCost) : 0,
       collectionOnly: !!collectionOnly,
+      shippingScope: VALID_SHIPPING_SCOPES.includes(shippingScope) ? shippingScope : 'worldwide',
+      shippingCountries: Array.isArray(shippingCountries)
+        ? shippingCountries.map(c => String(c).toUpperCase()).filter(c => /^[A-Z]{2}$/.test(c))
+        : [],
       videoUrl:  videoUrl  || '',
       videoUrl2: videoUrl2 || '',
       videoUrl3: videoUrl3 || '',
@@ -140,7 +148,16 @@ router.get('/slug/:slug', async (req, res) => {
       });
     }
 
-    res.json(product);
+    // Browse-time availability: the seller's own stated shipping scope only
+    // — never a live CJ freight call here (this route gets hit on every
+    // product page view; that check belongs at checkout, where the real
+    // destination is actually known and CJ calls are already happening).
+    const { country: buyerCountry } = lookupGeo(req.ip);
+    res.json({
+      ...product.toObject(),
+      buyerCountry,
+      shippableToBuyer: isCountryAllowedByScope(product, buyerCountry),
+    });
   } catch (err) {
     console.error('GET PRODUCT BY SLUG ERROR:', err);
 
@@ -300,7 +317,12 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    res.json(product);
+    const { country: buyerCountry } = lookupGeo(req.ip);
+    res.json({
+      ...product.toObject(),
+      buyerCountry,
+      shippableToBuyer: isCountryAllowedByScope(product, buyerCountry),
+    });
   } catch (err) {
     console.error('GET PRODUCT BY ID ERROR:', err);
 
@@ -458,6 +480,8 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       'shippingCost',
       'shipIncluded',
       'collectionOnly',
+      'shippingScope',
+      'shippingCountries',
       'condition',
       'acceptOffers',
       'variants',

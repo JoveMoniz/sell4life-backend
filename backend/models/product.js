@@ -120,6 +120,27 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Where the seller is willing to ship this item at all — 'worldwide' is
+    // the default so existing products keep behaving exactly as before this
+    // was added. For CJ-sourced items this is combined with (never
+    // overrides) CJ's own live per-country freight availability — a seller
+    // saying "worldwide" doesn't force CJ to ship somewhere it genuinely
+    // can't; it just means "don't restrict beyond what CJ can already do".
+    // For a vendor's own non-CJ stock (e.g. a used bicycle), this is the
+    // only availability check there is, since there's no supplier API to
+    // ask instead.
+    shippingScope: {
+      type: String,
+      enum: ['worldwide', 'uk', 'uk_eu', 'custom'],
+      default: 'worldwide',
+    },
+
+    // Only used when shippingScope === 'custom' — ISO 3166-1 alpha-2 codes.
+    shippingCountries: {
+      type: [String],
+      default: [],
+    },
+
     markupPct: {
       type: Number,
       default: null,
