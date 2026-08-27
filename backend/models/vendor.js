@@ -149,6 +149,9 @@ const vendorSchema = new mongoose.Schema(
       addrCountry:  { type: String, default: null },
       taxIdType:    { type: String, default: null },
       taxIdValue:   { type: String, default: null },
+      // EU sellers only — DAC7 wants a VAT number captured separately from
+      // the TIN when the seller has one; left null for GB/HMRC vendors.
+      vatId:        { type: String, default: null },
       confirmedAt:  { type: Date,   default: null },
     },
 
