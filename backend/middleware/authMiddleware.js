@@ -1,5 +1,11 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
+import { mustVerifyEmail } from '../utils/emailVerification.js';
+
+// Stays reachable for a logged-in-but-unverified user so they aren't
+// locked out of checking their own status, resending the email, or
+// logging out — every other authenticated route is blocked for them.
+const EMAIL_VERIFY_ALLOWLIST = ['/api/auth/me', '/api/auth/resend-verification', '/api/auth/logout'];
 
 /* ======================================================
    CONFIG
@@ -69,6 +75,22 @@ export default async function authMiddleware(req, res, next) {
       req.isOwner = true;
     } else {
       req.isOwner = false;
+    }
+
+    /* ======================================================
+   EMAIL VERIFICATION GATE
+   The main defense against throwaway/fake-email signups — blocks every
+   authenticated action until the account verifies, except the small
+   allowlist above. Admins are exempt (never created via public signup).
+====================================================== */
+
+    const requestPath = req.originalUrl.split('?')[0];
+
+    if (user.role !== 'admin' && mustVerifyEmail(user) && !EMAIL_VERIFY_ALLOWLIST.includes(requestPath)) {
+      return res.status(403).json({
+        error: 'Please verify your email to continue.',
+        code: 'EMAIL_UNVERIFIED',
+      });
     }
 
     /* ======================================================
