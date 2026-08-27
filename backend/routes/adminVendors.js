@@ -296,6 +296,36 @@ router.patch('/:id/tier', async (req, res) => {
 });
 
 /* ======================================================
+   RESET STRIPE CONNECTION
+   Clears a vendor's Stripe Connect account so their next "Connect bank
+   account" click creates a fresh Express account instead of resuming the
+   old one — needed after fixing the vendor.country bug, since an
+   already-connected vendor's existing account is permanently locked to
+   whatever country it was created with.
+====================================================== */
+
+router.post('/:id/reset-stripe', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid vendor ID' });
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      id,
+      { $unset: { stripeAccountId: '' }, payoutEnabled: false },
+      { new: true }
+    );
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    res.json({ message: 'Stripe connection reset', vendor });
+  } catch (error) {
+    console.error('❌ Reset vendor Stripe connection error:', error);
+    res.status(500).json({ message: 'Failed to reset Stripe connection' });
+  }
+});
+
+/* ======================================================
    VENDOR PRODUCTS (admin view)
 ====================================================== */
 
