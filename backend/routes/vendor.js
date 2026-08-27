@@ -1617,6 +1617,7 @@ router.get('/tax-info', authMiddleware, requireVendor, async (req, res) => {
         taxInfoSummary = {
           maskedTaxId:  maskTaxId(decrypt(vendor.taxInfo.taxIdValue)),
           taxIdType:    vendor.taxInfo.taxIdType || null,
+          maskedVatId:  vendor.taxInfo.vatId ? maskTaxId(decrypt(vendor.taxInfo.vatId)) : null,
           confirmedAt:  vendor.taxInfo.confirmedAt || null,
         };
       } catch (cryptoErr) {
@@ -1625,6 +1626,7 @@ router.get('/tax-info', authMiddleware, requireVendor, async (req, res) => {
     }
 
     res.json({
+      country:          vendor.country || null,
       reportingStatus:  vendor.reportingStatus || 'none',
       hmrcReporting:    vendor.hmrcReporting || {},
       taxInfoCompleted,
@@ -1646,7 +1648,7 @@ router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
     const {
       legalName, dateOfBirth,
       addrLine1, addrLine2, addrCity, addrPostcode, addrCountry,
-      taxIdType, taxIdValue,
+      taxIdType, taxIdValue, vatId,
     } = req.body;
 
     const REQUIRED = { legalName, addrLine1, addrCity, addrPostcode, addrCountry, taxIdType, taxIdValue };
@@ -1657,9 +1659,10 @@ router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
     }
 
-    const VALID_TYPES = ['ni', 'utr', 'other'];
+    // ni/utr — UK/HMRC. tin — EU/DAC7 tax identification number.
+    const VALID_TYPES = ['ni', 'utr', 'tin', 'other'];
     if (!VALID_TYPES.includes(String(taxIdType).trim().toLowerCase())) {
-      return res.status(400).json({ error: 'taxIdType must be ni, utr, or other' });
+      return res.status(400).json({ error: `taxIdType must be one of: ${VALID_TYPES.join(', ')}` });
     }
 
     const { encrypt } = await import('../utils/taxInfoCrypto.js');
@@ -1676,6 +1679,7 @@ router.post('/tax-info', authMiddleware, requireVendor, async (req, res) => {
         addrCountry:  encrypt(String(addrCountry).trim()),
         taxIdType:    String(taxIdType).trim().toLowerCase(),
         taxIdValue:   encrypt(String(taxIdValue).trim()),
+        vatId:        vatId ? encrypt(String(vatId).trim()) : null,
         confirmedAt:  now,
       },
       taxInfoCompletedAt: now,
