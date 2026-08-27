@@ -56,7 +56,7 @@ const router = express.Router();
 
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { storeName, storeSlug } = req.body;
+    const { storeName, storeSlug, country } = req.body;
 
     const VERIFY_ENFORCED_FROM = new Date('2026-06-27T00:00:00Z');
     const accountCreatedAt = req.user.createdAt ? new Date(req.user.createdAt) : new Date();
@@ -67,6 +67,18 @@ router.post('/create', authMiddleware, async (req, res) => {
     if (!storeName || !storeSlug) {
       return res.status(400).json({
         error: 'Missing fields',
+      });
+    }
+
+    // Collected up front so the whole store — including the Stripe payout
+    // account created later — is set up for the vendor's real country from
+    // the start, instead of asking again in Store Settings.
+    const countryCode = String(country || '').trim().toUpperCase();
+    if (!isStripeConnectCountry(countryCode)) {
+      return res.status(400).json({
+        error: countryCode
+          ? `We don't yet support payouts to ${countryCode}.`
+          : 'Please select your business country.',
       });
     }
 
@@ -102,6 +114,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       storeSlug: slug,
       storeDescription: req.body.storeDescription || '',
       type: vendorType,
+      country: countryCode,
       status: autoApprove ? 'approved' : 'pending',
       ...(autoApprove && { approvedAt: new Date() }),
     });
@@ -791,10 +804,12 @@ router.get('/stripe/status', authMiddleware, requireApprovedVendor, async (req, 
   }
 });
 
-// Static list of countries we currently support for vendor payouts — the
-// settings page uses this to populate the country picker. Extending
-// payouts to a new country is a one-line change in stripeConnectCountries.js.
-router.get('/stripe-connect-countries', authMiddleware, requireApprovedVendor, async (req, res) => {
+// Static list of countries we currently support for vendor payouts — used
+// by both the "Create Your Store" form (no Vendor doc exists yet, so this
+// stays unauthenticated) and the settings page's fallback picker for
+// legacy vendors. Extending payouts to a new country is a one-line change
+// in stripeConnectCountries.js.
+router.get('/stripe-connect-countries', async (req, res) => {
   res.json({ countries: STRIPE_CONNECT_COUNTRIES });
 });
 
