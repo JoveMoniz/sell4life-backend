@@ -28,6 +28,12 @@ const platformConfigSchema = new mongoose.Schema(
     reviewsEnabled:   { type: Boolean, default: false },
     reviewsMinCount:  { type: Number, default: 3, min: 1 },
 
+    // Blocks real checkout for any non-GB vendor until DAC7 (EU digital
+    // platform reporting) registration is sorted — a vendor can still sign
+    // up and list from an EU country, this only stops a real transaction
+    // from completing, since that's what starts the registration clock.
+    euSellingEnabled: { type: Boolean, default: false },
+
     // Reserve rates
     reserveRateStandard:    { type: Number, default: 0.10, min: 0, max: 1 },
     reserveRateStandardSetAt: { type: Date, default: null },

@@ -212,4 +212,38 @@ router.put('/reviews', async (req, res) => {
   }
 });
 
+/* ======================================================
+   GET /api/admin/config/eu-selling
+====================================================== */
+router.get('/eu-selling', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    res.json({ euSellingEnabled: cfg.euSellingEnabled ?? false });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/eu-selling
+   Body: { euSellingEnabled }
+====================================================== */
+router.put('/eu-selling', async (req, res) => {
+  try {
+    const { euSellingEnabled } = req.body;
+    if (euSellingEnabled === undefined) {
+      return res.status(400).json({ error: 'euSellingEnabled is required' });
+    }
+    const cfg = await PlatformConfig.findOneAndUpdate(
+      { _key: 'global' },
+      { $set: { euSellingEnabled: Boolean(euSellingEnabled) } },
+      { upsert: true, new: true }
+    );
+    res.json({ ok: true, euSellingEnabled: cfg.euSellingEnabled });
+  } catch (err) {
+    console.error('EU selling config PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
