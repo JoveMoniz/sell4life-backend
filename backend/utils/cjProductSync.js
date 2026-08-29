@@ -136,10 +136,19 @@ export async function syncProductFromCj(product, credential) {
   // best-effort keyword match (see categoryMatch.js), not a direct copy.
   // Each field is only ever filled when genuinely empty — never overwrites
   // a vendor's own manual choice on a later sync.
-  if ((!product.category || !product.subcategory) && result.cjCategoryName) {
-    const matched = matchCjCategory(result.cjCategoryName);
-    if (!product.category && matched.category) updateDoc.category = matched.category;
-    if (!product.subcategory && matched.subcategory) updateDoc.subcategory = matched.subcategory;
+  let categoryDebug = { cjCategoryName: result.cjCategoryName || null, matched: null, reason: null };
+  if (!product.category || !product.subcategory) {
+    if (!result.cjCategoryName) {
+      categoryDebug.reason = 'CJ did not return a categoryName for this product';
+    } else {
+      const matched = matchCjCategory(result.cjCategoryName);
+      categoryDebug.matched = matched;
+      if (!matched.category) categoryDebug.reason = 'No category scored above the match threshold';
+      if (!product.category && matched.category) updateDoc.category = matched.category;
+      if (!product.subcategory && matched.subcategory) updateDoc.subcategory = matched.subcategory;
+    }
+  } else {
+    categoryDebug.reason = 'Product already had category/subcategory set — left untouched';
   }
 
   // Only overwrite images when CJ's set actually changed (new/removed images) —
@@ -268,7 +277,7 @@ export async function syncProductFromCj(product, credential) {
   }
 
   await Product.findByIdAndUpdate(product._id, updateDoc);
-  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp };
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp, categoryDebug };
 }
 
 // ======================================================
