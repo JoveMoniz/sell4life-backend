@@ -1012,7 +1012,7 @@ router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requ
 
     if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ' });
     if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
-    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, shipping: r.shipping ?? null, note: r.note || null });
+    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, shipping: r.shipping ?? null, note: r.note || null, categoryDebug: r.categoryDebug || null });
   } catch (err) {
     console.error('[cj-sync]', err);
     return res.status(500).json({ error: 'CJ sync failed' });
