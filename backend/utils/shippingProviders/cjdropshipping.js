@@ -688,9 +688,19 @@ export async function getProductImages(vid, productName, credential, pidOverride
       }
     }
 
+    // code 1600014 isn't in CJ's published error-code docs, but is
+    // empirically known (see checkUkShippingForAllProducts above) to mean
+    // the connected account's API access is disabled on CJ's side — a
+    // token can still be issued even when this is the case, so it isn't
+    // caught by the earlier "no token" check. This needs action in the
+    // vendor's own CJ account (Developer/API settings), not a code fix.
+    const accountApiDisabled = lastListSearchDebug?.code === 1600014;
+
     return {
-      error: 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating',
-      debug: { pidOverrideTried: !!pidOverride, lastListSearchDebug, lastDetailApiDebug, lastVideoApiDebug, hadToken: !!token },
+      error: accountApiDisabled
+        ? 'Your CJ account\'s API access appears to be disabled — check Developer/API settings in your CJ account, or contact CJ support'
+        : 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating',
+      debug: { pidOverrideTried: !!pidOverride, lastListSearchDebug, lastDetailApiDebug, lastVideoApiDebug, hadToken: !!token, accountApiDisabled },
     };
   } catch (err) {
     console.error('[cjdropshipping] getProductImages error:', err.message);
