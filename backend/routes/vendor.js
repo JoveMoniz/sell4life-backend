@@ -1026,9 +1026,9 @@ router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requ
     const credential = decryptCredential(rawCred);
     const r = await syncProductFromCj(product, credential);
 
-    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ' });
+    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ', cjSearchDebug: r.cjSearchDebug || null });
     if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
-    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, shipping: r.shipping ?? null, note: r.note || null, categoryDebug: r.categoryDebug || null });
+    return res.json({ ok: true, images: r.count, videos: r.videos, variantsSynced: r.variantsSynced, shipping: r.shipping ?? null, note: r.note || null, categoryDebug: r.categoryDebug || null, cjSearchError: r.cjSearchError || null, cjSearchDebug: r.cjSearchDebug || null });
   } catch (err) {
     console.error('[cj-sync]', err);
     return res.status(500).json({ error: 'CJ sync failed' });
