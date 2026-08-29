@@ -541,14 +541,19 @@ export async function getProductImages(vid, productName, credential, pidOverride
 
   // Fetch full product media (images + videos + variant data) from the detail endpoint.
   // Falls back to /product/query if /product/detail fails.
-  async function detailMedia(pid) {
-    for (const url of [
-      `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
-      `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
-    ]) {
+  let lastDetailApiDebug = null;
+  async function detailMedia(pid, opts = {}) {
+    const { retries = 2, endpoints = ['detail', 'query'] } = opts;
+    const urlMap = {
+      detail: `${CJ_BASE}/product/detail?pid=${encodeURIComponent(pid)}`,
+      query:  `${CJ_BASE}/product/query?pid=${encodeURIComponent(pid)}`,
+    };
+    for (const key of endpoints) {
+      const url = urlMap[key];
       await delay(200);
-      const resp = await cjFetch(url);
+      const resp = await cjFetch(url, {}, retries);
       const data = resp?.ok ? await resp.json() : null;
+      lastDetailApiDebug = { endpoint: key, httpStatus: resp?.status ?? null, code: data?.code ?? null, hasData: !!data?.data };
       if (data?.code !== 200 || !data?.data) continue;
       const imgs = extractImages(data.data);
       if (imgs?.length) {
@@ -645,7 +650,13 @@ export async function getProductImages(vid, productName, credential, pidOverride
     // a pin that stopped working shouldn't permanently block every future
     // sync for a product that can still be found the normal way.
     if (pidOverride) {
-      const pinned = await detailMedia(pidOverride);
+      // No retries, single endpoint — this is a best-effort check that's
+      // expected to sometimes miss (stale pid) and fall through; retrying
+      // a doomed lookup 429s just burn rate-limit budget the real search
+      // below needs, and were the likely cause of near-total sync failures
+      // seen in bulk runs (each failing pin wasted up to 6 requests before
+      // the real search even started).
+      const pinned = await detailMedia(pidOverride, { retries: 0, endpoints: ['detail'] });
       if (pinned?.images?.length) return pinned;
     }
 
@@ -675,7 +686,10 @@ export async function getProductImages(vid, productName, credential, pidOverride
       }
     }
 
-    return { error: 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating' };
+    return {
+      error: 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating',
+      debug: { pidOverrideTried: !!pidOverride, lastDetailApiDebug, lastVideoApiDebug },
+    };
   } catch (err) {
     console.error('[cjdropshipping] getProductImages error:', err.message);
     return { error: `CJ API error: ${err.message}` };

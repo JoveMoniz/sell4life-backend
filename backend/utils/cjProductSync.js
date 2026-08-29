@@ -121,9 +121,9 @@ export async function syncProductFromCj(product, credential) {
       if (!sameSet) {
         await Product.findByIdAndUpdate(product._id, { images: variantImgs });
       }
-      return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback', cjSearchError: result?.error || null };
+      return { status: 'updated', count: variantImgs.length, videos: 0, variantsSynced: 0, note: 'variant-fallback', cjSearchError: result?.error || null, cjSearchDebug: result?.debug || null };
     }
-    return { status: 'failed', error: result?.error };
+    return { status: 'failed', error: result?.error, cjSearchDebug: result?.debug || null };
   }
 
   const updateDoc = {
