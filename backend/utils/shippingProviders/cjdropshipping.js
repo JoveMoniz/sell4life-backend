@@ -515,11 +515,15 @@ export async function getProductImages(vid, productName, credential, pidOverride
           || (pid ? `https://app.cjdropshipping.com/product-detail.html?id=${pid}` : '');
         const apiVideos = await fetchVideosByPid(pid);
         return {
-          images:      imgs,
-          videos:      [...new Set([...apiVideos, ...extractVideos(data.data)])],
-          cjVariants:  extractCjVariants(data.data),
-          supplier:    'CJdropshipping',
-          supplierUrl: productUrl,
+          images:       imgs,
+          videos:       [...new Set([...apiVideos, ...extractVideos(data.data)])],
+          cjVariants:   extractCjVariants(data.data),
+          supplier:     'CJdropshipping',
+          supplierUrl:  productUrl,
+          // CJ's own category path, e.g. "Home & Garden / Home Storage /
+          // Home Office Storage" — CJ's taxonomy, not ours; the caller maps
+          // it onto our own categories.
+          cjCategoryName: data.data.categoryName || null,
         };
       }
     }
@@ -585,7 +589,9 @@ export async function getProductImages(vid, productName, credential, pidOverride
       if (media?.images?.length) return media;
     }
     const imgs = extractImages(r.first);
-    return imgs?.length ? { images: imgs, videos: [], cjVariants: extractCjVariants(r.first) } : null;
+    return imgs?.length
+      ? { images: imgs, videos: [], cjVariants: extractCjVariants(r.first), cjCategoryName: r.first.categoryName || null }
+      : null;
   }
 
   try {
@@ -618,7 +624,7 @@ export async function getProductImages(vid, productName, credential, pidOverride
           const media3 = r.first.pid ? await detailMedia(r.first.pid) : null;
           if (media3?.images?.length) return media3;
           const imgs = extractImages(r.first);
-          if (imgs?.length) return { images: imgs, videos: [], cjVariants: extractCjVariants(r.first) };
+          if (imgs?.length) return { images: imgs, videos: [], cjVariants: extractCjVariants(r.first), cjCategoryName: r.first.categoryName || null };
         }
       }
     }
