@@ -446,9 +446,11 @@ export async function getProductImages(vid, productName, credential, pidOverride
     }
   }
 
+  let lastListSearchDebug = null;
   async function listSearch(params) {
     const resp = await cjFetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, ...params })}`);
     const data = resp?.ok ? await resp.json() : null;
+    lastListSearchDebug = { params, httpOk: !!resp?.ok, httpStatus: resp?.status ?? null, code: data?.code ?? null, message: data?.message ?? null, total: data?.data?.total ?? null };
     return { code: data?.code, total: data?.data?.total, first: data?.data?.list?.[0] };
   }
 
@@ -650,7 +652,7 @@ export async function getProductImages(vid, productName, credential, pidOverride
 
     return {
       error: 'No images found via CJ API — product may not be in the CJ catalog or credentials need updating',
-      debug: { pidOverrideTried: !!pidOverride, lastDetailApiDebug, lastVideoApiDebug },
+      debug: { pidOverrideTried: !!pidOverride, lastListSearchDebug, lastDetailApiDebug, lastVideoApiDebug, hadToken: !!token },
     };
   } catch (err) {
     console.error('[cjdropshipping] getProductImages error:', err.message);
