@@ -639,10 +639,14 @@ export async function getProductImages(vid, productName, credential, pidOverride
   try {
     // Vendor-pinned product: supplierUrl carried an explicit CJ pid — fetch it
     // directly, no fuzzy search. This is the manual fix for wrong matches.
+    // If the pin itself no longer resolves (stale pid, product removed from
+    // CJ, or a bad value that ended up in supplierUrl some other way), fall
+    // through to the normal SKU-based search below instead of hard-failing —
+    // a pin that stopped working shouldn't permanently block every future
+    // sync for a product that can still be found the normal way.
     if (pidOverride) {
       const pinned = await detailMedia(pidOverride);
       if (pinned?.images?.length) return pinned;
-      return { error: 'Could not fetch the CJ product from the Supplier Product URL — check the link' };
     }
 
     // Primary: search by productSku (most precise — exact CJ SKU match)
