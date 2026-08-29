@@ -206,8 +206,16 @@ export async function syncProductFromCj(product, credential) {
     ourVariantsCount: (product.variants || []).length,
     videoApi: result.videoApiDebug || null,
   };
+  // Pass 1: match our variants to CJ's, and find firstCjVid + the cost basis
+  // per variant — but don't price anything yet. The shipping quote below
+  // needs firstCjVid, and pricing had to wait for it: computing price here
+  // using the pre-sync product.shippingCost left the vendor-visible price
+  // one sync cycle behind every time CJ's freight quote changed, since this
+  // same run then overwrote shippingCost with the new figure right after —
+  // so the just-saved price always looked "wrong" relative to cost+shipping.
+  let matched = [];
   if (result.cjVariants?.length) {
-    const syncedVariants = (product.variants || []).map(ourV => {
+    matched = (product.variants || []).map(ourV => {
       const ourSku = (ourV.sku ?? '').trim();
       let cjV = result.cjVariants.find(cv =>
         ourSku && (cv.variantSku.trim() === ourSku || cv.vid.trim() === ourSku)
@@ -227,27 +235,59 @@ export async function syncProductFromCj(product, credential) {
         }
       }
 
-      if (!cjV) return ourV;
+      if (!cjV) return { ourV, cjV: null, costGbp: null };
       if (!firstCjVid && cjV.vid) firstCjVid = cjV.vid;
       variantsSynced++;
 
-      let priceUpdate = {};
-      if (hasMarkup && cjV.sellPriceUsd != null) {
-        const costGbp = cjV.sellPriceUsd * usdGbp;
+      let costGbp = null;
+      if (cjV.sellPriceUsd != null) {
+        costGbp = cjV.sellPriceUsd * usdGbp;
         if (minCostGbp == null || costGbp < minCostGbp) minCostGbp = costGbp;
-        // Must match the frontend markup-calc.js formula exactly — (cost + ship
-        // when shipIncluded) * (1 + markup%) — otherwise this auto-sync (which
-        // runs on every save and every 12h via the periodic worker) silently
-        // reverts whatever price the vendor's own "Apply to Price" tool just
-        // set, because the two were computing different numbers for the same
-        // markupPct. That mismatch is what caused a real vendor-visible bug:
-        // the price kept drifting back down shortly after being fixed.
-        const shipGbp = product.shipIncluded ? (Number(product.shippingCost) || 0) : 0;
+      }
+      return { ourV, cjV, costGbp };
+    });
+  }
+
+  // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
+  // "variant not found"). Only overwrite shippingCost when a quote succeeds —
+  // otherwise the existing (weight-estimated) value stays. Fetched before
+  // pass 2 below so this run's own fresh figure feeds this run's own price
+  // calc, rather than the previous run's now-stale shippingCost.
+  let shippingGbp = null;
+  if (firstCjVid) {
+    const quote = await cjProvider.getShippingCost(
+      { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1 },
+      credential
+    );
+    if (quote && Number.isFinite(Number(quote.cost))) {
+      shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
+      updateDoc.shippingCost = shippingGbp;
+    }
+  }
+
+  // Pass 2: price is only recalculated when the vendor has a markup%
+  // configured (via the "Apply to Price" tool) — without that we have no
+  // basis for turning CJ's cost into a sell price, so an existing
+  // manually-set variant price is left alone in that case.
+  if (matched.length) {
+    // Must match the frontend markup-calc.js formula exactly — (cost + ship
+    // when shipIncluded) * (1 + markup%) — otherwise this auto-sync (which
+    // runs on every save and every 12h via the periodic worker) silently
+    // reverts whatever price the vendor's own "Apply to Price" tool just
+    // set, because the two were computing different numbers for the same
+    // markupPct.
+    const shipGbp = product.shipIncluded
+      ? (shippingGbp != null ? shippingGbp : (Number(product.shippingCost) || 0))
+      : 0;
+
+    const syncedVariants = matched.map(({ ourV, cjV, costGbp }) => {
+      if (!cjV) return ourV;
+      let priceUpdate = {};
+      if (hasMarkup && costGbp != null) {
         const newPrice = Math.round((costGbp + shipGbp) * (1 + Number(product.markupPct) / 100) * 100) / 100;
         priceUpdate = { price: newPrice };
         pricesSynced++;
       }
-
       return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...priceUpdate };
     });
     if (variantsSynced > 0) updateDoc.variants = syncedVariants;
@@ -264,21 +304,6 @@ export async function syncProductFromCj(product, credential) {
     // actual saved price and looked broken. Keep it honest the same way as
     // the base price: reflect the cost basis that was actually used.
     if (minCostGbp != null) updateDoc.costPrice = Math.round(minCostGbp * 100) / 100;
-  }
-
-  // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
-  // "variant not found"). Only overwrite shippingCost when a quote succeeds —
-  // otherwise the existing (weight-estimated) value stays.
-  let shippingGbp = null;
-  if (firstCjVid) {
-    const quote = await cjProvider.getShippingCost(
-      { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1 },
-      credential
-    );
-    if (quote && Number.isFinite(Number(quote.cost))) {
-      shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
-      updateDoc.shippingCost = shippingGbp;
-    }
   }
 
   await Product.findByIdAndUpdate(product._id, updateDoc);
