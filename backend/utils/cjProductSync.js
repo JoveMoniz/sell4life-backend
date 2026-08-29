@@ -6,6 +6,7 @@ import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
 import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth, getShippingCostDiagnostic } from './shippingProviders/cjdropshipping.js';
 import { decryptCredential } from './shippingProviders/registry.js';
+import { matchCjCategory } from './categoryMatch.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
 // Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
@@ -129,6 +130,17 @@ export async function syncProductFromCj(product, credential) {
     supplier: result.supplier ?? 'CJdropshipping',
     ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
   };
+
+  // Auto-fill category/subcategory from CJ's own taxonomy when they're
+  // still empty — CJ's category names don't match ours, so this is a
+  // best-effort keyword match (see categoryMatch.js), not a direct copy.
+  // Each field is only ever filled when genuinely empty — never overwrites
+  // a vendor's own manual choice on a later sync.
+  if ((!product.category || !product.subcategory) && result.cjCategoryName) {
+    const matched = matchCjCategory(result.cjCategoryName);
+    if (!product.category && matched.category) updateDoc.category = matched.category;
+    if (!product.subcategory && matched.subcategory) updateDoc.subcategory = matched.subcategory;
+  }
 
   // Only overwrite images when CJ's set actually changed (new/removed images) —
   // never just to "correct" the order. Every sync used to reset images to CJ's
