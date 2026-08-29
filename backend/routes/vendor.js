@@ -969,6 +969,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     // isn't filling in, across the whole run rather than one product at a
     // time. Not shown per-item (too noisy for a 100+ product bulk run).
     let noCjVariants = 0, sampleVideoApiDebug = null, noCategoryReturned = 0;
+    let fallbackCount = 0, sampleCjSearchError = null;
 
     for (let i = 0; i < targets.length; i++) {
       if (clientGone) {
@@ -981,6 +982,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       const r = await syncProductFromCj(product, credential);
       if (r.status === 'updated') {
         updated++;
+        if (r.note === 'variant-fallback') {
+          fallbackCount++;
+          if (!sampleCjSearchError && r.cjSearchError) sampleCjSearchError = r.cjSearchError;
+        }
         if (r.variantMatchDebug?.cjVariantsFound === 0) noCjVariants++;
         if (!sampleVideoApiDebug && r.variantMatchDebug?.videoApi) sampleVideoApiDebug = r.variantMatchDebug.videoApi;
         if (!r.categoryDebug?.cjCategoryName) noCategoryReturned++;
@@ -996,7 +1001,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
     send({
       type: 'done', total: targets.length, updated, failed, skipped,
-      debug: { noCjVariants, noCategoryReturned, sampleVideoApiDebug },
+      debug: { noCjVariants, noCategoryReturned, sampleVideoApiDebug, fallbackCount, sampleCjSearchError },
     });
   } catch (err) {
     console.error('[bulk-cj-images]', err);
