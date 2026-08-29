@@ -295,8 +295,101 @@ export async function syncProductFromCj(product, credential) {
 // Only checks the first variant with a cjVid per product, matching
 // syncProductFromCj's existing "shipping is roughly product-level" treatment.
 // ======================================================
+function blankShippingSummary() {
+  return { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, apiDisabled: 0, details: [] };
+}
+
+// Checks UK freight availability for one vendor's CJ-connected products and
+// merges the results into `summary`. Shared by the all-vendors admin sweep
+// and the single-vendor on-demand check a vendor can trigger themselves.
+async function checkUkShippingForVendor(vendor, summary) {
+  summary.vendorsChecked++;
+  let credential;
+  try {
+    credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+  } catch (err) {
+    summary.errors++;
+    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
+    return;
+  }
+
+  // Test auth once per vendor before looping products — a *token* can be
+  // obtained even when the account's API access is separately disabled
+  // on CJ's side, so this alone isn't enough (see the code:200 check
+  // below), but it still catches genuinely wrong credentials up front.
+  const authCheck = await testCredentialAuth(credential);
+  if (!authCheck.ok) {
+    summary.authFailed++;
+    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
+    return;
+  }
+
+  const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
+
+  let vendorApiDisabled = false;
+
+  for (const product of products) {
+    if (vendorApiDisabled) { summary.skipped++; continue; }
+
+    summary.productsChecked++;
+    try {
+      const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+      if (!cjVid) { summary.skipped++; continue; }
+
+      // Use the diagnostic call, not getShippingCost() — that function
+      // collapses "CJ account-level API access disabled" (code !== 200,
+      // e.g. 1600014) and "genuinely no freight route" (code === 200,
+      // empty options) into the same null, which would otherwise
+      // misreport every product for an account with disabled API access
+      // as having lost UK shipping — this is what actually happened on
+      // the first run of this check, before this distinction existed.
+      const diag = await getShippingCostDiagnostic(
+        { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
+        credential
+      );
+
+      if (diag.code !== 200) {
+        // Account-level problem, not per-product — stop hammering CJ with
+        // the same failure for the rest of this vendor's catalog, and
+        // clear any shippingUnavailableUK flags this vendor's products
+        // already carry from an earlier run — those were written before
+        // this code-!==200 distinction existed and don't reflect real
+        // per-product data, just this same account-level failure repeated.
+        vendorApiDisabled = true;
+        summary.apiDisabled++;
+        await Product.updateMany(
+          { vendor: vendor._id, shippingCheckedAt: { $ne: null } },
+          { shippingUnavailableUK: null, shippingCheckedAt: null }
+        );
+        summary.details.push({
+          vendorId: String(vendor._id), storeName: vendor.storeName,
+          error: `CJ API error (code ${diag.code}): ${diag.message || 'unknown'} — rest of this vendor's products skipped, stale flags cleared, not reported as unavailable`,
+        });
+        continue;
+      }
+
+      const unavailable = diag.optionsCount === 0;
+
+      await Product.findByIdAndUpdate(product._id, {
+        shippingUnavailableUK: unavailable,
+        shippingCheckedAt: new Date(),
+      });
+
+      if (unavailable) {
+        summary.unavailable++;
+        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
+      } else {
+        summary.available++;
+      }
+    } catch (err) {
+      summary.errors++;
+      summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
+    }
+  }
+}
+
 export async function checkUkShippingForAllProducts() {
-  const summary = { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, apiDisabled: 0, details: [] };
+  const summary = blankShippingSummary();
 
   const vendors = await Vendor.find({
     type: 'professional',
@@ -304,90 +397,21 @@ export async function checkUkShippingForAllProducts() {
   });
 
   for (const vendor of vendors) {
-    summary.vendorsChecked++;
-    let credential;
-    try {
-      credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-    } catch (err) {
-      summary.errors++;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
-      continue;
-    }
-
-    // Test auth once per vendor before looping products — a *token* can be
-    // obtained even when the account's API access is separately disabled
-    // on CJ's side, so this alone isn't enough (see the code:200 check
-    // below), but it still catches genuinely wrong credentials up front.
-    const authCheck = await testCredentialAuth(credential);
-    if (!authCheck.ok) {
-      summary.authFailed++;
-      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
-      continue;
-    }
-
-    const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
-
-    let vendorApiDisabled = false;
-
-    for (const product of products) {
-      if (vendorApiDisabled) { summary.skipped++; continue; }
-
-      summary.productsChecked++;
-      try {
-        const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
-        if (!cjVid) { summary.skipped++; continue; }
-
-        // Use the diagnostic call, not getShippingCost() — that function
-        // collapses "CJ account-level API access disabled" (code !== 200,
-        // e.g. 1600014) and "genuinely no freight route" (code === 200,
-        // empty options) into the same null, which would otherwise
-        // misreport every product for an account with disabled API access
-        // as having lost UK shipping — this is what actually happened on
-        // the first run of this check, before this distinction existed.
-        const diag = await getShippingCostDiagnostic(
-          { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
-          credential
-        );
-
-        if (diag.code !== 200) {
-          // Account-level problem, not per-product — stop hammering CJ with
-          // the same failure for the rest of this vendor's catalog, and
-          // clear any shippingUnavailableUK flags this vendor's products
-          // already carry from an earlier run — those were written before
-          // this code-!==200 distinction existed and don't reflect real
-          // per-product data, just this same account-level failure repeated.
-          vendorApiDisabled = true;
-          summary.apiDisabled++;
-          await Product.updateMany(
-            { vendor: vendor._id, shippingCheckedAt: { $ne: null } },
-            { shippingUnavailableUK: null, shippingCheckedAt: null }
-          );
-          summary.details.push({
-            vendorId: String(vendor._id), storeName: vendor.storeName,
-            error: `CJ API error (code ${diag.code}): ${diag.message || 'unknown'} — rest of this vendor's products skipped, stale flags cleared, not reported as unavailable`,
-          });
-          continue;
-        }
-
-        const unavailable = diag.optionsCount === 0;
-
-        await Product.findByIdAndUpdate(product._id, {
-          shippingUnavailableUK: unavailable,
-          shippingCheckedAt: new Date(),
-        });
-
-        if (unavailable) {
-          summary.unavailable++;
-          summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
-        } else {
-          summary.available++;
-        }
-      } catch (err) {
-        summary.errors++;
-        summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
-      }
-    }
+    await checkUkShippingForVendor(vendor, summary);
   }
 
+  return summary;
+}
+
+// On-demand check for a single vendor (e.g. a "Check UK shipping now"
+// button on the vendor's own My Products page) — same logic, scoped to
+// just their own catalog rather than sweeping every vendor.
+export async function checkUkShippingForOneVendor(vendor) {
+  const summary = blankShippingSummary();
+  if (!vendor?.supplierCredentials?.cjdropshipping) {
+    summary.details.push({ error: 'No CJ Dropshipping account connected' });
+    return summary;
+  }
+  await checkUkShippingForVendor(vendor, summary);
   return summary;
 }

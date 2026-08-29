@@ -162,6 +162,10 @@ const vendorSchema = new mongoose.Schema(
       type:    mongoose.Schema.Types.Mixed,
       default: {},
     },
+
+    // Cooldown timestamp for the vendor-triggered "Check UK shipping now"
+    // button — prevents button-mashing from hammering CJ's freight API.
+    lastUkShippingCheckAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

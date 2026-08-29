@@ -45,7 +45,7 @@ import { getProvider, listProviders, encryptCredential, decryptCredential } from
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
-import { syncProductFromCj } from '../utils/cjProductSync.js';
+import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 
 const router = express.Router();
@@ -1058,6 +1058,34 @@ router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, req
   } catch (err) {
     console.error('[cj-images]', err);
     return res.status(500).json({ error: 'Failed to fetch images from CJ' });
+  }
+});
+
+/* ======================================================
+   CHECK UK SHIPPING AVAILABILITY — ON DEMAND, ONE VENDOR
+   Vendor-triggered version of the admin sweep — scoped to just their own
+   catalog so a vendor doesn't wait for the automatic 24h worker cycle
+   after connecting CJ or importing new products.
+====================================================== */
+router.post('/products/check-cj-shipping', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    if (!vendor.supplierCredentials?.cjdropshipping) {
+      return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+    }
+
+    const COOLDOWN_MS = 5 * 60 * 1000;
+    if (vendor.lastUkShippingCheckAt && Date.now() - new Date(vendor.lastUkShippingCheckAt).getTime() < COOLDOWN_MS) {
+      const waitSec = Math.ceil((COOLDOWN_MS - (Date.now() - new Date(vendor.lastUkShippingCheckAt).getTime())) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSec}s before checking again` });
+    }
+
+    await Vendor.findByIdAndUpdate(vendor._id, { lastUkShippingCheckAt: new Date() });
+    const summary = await checkUkShippingForOneVendor(vendor);
+    return res.json(summary);
+  } catch (err) {
+    console.error('[check-cj-shipping]', err);
+    return res.status(500).json({ error: 'Failed to check UK shipping' });
   }
 });
 
