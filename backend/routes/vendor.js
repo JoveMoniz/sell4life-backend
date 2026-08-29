@@ -965,6 +965,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     send({ type: 'start', total: targets.length });
 
     let updated = 0, failed = 0, skipped = 0;
+    // Diagnostic aggregate — why category/variant-price/video sync is or
+    // isn't filling in, across the whole run rather than one product at a
+    // time. Not shown per-item (too noisy for a 100+ product bulk run).
+    let noCjVariants = 0, sampleVideoApiDebug = null, noCategoryReturned = 0;
 
     for (let i = 0; i < targets.length; i++) {
       if (clientGone) {
@@ -977,6 +981,9 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       const r = await syncProductFromCj(product, credential);
       if (r.status === 'updated') {
         updated++;
+        if (r.variantMatchDebug?.cjVariantsFound === 0) noCjVariants++;
+        if (!sampleVideoApiDebug && r.variantMatchDebug?.videoApi) sampleVideoApiDebug = r.variantMatchDebug.videoApi;
+        if (!r.categoryDebug?.cjCategoryName) noCategoryReturned++;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.shipping != null ? { shipping: r.shipping } : {}), ...(r.note ? { note: r.note } : {}) });
       } else if (r.status === 'skipped') {
         skipped++;
@@ -987,7 +994,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       }
     }
 
-    send({ type: 'done', total: targets.length, updated, failed, skipped });
+    send({
+      type: 'done', total: targets.length, updated, failed, skipped,
+      debug: { noCjVariants, noCategoryReturned, sampleVideoApiDebug },
+    });
   } catch (err) {
     console.error('[bulk-cj-images]', err);
     send({ type: 'error', message: err.message });

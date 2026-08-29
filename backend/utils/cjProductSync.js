@@ -201,6 +201,11 @@ export async function syncProductFromCj(product, credential) {
   let firstCjVid = '';
   let minCostGbp = null;
   const hasMarkup = Number.isFinite(Number(product.markupPct));
+  const variantMatchDebug = {
+    cjVariantsFound: result.cjVariants?.length || 0,
+    ourVariantsCount: (product.variants || []).length,
+    videoApi: result.videoApiDebug || null,
+  };
   if (result.cjVariants?.length) {
     const syncedVariants = (product.variants || []).map(ourV => {
       const ourSku = (ourV.sku ?? '').trim();
@@ -277,7 +282,7 @@ export async function syncProductFromCj(product, credential) {
   }
 
   await Product.findByIdAndUpdate(product._id, updateDoc);
-  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp, categoryDebug };
+  return { status: 'updated', count: result.images.length, videos: videosSaved, variantsSynced, pricesSynced, shipping: shippingGbp, categoryDebug, variantMatchDebug };
 }
 
 // ======================================================

@@ -480,6 +480,7 @@ export async function getProductImages(vid, productName, credential, pidOverride
   // Videos live behind a dedicated endpoint (POST /product/queryVideosByProductId) —
   // the productVideo field on /product/detail is empty unless requested separately.
   // Response uses code:0 + success:true (unlike the other endpoints' code:200).
+  let lastVideoApiDebug = null;
   async function fetchVideosByPid(pid) {
     try {
       await delay(200);
@@ -489,11 +490,13 @@ export async function getProductImages(vid, productName, credential, pidOverride
         body:    JSON.stringify({ productId: pid }),
       });
       const data = resp?.ok ? await resp.json() : null;
+      lastVideoApiDebug = { httpOk: !!resp?.ok, httpStatus: resp?.status ?? null, code: data?.code ?? null, message: data?.message ?? null, dataLen: Array.isArray(data?.data) ? data.data.length : null };
       if (!data || (data.code !== 0 && data.code !== 200) || !Array.isArray(data.data)) return [];
       return data.data
         .map(v => v.videoUrl)
         .filter(u => typeof u === 'string' && u.startsWith('http'));
-    } catch (_) {
+    } catch (err) {
+      lastVideoApiDebug = { error: err.message };
       return [];
     }
   }
@@ -524,6 +527,7 @@ export async function getProductImages(vid, productName, credential, pidOverride
           // Home Office Storage" — CJ's taxonomy, not ours; the caller maps
           // it onto our own categories.
           cjCategoryName: data.data.categoryName || null,
+          videoApiDebug: lastVideoApiDebug,
         };
       }
     }
