@@ -127,8 +127,15 @@ export function matchCjCategory(cjCategoryName) {
     }
   }
 
+  // Both add-product.js and edit-product.js store subcategory as a slug
+  // (e.g. "Garden Furniture & Parasols" -> "garden-furniture-parasols"),
+  // never the raw display name — matching that exact slugification here so
+  // the vendor's subcategory dropdown actually selects the stored value
+  // instead of silently matching nothing.
+  const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
   return {
     category: bestCategory,
-    subcategory: bestSubScore >= SUBCATEGORY_THRESHOLD ? bestSub : null,
+    subcategory: bestSubScore >= SUBCATEGORY_THRESHOLD ? slugify(bestSub) : null,
   };
 }
