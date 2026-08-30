@@ -47,6 +47,7 @@ import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIP
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj } from '../utils/cjProductSync.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
+import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
 
 const router = express.Router();
 
@@ -105,6 +106,28 @@ router.post('/create', authMiddleware, async (req, res) => {
     // Casual vendors are auto-approved — no admin review needed
     const autoApprove = vendorType === 'casual';
 
+    // Founding Seller program — atomically claim a spot if the cap hasn't
+    // been reached yet. The $lt guard means two concurrent signups can
+    // never both claim the last spot (findOneAndUpdate only matches/updates
+    // if the condition still holds at the moment it runs).
+    const platformCfg = await getPlatformConfig();
+    const foundingCap = platformCfg.foundingSeller?.cap ?? 0;
+    const foundingClaim = foundingCap > 0
+      ? await PlatformConfig.findOneAndUpdate(
+          { _key: 'global', 'foundingSeller.claimed': { $lt: foundingCap } },
+          { $inc: { 'foundingSeller.claimed': 1 } },
+          { new: true }
+        )
+      : null;
+    const isFoundingSeller = !!foundingClaim;
+    const foundingSellerData = isFoundingSeller
+      ? {
+          enrolled: true,
+          joinedAt: new Date(),
+          freeSalesLimit: platformCfg.foundingSeller?.freeSalesByTier?.[vendorType] ?? 0,
+        }
+      : undefined;
+
     const vendor = await Vendor.create({
       userId: req.user._id,
       storeName,
@@ -114,12 +137,14 @@ router.post('/create', authMiddleware, async (req, res) => {
       country: countryCode,
       status: autoApprove ? 'approved' : 'pending',
       ...(autoApprove && { approvedAt: new Date() }),
+      ...(foundingSellerData && { foundingSeller: foundingSellerData }),
     });
 
     res.json({
       success: true,
       vendor,
       autoApproved: autoApprove,
+      foundingSeller: isFoundingSeller,
     });
   } catch (err) {
     console.error('Vendor create error:', err);
