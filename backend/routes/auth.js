@@ -7,6 +7,7 @@ import User from '../models/user.js';
 import EmailVerification from '../models/emailVerification.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailEmailVerification, mailWelcome } from '../utils/email.js';
+import { lookupCountry } from '../utils/geoip.js';
 
 const router = express.Router();
 
@@ -132,6 +133,13 @@ router.post('/register', async (req, res) => {
 
     const username = await createUniqueUsername(baseUsername);
 
+    // Real GeoIP-detected country, not the schema's 'GB' default — the
+    // default previously made every buyer look UK-based regardless of
+    // where they actually signed up from, since registration never asked
+    // for a country. Falls back to the default when GeoIP can't resolve
+    // (local dev, VPN, etc.) rather than leaving the field blank.
+    const detectedCountry = lookupCountry(req.ip);
+
     /* ======================================================
        CREATE USER
     ====================================================== */
@@ -142,6 +150,7 @@ router.post('/register', async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role: 'user',
+      ...(detectedCountry && { country: detectedCountry }),
     });
 
     /* ======================================================
