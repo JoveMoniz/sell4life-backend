@@ -45,6 +45,18 @@ const logoHeader = `
     </span>
   </div>`;
 
+// Names get stored however someone typed them at signup ("JOVELINO VAZ
+// MONIZ", "jovelino vaz moniz") — title-case for greetings so emails don't
+// read as shouty regardless of how the account itself has it stored.
+function titleCase(name) {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(w => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
 // ---- Pre-built templates ----
 
 export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddress }) {
@@ -113,7 +125,7 @@ export function mailPasswordReset({ to, name, resetUrl }) {
     html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
       ${logoHeader}
       <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Reset your password</p>
-      <p style="margin:0 0 16px;color:#374151">Hi ${name || 'there'},<br><br>We received a request to reset your Sell4Life password. Click the button below — this link expires in <strong>1 hour</strong>.</p>
+      <p style="margin:0 0 16px;color:#374151">Hi ${titleCase(name) || 'there'},<br><br>We received a request to reset your Sell4Life password. Click the button below — this link expires in <strong>1 hour</strong>.</p>
       <p style="margin:0 0 20px">
         <a href="${resetUrl}" style="display:inline-block;background:#0b6b6a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">Reset Password</a>
       </p>
@@ -151,7 +163,7 @@ export function mailEmailVerification({ to, name, verifyUrl }) {
     html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
       ${logoHeader}
       <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Verify your email address</p>
-      <p style="margin:0 0 16px;color:#374151">Hi ${name || 'there'},<br><br>Thanks for joining Sell4Life! Click the button below to verify your email address. This link expires in <strong>24 hours</strong>.</p>
+      <p style="margin:0 0 16px;color:#374151">Hi ${titleCase(name) || 'there'},<br><br>Thanks for joining Sell4Life! Click the button below to verify your email address. This link expires in <strong>24 hours</strong>.</p>
       <p style="margin:0 0 20px">
         <a href="${verifyUrl}" style="display:inline-block;background:#0b6b6a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">Verify Email</a>
       </p>
@@ -248,7 +260,7 @@ export function mailWelcome({ to, name }) {
     subject: 'Welcome to Sell4Life!',
     html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
       ${logoHeader}
-      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Welcome, ${name || 'there'}! 🎉</p>
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Welcome, ${titleCase(name) || 'there'}! 🎉</p>
       <p style="margin:0 0 10px;color:#374151">Thanks for joining Sell4Life — we're glad you're here. Browse thousands of products from independent sellers across the UK, message sellers directly with questions, and even make an offer on selected listings.</p>
       <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/shop/" style="background:#0b6b6a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Browsing</a></p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
@@ -264,7 +276,7 @@ export function mailSellerInvite({ to, name }) {
     html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
       ${logoHeader}
       <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Turn clutter into cash</p>
-      <p style="margin:0 0 10px;color:#374151">Hi ${name || 'there'}, quick thought — if you've got anything sitting around unused (old electronics, clothes, furniture, whatever), you can list it on Sell4Life in a couple of minutes with a free Casual seller account. No monthly fees, no upfront cost — you only pay when it sells.</p>
+      <p style="margin:0 0 10px;color:#374151">Hi ${titleCase(name) || 'there'}, quick thought — if you've got anything sitting around unused (old electronics, clothes, furniture, whatever), you can list it on Sell4Life in a couple of minutes with a free Casual seller account. No monthly fees, no upfront cost — you only pay when it sells.</p>
       <p style="margin:0 0 10px;color:#374151">We're also running a <strong>Founding Seller</strong> promotion right now — early sellers get a limited number of sales completely free of platform commission.</p>
       <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/sell/" style="background:#f28c28;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Selling — It's Free</a></p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
