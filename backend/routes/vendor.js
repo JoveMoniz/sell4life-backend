@@ -43,7 +43,7 @@ import stripe from '../config/stripe.js';
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
-import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED } from '../utils/vendorBalance.js';
+import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj } from '../utils/cjProductSync.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
@@ -379,9 +379,13 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     let totalStripeFees = 0;
 
     const feeCfg = await getFeeConfig();
+    const foundingStatus = await getFoundingSellerStatus(vendor);
 
     for (const order of ordersRaw) {
-      const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+      const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
+      const COMMISSION_RATE = isFreeFoundingSale
+        ? 0
+        : await resolveCommissionRateForOrder(vendor, order.createdAt);
       const RESERVE_RATE    = resolveReserveRateAtTime(vendor, feeCfg, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
         (vo) => String(vo.vendorId) === String(vendorId)
@@ -525,6 +529,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             amount:      netAmount,
             commission,
             commissionRate: COMMISSION_RATE,
+            foundingFree: isFreeFoundingSale,
             reserveRate:    RESERVE_RATE,
             allDelivered,
             vatAmount,
@@ -561,6 +566,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
             amount:      netAmount,
             commission,
             commissionRate: COMMISSION_RATE,
+            foundingFree: isFreeFoundingSale,
             reserveRate:    RESERVE_RATE,
             allDelivered,
             vatAmount,
@@ -618,7 +624,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     // Sort chronologically (newest first)
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const currentCommissionRate = await resolveCommissionRateForOrder(vendor, new Date());
+    const normalCommissionRate  = await resolveCommissionRateForOrder(vendor, new Date());
+    const currentCommissionRate = foundingStatus.active ? 0 : normalCommissionRate;
     const currentReserveRate    = resolveReserveRateAtTime(vendor, feeCfg, new Date());
     console.log('[rates] vendor=%s type=%s commission=%s reserve=%s cfg.reserveStandard=%s cfg.reserveSetAt=%s',
       vendor._id, vendor.type, currentCommissionRate, currentReserveRate,
@@ -637,6 +644,8 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
         net,
         netAfterFees:     Number((net - totalCommission).toFixed(2)),
         commissionRate:   currentCommissionRate,
+        normalCommissionRate,
+        foundingSeller:   foundingStatus.enrolled ? foundingStatus : null,
         reserveRate:      currentReserveRate,
         vatRegistered:    isVatRegistered,
         vatNumber:        vendor.vatNumber || '',
@@ -668,13 +677,12 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       return res.status(400).json({ error: 'Invalid period' });
     }
 
-    const [balance, payouts, pendingRequest] = await Promise.all([
+    const [balance, payouts, pendingRequest, foundingStatus] = await Promise.all([
       computeVendorBalance(vendorId),
       Payout.find({ vendorId }).sort({ createdAt: -1 }).limit(50),
       Payout.findOne({ vendorId, status: 'requested' }),
+      getFoundingSellerStatus(vendor),
     ]);
-
-    const commissionRate = await resolveCommissionRateForOrder(vendor, new Date());
 
     // Period-filtered summary stats
     let periodStats = null;
@@ -694,7 +702,10 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
           const paymentStatus = (order.paymentStatus || '').toLowerCase();
           const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(paymentStatus);
           if (!isPaid) continue;
-          const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+          const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
+          const COMMISSION_RATE = isFreeFoundingSale
+            ? 0
+            : await resolveCommissionRateForOrder(vendor, order.createdAt);
           const vendorItems = (order.items || []).filter(i => String(i.vendorId) === String(vendorId));
 
           // Stripe fee: vendor's proportional share of the order's Stripe fee
@@ -731,7 +742,6 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
 
     res.json({
       ...balance,
-      commissionRate,
       vendorType: vendor.type || 'casual',
       minimumPayout: MIN_PAYOUT,
       hasPendingRequest: !!pendingRequest,
@@ -897,8 +907,16 @@ router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req
 ====================================================== */
 router.get('/fee-rate', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
-    const commissionRate = await resolveCommissionRateForOrder(req.vendor, new Date());
-    res.json({ commissionRate, stripePct: STRIPE_PCT, stripeFixed: STRIPE_FIXED });
+    const normalCommissionRate = await resolveCommissionRateForOrder(req.vendor, new Date());
+    const foundingStatus = await getFoundingSellerStatus(req.vendor);
+    const commissionRate = foundingStatus.active ? 0 : normalCommissionRate;
+    res.json({
+      commissionRate,
+      normalCommissionRate,
+      stripePct: STRIPE_PCT,
+      stripeFixed: STRIPE_FIXED,
+      foundingSeller: foundingStatus.enrolled ? foundingStatus : null,
+    });
   } catch (err) {
     console.error('[fee-rate]', err);
     res.status(500).json({ error: 'Failed to load fee rate' });

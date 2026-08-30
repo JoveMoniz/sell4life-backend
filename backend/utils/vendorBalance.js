@@ -38,15 +38,32 @@ function isPaidOrder(order) {
   return ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
 }
 
-// Counts a vendor's paid orders, oldest first — used standalone by the admin
-// vendor list for "free sales used X/Y". computeVendorBalance below computes
-// the same rank inline (it already has the sorted order list) rather than
-// calling this, to avoid a second DB round-trip.
-export async function countVendorPaidOrders(vendorId) {
-  const orders = await Order.find({ 'vendorOrders.vendorId': vendorId })
+// Founding Seller status for a vendor — used/limit/remaining, whether the
+// free-sale window is still active, and a cutoff timestamp (their Nth paid
+// order's createdAt) that determines whether any GIVEN order of theirs
+// falls within it. One query, meant to be the single source every vendor-
+// facing route (Transactions, Payouts, the margin-panel fee-rate endpoint)
+// and computeVendorBalance below call instead of each re-deriving this.
+export async function getFoundingSellerStatus(vendor) {
+  const limit = vendor?.foundingSeller?.enrolled ? vendor.foundingSeller.freeSalesLimit : null;
+  if (limit == null || limit <= 0) {
+    return { enrolled: false, active: false, limit: 0, used: 0, remaining: 0, cutoff: null };
+  }
+  const orders = await Order.find({ 'vendorOrders.vendorId': vendor._id })
     .select('paymentStatus createdAt')
+    .sort({ createdAt: 1 })
     .lean();
-  return orders.filter(isPaidOrder).length;
+  const paid = orders.filter(isPaidOrder);
+  const used = Math.min(paid.length, limit);
+  const remaining = Math.max(0, limit - paid.length);
+  const cutoff = paid.length ? paid[Math.min(limit, paid.length) - 1].createdAt : null;
+  return { enrolled: true, active: remaining > 0, limit, used, remaining, cutoff };
+}
+
+// True if an order at this date falls within a vendor's Founding Seller
+// free-sale window, per the cutoff from getFoundingSellerStatus above.
+export function isWithinFoundingCutoff(orderCreatedAt, cutoff) {
+  return !!cutoff && new Date(orderCreatedAt).getTime() <= new Date(cutoff).getTime();
 }
 
 export async function computeVendorBalance(vendorId) {
@@ -67,6 +84,7 @@ export async function computeVendorBalance(vendorId) {
   const reserveMs = RESERVE_DAYS * 24 * 60 * 60 * 1000;
 
   let totalGross              = 0;
+  let totalCommissionCleared  = 0; // per-order-rate-aware commission on totalGross — NOT a flat rate applied once at the end, so a Founding Seller's free orders correctly contribute $0 here even when mixed with normal-rate orders in the same cleared balance
   let totalReserved           = 0;
   let totalReservedNet        = 0; // reserved gross minus per-order commission — for reservedBalance
   let totalGrossAllTime       = 0;
@@ -151,6 +169,7 @@ export async function computeVendorBalance(vendorId) {
 
       if (now >= reserveReleasesAt) {
         totalGross += itemValue;
+        totalCommissionCleared += itemValue * ORDER_COMMISSION_RATE;
       } else {
         const reserveHeld    = itemValue * ORDER_RESERVE_RATE;
         const reserveHeldNet = reserveHeld * (1 - ORDER_COMMISSION_RATE);
@@ -166,7 +185,9 @@ export async function computeVendorBalance(vendorId) {
         if (now < clearsAt) {
           if (!nextClearanceMs || clearsAt < nextClearanceMs) nextClearanceMs = clearsAt;
         } else {
-          totalGross += itemValue * (1 - ORDER_RESERVE_RATE);
+          const releasedNow = itemValue * (1 - ORDER_RESERVE_RATE);
+          totalGross += releasedNow;
+          totalCommissionCleared += releasedNow * ORDER_COMMISSION_RATE;
         }
       }
     });
@@ -199,11 +220,20 @@ export async function computeVendorBalance(vendorId) {
     totalStripeFees      += Number((orderFee * vendorFraction).toFixed(2));
   }
 
+  // Founding Seller status, derived from paidOrderRank (= total paid order
+  // count, since the loop above incremented it once per paid order) rather
+  // than a second query — this function already walked every order.
+  const foundingEnrolled  = !!vendor?.foundingSeller?.enrolled;
+  const foundingLimit     = vendor?.foundingSeller?.freeSalesLimit ?? 0;
+  const foundingUsed      = Math.min(paidOrderRank, foundingLimit);
+  const foundingRemaining = Math.max(0, foundingLimit - paidOrderRank);
+  const foundingActive    = foundingEnrolled && foundingRemaining > 0;
+
   // Cleared balance (payout-eligible) — totalGross is already net of each
   // delivered item's own refund (see itemValue above), so it must NOT be
   // reduced by totalRefunds again here.
   const netSales     = Math.max(0, totalGross);
-  const commission   = Number((netSales * VENDOR_COMMISSION).toFixed(2));
+  const commission   = Number(totalCommissionCleared.toFixed(2));
   const netAfterFees = Number((netSales - commission).toFixed(2));
 
   // All-time commission: per-order rates summed, then scaled down via the shared
@@ -250,8 +280,14 @@ export async function computeVendorBalance(vendorId) {
     commissionAllTime,
     netAfterFeesAllTime,
     totalStripeFees: Number(totalStripeFees.toFixed(2)),
-    // Current effective rate for display on payouts page
-    commissionRate: VENDOR_COMMISSION,
+    // Current effective rate for display on payouts page — 0 while a
+    // Founding Seller still has free sales remaining, matching the real
+    // per-order rate actually applied above.
+    commissionRate: foundingActive ? 0 : VENDOR_COMMISSION,
+    normalCommissionRate: VENDOR_COMMISSION,
+    foundingSeller: foundingEnrolled
+      ? { enrolled: true, active: foundingActive, limit: foundingLimit, used: foundingUsed, remaining: foundingRemaining }
+      : null,
     // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
     holdDays: HOLD_DAYS, reserveDays: RESERVE_DAYS,
