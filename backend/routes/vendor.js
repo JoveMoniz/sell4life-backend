@@ -125,6 +125,7 @@ router.post('/create', authMiddleware, async (req, res) => {
           enrolled: true,
           joinedAt: new Date(),
           freeSalesLimit: platformCfg.foundingSeller?.freeSalesByTier?.[vendorType] ?? 0,
+          rate: platformCfg.foundingSeller?.rate ?? 0,
         }
       : undefined;
 
@@ -384,7 +385,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     for (const order of ordersRaw) {
       const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
       const COMMISSION_RATE = isFreeFoundingSale
-        ? 0
+        ? foundingStatus.rate
         : await resolveCommissionRateForOrder(vendor, order.createdAt);
       const RESERVE_RATE    = resolveReserveRateAtTime(vendor, feeCfg, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
@@ -625,7 +626,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const normalCommissionRate  = await resolveCommissionRateForOrder(vendor, new Date());
-    const currentCommissionRate = foundingStatus.active ? 0 : normalCommissionRate;
+    const currentCommissionRate = foundingStatus.active ? foundingStatus.rate : normalCommissionRate;
     const currentReserveRate    = resolveReserveRateAtTime(vendor, feeCfg, new Date());
     console.log('[rates] vendor=%s type=%s commission=%s reserve=%s cfg.reserveStandard=%s cfg.reserveSetAt=%s',
       vendor._id, vendor.type, currentCommissionRate, currentReserveRate,
@@ -704,7 +705,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
           if (!isPaid) continue;
           const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
           const COMMISSION_RATE = isFreeFoundingSale
-            ? 0
+            ? foundingStatus.rate
             : await resolveCommissionRateForOrder(vendor, order.createdAt);
           const vendorItems = (order.items || []).filter(i => String(i.vendorId) === String(vendorId));
 
@@ -909,7 +910,7 @@ router.get('/fee-rate', authMiddleware, requireApprovedVendor, async (req, res) 
   try {
     const normalCommissionRate = await resolveCommissionRateForOrder(req.vendor, new Date());
     const foundingStatus = await getFoundingSellerStatus(req.vendor);
-    const commissionRate = foundingStatus.active ? 0 : normalCommissionRate;
+    const commissionRate = foundingStatus.active ? foundingStatus.rate : normalCommissionRate;
     res.json({
       commissionRate,
       normalCommissionRate,

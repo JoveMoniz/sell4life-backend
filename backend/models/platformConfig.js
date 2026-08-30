@@ -34,13 +34,20 @@ const platformConfigSchema = new mongoose.Schema(
     // from completing, since that's what starts the registration clock.
     euSellingEnabled: { type: Boolean, default: false },
 
-    // Founding Seller program — waives commission for each seller's first N
-    // sales, for the first `cap` sellers overall. `claimed` is an atomic
-    // counter (claimed via findOneAndUpdate + $lt guard at signup), the
-    // source of truth for the public "spots remaining" display.
+    // Founding Seller program — discounts commission (rate, default 0 =
+    // fully free) for each seller's first N sales, for the first `cap`
+    // sellers overall. `claimed` is an atomic counter (claimed via
+    // findOneAndUpdate + $lt guard at signup), the source of truth for the
+    // public "spots remaining" display. `rate` and `freeSalesByTier` are
+    // snapshotted onto each vendor at signup (Vendor.foundingSeller), so
+    // raising the cap or changing the rate here only affects new signups
+    // from that point on — e.g. run a "wave 2" at a lower discount (not
+    // necessarily 0%) once the current wave's cap is reached, without
+    // retroactively changing what earlier Founding Sellers were promised.
     foundingSeller: {
       cap:     { type: Number, default: 50, min: 0 },
       claimed: { type: Number, default: 0, min: 0 },
+      rate:    { type: Number, default: 0, min: 0, max: 1 },
       freeSalesByTier: {
         casual:       { type: Number, default: 10, min: 0 },
         refurbished:  { type: Number, default: 10, min: 0 },
@@ -68,6 +75,7 @@ export default PlatformConfig;
 const FOUNDING_SELLER_DEFAULTS = {
   cap: 50,
   claimed: 0,
+  rate: 0,
   freeSalesByTier: { casual: 10, refurbished: 10, professional: 30, enterprise: 30 },
 };
 
@@ -84,8 +92,9 @@ export async function getPlatformConfig() {
   // every caller can trust cfg.foundingSeller.* without its own fallback.
   if (!cfg.foundingSeller) {
     cfg.foundingSeller = { ...FOUNDING_SELLER_DEFAULTS, freeSalesByTier: { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier } };
-  } else if (!cfg.foundingSeller.freeSalesByTier) {
-    cfg.foundingSeller.freeSalesByTier = { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier };
+  } else {
+    if (!cfg.foundingSeller.freeSalesByTier) cfg.foundingSeller.freeSalesByTier = { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier };
+    if (cfg.foundingSeller.rate == null) cfg.foundingSeller.rate = FOUNDING_SELLER_DEFAULTS.rate;
   }
   return cfg;
 }

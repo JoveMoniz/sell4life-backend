@@ -47,8 +47,13 @@ function isPaidOrder(order) {
 export async function getFoundingSellerStatus(vendor) {
   const limit = vendor?.foundingSeller?.enrolled ? vendor.foundingSeller.freeSalesLimit : null;
   if (limit == null || limit <= 0) {
-    return { enrolled: false, active: false, limit: 0, used: 0, remaining: 0, cutoff: null };
+    return { enrolled: false, active: false, limit: 0, used: 0, remaining: 0, cutoff: null, rate: 0 };
   }
+  // Legacy enrollees from before `rate` existed on the schema had an
+  // implicit 0% (fully free) — treat a missing value the same way rather
+  // than falling back to the platform's CURRENT rate config, which could
+  // now be a later, non-zero "wave 2" value they never actually agreed to.
+  const rate = vendor.foundingSeller.rate ?? 0;
   const orders = await Order.find({ 'vendorOrders.vendorId': vendor._id })
     .select('paymentStatus createdAt')
     .sort({ createdAt: 1 })
@@ -57,7 +62,7 @@ export async function getFoundingSellerStatus(vendor) {
   const used = Math.min(paid.length, limit);
   const remaining = Math.max(0, limit - paid.length);
   const cutoff = paid.length ? paid[Math.min(limit, paid.length) - 1].createdAt : null;
-  return { enrolled: true, active: remaining > 0, limit, used, remaining, cutoff };
+  return { enrolled: true, active: remaining > 0, limit, used, remaining, cutoff, rate };
 }
 
 // True if an order at this date falls within a vendor's Founding Seller
@@ -117,7 +122,7 @@ export async function computeVendorBalance(vendorId) {
       && vendor.foundingSeller.freeSalesLimit != null
       && paidOrderRank <= vendor.foundingSeller.freeSalesLimit;
     const ORDER_COMMISSION_RATE = isFreeFoundingSale
-      ? 0
+      ? (vendor.foundingSeller.rate ?? 0)
       : await resolveCommissionRateForOrder(vendor, order.createdAt);
     const ORDER_RESERVE_RATE    = resolveReserveRateAtTime(vendor, cfg, order.createdAt);
 
@@ -228,6 +233,7 @@ export async function computeVendorBalance(vendorId) {
   const foundingUsed      = Math.min(paidOrderRank, foundingLimit);
   const foundingRemaining = Math.max(0, foundingLimit - paidOrderRank);
   const foundingActive    = foundingEnrolled && foundingRemaining > 0;
+  const foundingRate      = vendor?.foundingSeller?.rate ?? 0;
 
   // Cleared balance (payout-eligible) — totalGross is already net of each
   // delivered item's own refund (see itemValue above), so it must NOT be
@@ -280,13 +286,13 @@ export async function computeVendorBalance(vendorId) {
     commissionAllTime,
     netAfterFeesAllTime,
     totalStripeFees: Number(totalStripeFees.toFixed(2)),
-    // Current effective rate for display on payouts page — 0 while a
-    // Founding Seller still has free sales remaining, matching the real
-    // per-order rate actually applied above.
-    commissionRate: foundingActive ? 0 : VENDOR_COMMISSION,
+    // Current effective rate for display on payouts page — the vendor's
+    // own snapshotted Founding Seller rate while sales remain, matching the
+    // real per-order rate actually applied above.
+    commissionRate: foundingActive ? foundingRate : VENDOR_COMMISSION,
     normalCommissionRate: VENDOR_COMMISSION,
     foundingSeller: foundingEnrolled
-      ? { enrolled: true, active: foundingActive, limit: foundingLimit, used: foundingUsed, remaining: foundingRemaining }
+      ? { enrolled: true, active: foundingActive, limit: foundingLimit, used: foundingUsed, remaining: foundingRemaining, rate: foundingRate }
       : null,
     // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
