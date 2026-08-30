@@ -65,12 +65,27 @@ const PlatformConfig =
 
 export default PlatformConfig;
 
+const FOUNDING_SELLER_DEFAULTS = {
+  cap: 50,
+  claimed: 0,
+  freeSalesByTier: { casual: 10, refurbished: 10, professional: 30, enterprise: 30 },
+};
+
 // Returns the singleton config, creating it with defaults if absent
 export async function getPlatformConfig() {
   let cfg = await PlatformConfig.findOne({ _key: 'global' }).lean();
   if (!cfg) {
     cfg = await PlatformConfig.create({ _key: 'global' });
     cfg = cfg.toObject();
+  }
+  // .lean() skips schema-default application for paths missing on an
+  // already-existing document (e.g. this singleton, created before
+  // foundingSeller was added to the schema) — merge defaults in here so
+  // every caller can trust cfg.foundingSeller.* without its own fallback.
+  if (!cfg.foundingSeller) {
+    cfg.foundingSeller = { ...FOUNDING_SELLER_DEFAULTS, freeSalesByTier: { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier } };
+  } else if (!cfg.foundingSeller.freeSalesByTier) {
+    cfg.foundingSeller.freeSalesByTier = { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier };
   }
   return cfg;
 }
