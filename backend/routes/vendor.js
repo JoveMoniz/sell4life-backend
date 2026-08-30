@@ -43,7 +43,7 @@ import stripe from '../config/stripe.js';
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
-import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate } from '../utils/vendorBalance.js';
+import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
@@ -862,6 +862,21 @@ router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req
   } catch (err) {
     console.error('Stripe connect error:', err);
     res.status(500).json({ error: err.message || 'Could not start Stripe onboarding' });
+  }
+});
+
+/* ======================================================
+   FEE RATE — for client-side profit-margin estimates (e.g. the My Products
+   hover panel). Real per-order fees can differ slightly (VAT, reserve
+   holds), so the frontend labels anything built from this as an estimate.
+====================================================== */
+router.get('/fee-rate', authMiddleware, requireApprovedVendor, async (req, res) => {
+  try {
+    const commissionRate = await resolveCommissionRateForOrder(req.vendor, new Date());
+    res.json({ commissionRate, stripePct: STRIPE_PCT, stripeFixed: STRIPE_FIXED });
+  } catch (err) {
+    console.error('[fee-rate]', err);
+    res.status(500).json({ error: 'Failed to load fee rate' });
   }
 });
 

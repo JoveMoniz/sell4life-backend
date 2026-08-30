@@ -11,8 +11,8 @@ export const RESERVE_STANDARD  = 0.10;
 export const RESERVE_TRUSTED   = 0.05;
 export const TRUSTED_MONTHS    = 6;
 export const MIN_PAYOUT        = 20;
-const STRIPE_PCT   = 0.014;
-const STRIPE_FIXED = 0.20;
+export const STRIPE_PCT   = 0.014;
+export const STRIPE_FIXED = 0.20;
 
 export function resolveReserveRate(vendor, ordersRaw) {
   const approvedAt = vendor.approvedAt ? new Date(vendor.approvedAt).getTime() : Date.now();
