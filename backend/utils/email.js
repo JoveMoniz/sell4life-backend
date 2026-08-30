@@ -21,13 +21,33 @@ function getClient() {
   return _client;
 }
 
+// Gmail's mobile app "font boosting" auto-scales text in any email that
+// lacks a viewport meta tag — since our templates are plain HTML fragments
+// with no <head>, Gmail was inflating text past what the fixed-padding CTA
+// buttons were sized for, wrapping them onto two lines (Yahoo doesn't do
+// this, which is why the same email looked fine there). text-size-adjust
+// tells Gmail not to touch it.
+function wrapEmailDocument(bodyHtml) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>body{-webkit-text-size-adjust:100%;text-size-adjust:100%;margin:0;padding:0}</style>
+</head>
+<body style="margin:0;padding:0">
+${bodyHtml}
+</body>
+</html>`;
+}
+
 export async function sendMail({ to, subject, html }) {
   const client = getClient();
   if (!client) return;
 
   try {
     const from = process.env.EMAIL_FROM || 'Sell4Life <noreply@sell4life.com>';
-    const { error } = await client.emails.send({ from, to, subject, html });
+    const { error } = await client.emails.send({ from, to, subject, html: wrapEmailDocument(html) });
     if (error) {
       console.error('[email] Send failed:', error.message);
     } else {
