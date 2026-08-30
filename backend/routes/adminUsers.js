@@ -8,6 +8,8 @@ import Order from '../models/order.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import { mailWelcome, mailSellerInvite } from '../utils/email.js';
+import { getPlatformConfig } from '../models/platformConfig.js';
+import EmailLog from '../models/emailLog.js';
 
 const router = express.Router();
 
@@ -339,13 +341,16 @@ router.get('/:id/orders', authMiddleware, adminMiddleware, async (req, res) => {
 ====================================================== */
 router.post('/backfill-welcome', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    const cfg = await getPlatformConfig();
+    const { sellerInviteCountry } = cfg.marketingEmails;
+
     const users = await User.find({
       role: 'user',
       sellerInviteEmailSentAt: null,
       active: true,
       banned: { $ne: true },
       // Not gated on emailVerified — see sellerInviteWorker.js.
-      country: 'GB', // UK-only for now — see sellerInviteWorker.js
+      ...(sellerInviteCountry ? { country: sellerInviteCountry } : {}),
     }).select('email name').lean();
 
     let welcomed = 0;
@@ -364,8 +369,10 @@ router.post('/backfill-welcome', authMiddleware, adminMiddleware, async (req, re
 
       try {
         await mailWelcome({ to: user.email, name: user.name });
+        await EmailLog.create({ type: 'welcome', to: user.email, userId: user._id, userName: user.name });
         welcomed++;
         await mailSellerInvite({ to: user.email, name: user.name });
+        await EmailLog.create({ type: 'seller_invite', to: user.email, userId: user._id, userName: user.name });
         invited++;
         await User.updateOne({ _id: user._id }, { sellerInviteEmailSentAt: new Date() });
         results.push({ email: user.email, action: 'sent' });

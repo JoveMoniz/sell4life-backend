@@ -4,17 +4,23 @@
 // to open a free Casual seller account ("got stuff to sell?"). Sent
 // separately from the immediate welcome email so it doesn't read as an
 // upsell bolted onto the welcome — see mailWelcome vs mailSellerInvite
-// in utils/email.js.
+// in utils/email.js. Delay/country/on-off are admin-configurable via
+// PlatformConfig.marketingEmails (account/admin/emails.html).
 // ======================================================
 import User from '../models/user.js';
 import Vendor from '../models/vendor.js';
+import EmailLog from '../models/emailLog.js';
+import { getPlatformConfig } from '../models/platformConfig.js';
 import { mailSellerInvite } from '../utils/email.js';
 
-const INVITE_DELAY_DAYS = 2;
 const BATCH_LIMIT = 200; // safety cap per tick — plenty for current volume
 
 export async function processSellerInvites() {
-  const cutoff = new Date(Date.now() - INVITE_DELAY_DAYS * 24 * 60 * 60 * 1000);
+  const cfg = await getPlatformConfig();
+  const { sellerInviteEnabled, sellerInviteDelayDays, sellerInviteCountry } = cfg.marketingEmails;
+  if (!sellerInviteEnabled) return { disabled: true, candidates: 0, sent: 0, skippedAlreadyVendor: 0 };
+
+  const cutoff = new Date(Date.now() - sellerInviteDelayDays * 24 * 60 * 60 * 1000);
 
   const candidates = await User.find({
     sellerInviteEmailSentAt: null,
@@ -25,10 +31,7 @@ export async function processSellerInvites() {
     // signups never click the verification link, and a welcome/invite
     // email isn't sensitive enough to require it first (worst case an
     // invalid address just bounces harmlessly).
-    // UK-only for now — matches the existing DAC7/EU-selling gate; inviting
-    // a non-UK buyer to become a seller doesn't make sense while real EU
-    // sales are still blocked platform-wide.
-    country: 'GB',
+    ...(sellerInviteCountry ? { country: sellerInviteCountry } : {}),
   })
     .select('email name')
     .limit(BATCH_LIMIT)
@@ -50,6 +53,7 @@ export async function processSellerInvites() {
     try {
       await mailSellerInvite({ to: user.email, name: user.name });
       await User.updateOne({ _id: user._id }, { sellerInviteEmailSentAt: new Date() });
+      await EmailLog.create({ type: 'seller_invite', to: user.email, userId: user._id, userName: user.name });
       sent++;
     } catch (err) {
       console.error('[seller-invite] send failed for', user.email, err.message);
