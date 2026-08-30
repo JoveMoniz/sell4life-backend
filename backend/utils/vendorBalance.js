@@ -62,7 +62,7 @@ export async function getFoundingSellerStatus(vendor) {
   const used = Math.min(paid.length, limit);
   const remaining = Math.max(0, limit - paid.length);
   const cutoff = paid.length ? paid[Math.min(limit, paid.length) - 1].createdAt : null;
-  return { enrolled: true, active: remaining > 0, limit, used, remaining, cutoff, rate };
+  return { enrolled: true, active: remaining > 0, limit, used, remaining, cutoff, rate, joinedAt: vendor.foundingSeller.joinedAt ?? null };
 }
 
 // True if an order at this date falls within a vendor's Founding Seller
@@ -292,7 +292,7 @@ export async function computeVendorBalance(vendorId) {
     commissionRate: foundingActive ? foundingRate : VENDOR_COMMISSION,
     normalCommissionRate: VENDOR_COMMISSION,
     foundingSeller: foundingEnrolled
-      ? { enrolled: true, active: foundingActive, limit: foundingLimit, used: foundingUsed, remaining: foundingRemaining, rate: foundingRate }
+      ? { enrolled: true, active: foundingActive, limit: foundingLimit, used: foundingUsed, remaining: foundingRemaining, rate: foundingRate, joinedAt: vendor?.foundingSeller?.joinedAt ?? null }
       : null,
     // Reserve & trust
     reserveRate: RESERVE_RATE, trustedSeller: trusted,
