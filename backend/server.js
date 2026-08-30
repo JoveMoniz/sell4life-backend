@@ -27,6 +27,7 @@ import { startVendorPayoutWorker } from './jobs/vendorPayoutWorker.js';
 import { startCjProductSyncWorker } from './jobs/cjProductSyncWorker.js';
 import { startCjOrderStatusSyncWorker } from './jobs/cjOrderStatusSyncWorker.js';
 import { startAnalyticsRollupWorker } from './jobs/analyticsRollupWorker.js';
+import { startSellerInviteWorker } from './jobs/sellerInviteWorker.js';
 import authRoute from './routes/auth.js';
 import vendorRoutes from './routes/vendor.js';
 import ordersRoute from './routes/orders.js';
@@ -345,4 +346,5 @@ mongoose
     startCjProductSyncWorker();
     startCjOrderStatusSyncWorker();
     startAnalyticsRollupWorker();
+    startSellerInviteWorker();
   });
