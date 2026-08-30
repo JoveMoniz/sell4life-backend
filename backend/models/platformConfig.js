@@ -56,6 +56,15 @@ const platformConfigSchema = new mongoose.Schema(
       },
     },
 
+    // Marketing/lifecycle emails — the delayed "got stuff to sell?"
+    // seller-invite worker (welcome email on signup is unconditional and
+    // not covered here). Country is an ISO code ('' = no restriction).
+    marketingEmails: {
+      sellerInviteEnabled:    { type: Boolean, default: true },
+      sellerInviteDelayDays:  { type: Number, default: 2, min: 0 },
+      sellerInviteCountry:    { type: String, default: 'GB' },
+    },
+
     // Reserve rates
     reserveRateStandard:    { type: Number, default: 0.10, min: 0, max: 1 },
     reserveRateStandardSetAt: { type: Date, default: null },
@@ -79,6 +88,12 @@ const FOUNDING_SELLER_DEFAULTS = {
   freeSalesByTier: { casual: 10, refurbished: 10, professional: 30, enterprise: 30 },
 };
 
+const MARKETING_EMAILS_DEFAULTS = {
+  sellerInviteEnabled: true,
+  sellerInviteDelayDays: 2,
+  sellerInviteCountry: 'GB',
+};
+
 // Returns the singleton config, creating it with defaults if absent
 export async function getPlatformConfig() {
   let cfg = await PlatformConfig.findOne({ _key: 'global' }).lean();
@@ -95,6 +110,13 @@ export async function getPlatformConfig() {
   } else {
     if (!cfg.foundingSeller.freeSalesByTier) cfg.foundingSeller.freeSalesByTier = { ...FOUNDING_SELLER_DEFAULTS.freeSalesByTier };
     if (cfg.foundingSeller.rate == null) cfg.foundingSeller.rate = FOUNDING_SELLER_DEFAULTS.rate;
+  }
+  if (!cfg.marketingEmails) {
+    cfg.marketingEmails = { ...MARKETING_EMAILS_DEFAULTS };
+  } else {
+    if (cfg.marketingEmails.sellerInviteEnabled == null) cfg.marketingEmails.sellerInviteEnabled = MARKETING_EMAILS_DEFAULTS.sellerInviteEnabled;
+    if (cfg.marketingEmails.sellerInviteDelayDays == null) cfg.marketingEmails.sellerInviteDelayDays = MARKETING_EMAILS_DEFAULTS.sellerInviteDelayDays;
+    if (cfg.marketingEmails.sellerInviteCountry == null) cfg.marketingEmails.sellerInviteCountry = MARKETING_EMAILS_DEFAULTS.sellerInviteCountry;
   }
   return cfg;
 }

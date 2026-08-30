@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 
 import User from '../models/user.js';
 import EmailVerification from '../models/emailVerification.js';
+import EmailLog from '../models/emailLog.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailEmailVerification, mailWelcome } from '../utils/email.js';
 import { lookupCountry } from '../utils/geoip.js';
@@ -187,6 +188,7 @@ router.post('/register', async (req, res) => {
     (async () => {
       try {
         await mailWelcome({ to: user.email, name: user.name });
+        await EmailLog.create({ type: 'welcome', to: user.email, userId: user._id, userName: user.name });
       } catch (e) {
         console.error('Welcome email error:', e.message);
       }

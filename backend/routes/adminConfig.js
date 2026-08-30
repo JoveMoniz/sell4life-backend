@@ -5,6 +5,8 @@ import Vendor from '../models/vendor.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import { getFoundingSellerStatus } from '../utils/vendorBalance.js';
+import User from '../models/user.js';
+import EmailLog from '../models/emailLog.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -250,6 +252,99 @@ router.put('/founding-seller', async (req, res) => {
     res.json({ ok: true, foundingSeller: cfg.foundingSeller });
   } catch (err) {
     console.error('Founding seller config PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /api/admin/config/marketing-emails
+====================================================== */
+router.get('/marketing-emails', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    res.json({ marketingEmails: cfg.marketingEmails });
+  } catch (err) {
+    console.error('Marketing emails config GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/marketing-emails
+   Body: { sellerInviteEnabled, sellerInviteDelayDays, sellerInviteCountry }
+   sellerInviteCountry: '' clears the restriction (all countries).
+====================================================== */
+router.put('/marketing-emails', async (req, res) => {
+  try {
+    const { sellerInviteEnabled, sellerInviteDelayDays, sellerInviteCountry } = req.body;
+    const update = {};
+
+    if (sellerInviteEnabled !== undefined) {
+      update['marketingEmails.sellerInviteEnabled'] = !!sellerInviteEnabled;
+    }
+    if (sellerInviteDelayDays !== undefined) {
+      const v = Number(sellerInviteDelayDays);
+      if (isNaN(v) || v < 0) return res.status(400).json({ error: 'Invalid sellerInviteDelayDays' });
+      update['marketingEmails.sellerInviteDelayDays'] = v;
+    }
+    if (sellerInviteCountry !== undefined) {
+      update['marketingEmails.sellerInviteCountry'] = String(sellerInviteCountry).trim().toUpperCase();
+    }
+
+    const cfg = await PlatformConfig.findOneAndUpdate(
+      { _key: 'global' },
+      { $set: update },
+      { upsert: true, new: true }
+    );
+
+    res.json({ ok: true, marketingEmails: cfg.marketingEmails });
+  } catch (err) {
+    console.error('Marketing emails config PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /api/admin/config/marketing-emails/stats
+====================================================== */
+router.get('/marketing-emails/stats', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    const { sellerInviteDelayDays, sellerInviteCountry } = cfg.marketingEmails;
+    const cutoff = new Date(Date.now() - sellerInviteDelayDays * 24 * 60 * 60 * 1000);
+    const countryFilter = sellerInviteCountry ? { country: sellerInviteCountry } : {};
+
+    const [totalUsers, eligibleCountryUsers, invited, pending, totalWelcomeSent, totalInviteSent] = await Promise.all([
+      User.countDocuments({ role: 'user' }),
+      User.countDocuments({ role: 'user', ...countryFilter }),
+      User.countDocuments({ role: 'user', sellerInviteEmailSentAt: { $ne: null }, ...countryFilter }),
+      User.countDocuments({ role: 'user', sellerInviteEmailSentAt: null, active: true, banned: { $ne: true }, createdAt: { $lte: cutoff }, ...countryFilter }),
+      EmailLog.countDocuments({ type: 'welcome' }),
+      EmailLog.countDocuments({ type: 'seller_invite' }),
+    ]);
+
+    res.json({ totalUsers, eligibleCountryUsers, invited, pending, totalWelcomeSent, totalInviteSent });
+  } catch (err) {
+    console.error('Marketing emails stats error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /api/admin/config/marketing-emails/log
+   Recent sends, newest first. ?limit= (default 100, max 500)
+====================================================== */
+router.get('/marketing-emails/log', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const logs = await EmailLog.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('type to userName createdAt')
+      .lean();
+    res.json({ logs });
+  } catch (err) {
+    console.error('Marketing emails log error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
