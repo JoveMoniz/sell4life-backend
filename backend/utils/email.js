@@ -286,7 +286,7 @@ export function renderMarketingEmail(tpl, { name, ctaColor = '#0b6b6a' } = {}) {
     `<p style="margin:0 0 10px;color:#374151">${p}</p>`
   ).join('');
   const cta = tpl.ctaText && tpl.ctaUrl
-    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">${tpl.ctaText}</a></p>`
+    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600;white-space:nowrap">${tpl.ctaText}</a></p>`
     : '';
 
   return `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
