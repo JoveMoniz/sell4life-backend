@@ -46,6 +46,7 @@ import trackRoute from './routes/track.js';
 import adminAnalyticsRoute from './routes/adminAnalytics.js';
 import sitemapRoute from './routes/sitemap.js';
 import currencyRoute from './routes/currency.js';
+import publicStatusRoute from './routes/publicStatus.js';
 import { initGeoIp, isGeoIpLoaded } from './utils/geoip.js';
 
 // ======================================================
@@ -272,6 +273,7 @@ app.use('/api/messages', messagesRoute);
 app.use('/api/interactions', trackRoute);
 app.use('/api/admin/analytics', adminAnalyticsRoute);
 app.use('/api', sitemapRoute);
+app.use('/api', publicStatusRoute);
 app.use('/api/currency', currencyRoute);
 
 // ======================================================

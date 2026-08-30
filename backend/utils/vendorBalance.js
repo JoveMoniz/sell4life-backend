@@ -30,10 +30,29 @@ export function resolveReserveRate(vendor, ordersRaw) {
     : { rate: RESERVE_TRUSTED,  trusted: true  };
 }
 
+// Same "isPaid" definition used throughout this file. A standalone helper so
+// eligibility for Founding Seller free sales (below) and the admin "used X/Y"
+// display both count paid orders identically without duplicating the logic.
+function isPaidOrder(order) {
+  const ps = (order.paymentStatus || '').toLowerCase();
+  return ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
+}
+
+// Counts a vendor's paid orders, oldest first — used standalone by the admin
+// vendor list for "free sales used X/Y". computeVendorBalance below computes
+// the same rank inline (it already has the sorted order list) rather than
+// calling this, to avoid a second DB round-trip.
+export async function countVendorPaidOrders(vendorId) {
+  const orders = await Order.find({ 'vendorOrders.vendorId': vendorId })
+    .select('paymentStatus createdAt')
+    .lean();
+  return orders.filter(isPaidOrder).length;
+}
+
 export async function computeVendorBalance(vendorId) {
   const [ordersRaw, vendor] = await Promise.all([
-    Order.find({ 'vendorOrders.vendorId': vendorId }),
-    Vendor.findById(vendorId).select('approvedAt type commissionOverride commissionOverrideSetAt').lean(),
+    Order.find({ 'vendorOrders.vendorId': vendorId }).sort({ createdAt: 1 }),
+    Vendor.findById(vendorId).select('approvedAt type commissionOverride commissionOverrideSetAt foundingSeller').lean(),
   ]);
 
   const { trusted } = resolveReserveRate(vendor || {}, ordersRaw);
@@ -62,16 +81,26 @@ export async function computeVendorBalance(vendorId) {
   let nextReserveReleaseMs    = null;
   const reserveByDate         = {}; // stores net-of-commission amount per release date
 
+  // Founding Seller free-sale rank — incremented once per paid order (not
+  // per item) as we walk orders oldest-first, so "is this order among the
+  // vendor's first N paid orders" is derived fresh every call rather than
+  // trusted from a stored counter that could drift out of sync.
+  let paidOrderRank = 0;
+
   for (const order of ordersRaw) {
     const vendorItems = (order.items || []).filter(
       item => String(item.vendorId) === String(vendorId)
     );
-    const ps     = (order.paymentStatus || '').toLowerCase();
-    const isPaid = ['paid', 'refunded', 'refund_scheduled', 'partially_refunded'].includes(ps);
-    if (!isPaid) continue;
+    if (!isPaidOrder(order)) continue;
+    paidOrderRank++;
 
     // Per-order commission and reserve rates (date-aware)
-    const ORDER_COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+    const isFreeFoundingSale = !!vendor?.foundingSeller?.enrolled
+      && vendor.foundingSeller.freeSalesLimit != null
+      && paidOrderRank <= vendor.foundingSeller.freeSalesLimit;
+    const ORDER_COMMISSION_RATE = isFreeFoundingSale
+      ? 0
+      : await resolveCommissionRateForOrder(vendor, order.createdAt);
     const ORDER_RESERVE_RATE    = resolveReserveRateAtTime(vendor, cfg, order.createdAt);
 
     // Count ALL paid items for all-time commission (per-order rate — respects timestamp gates)

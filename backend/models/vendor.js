@@ -163,6 +163,16 @@ const vendorSchema = new mongoose.Schema(
       default: {},
     },
 
+    // Founding Seller program — set once at registration if a spot was
+    // available. freeSalesLimit is a SNAPSHOT of the tier's configured
+    // limit at signup time, so a later admin change to the program config
+    // doesn't retroactively change what this seller was promised.
+    foundingSeller: {
+      enrolled:       { type: Boolean, default: false },
+      joinedAt:       { type: Date, default: null },
+      freeSalesLimit: { type: Number, default: null },
+    },
+
     // Cooldown timestamp for the vendor-triggered "Check UK shipping now"
     // button — prevents button-mashing from hammering CJ's freight API.
     lastUkShippingCheckAt: { type: Date, default: null },

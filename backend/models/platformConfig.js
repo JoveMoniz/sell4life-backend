@@ -34,6 +34,21 @@ const platformConfigSchema = new mongoose.Schema(
     // from completing, since that's what starts the registration clock.
     euSellingEnabled: { type: Boolean, default: false },
 
+    // Founding Seller program — waives commission for each seller's first N
+    // sales, for the first `cap` sellers overall. `claimed` is an atomic
+    // counter (claimed via findOneAndUpdate + $lt guard at signup), the
+    // source of truth for the public "spots remaining" display.
+    foundingSeller: {
+      cap:     { type: Number, default: 50, min: 0 },
+      claimed: { type: Number, default: 0, min: 0 },
+      freeSalesByTier: {
+        casual:       { type: Number, default: 10, min: 0 },
+        refurbished:  { type: Number, default: 10, min: 0 },
+        professional: { type: Number, default: 30, min: 0 },
+        enterprise:   { type: Number, default: 30, min: 0 },
+      },
+    },
+
     // Reserve rates
     reserveRateStandard:    { type: Number, default: 0.10, min: 0, max: 1 },
     reserveRateStandardSetAt: { type: Date, default: null },

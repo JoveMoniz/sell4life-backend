@@ -4,6 +4,7 @@ import PlatformConfig from '../models/platformConfig.js';
 import Vendor from '../models/vendor.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
+import { countVendorPaidOrders } from '../utils/vendorBalance.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -138,9 +139,18 @@ router.put('/vendor/:id/commission', async (req, res) => {
 router.get('/vendors', async (req, res) => {
   try {
     const [vendors, cfg] = await Promise.all([
-      Vendor.find({}).select('storeName storeSlug type status commissionOverride').lean(),
+      Vendor.find({}).select('storeName storeSlug type status commissionOverride foundingSeller').lean(),
       getPlatformConfig(),
     ]);
+
+    // Only enrolled Founding Sellers need their real "used" count — cheap
+    // in practice since there are at most `foundingSeller.cap` of them.
+    const foundingVendors = vendors.filter(v => v.foundingSeller?.enrolled);
+    const usedCounts = await Promise.all(
+      foundingVendors.map(v => countVendorPaidOrders(v._id))
+    );
+    const usedById = {};
+    foundingVendors.forEach((v, i) => { usedById[String(v._id)] = usedCounts[i]; });
 
     const rows = vendors.map(v => {
       const tierRate = cfg.commissionByTier?.[v.type];
@@ -157,12 +167,71 @@ router.get('/vendors', async (req, res) => {
         status:             v.status,
         commissionOverride: v.commissionOverride,
         effectiveRate:      effective,
+        foundingSeller: v.foundingSeller?.enrolled
+          ? {
+              enrolled:       true,
+              joinedAt:       v.foundingSeller.joinedAt,
+              freeSalesLimit: v.foundingSeller.freeSalesLimit,
+              freeSalesUsed:  Math.min(usedById[String(v._id)] ?? 0, v.foundingSeller.freeSalesLimit ?? 0),
+            }
+          : null,
       };
     });
 
     res.json({ vendors: rows });
   } catch (err) {
     console.error('Config vendors GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /api/admin/config/founding-seller
+====================================================== */
+router.get('/founding-seller', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    res.json({ foundingSeller: cfg.foundingSeller || {} });
+  } catch (err) {
+    console.error('Founding seller config GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/founding-seller
+   Body: { cap, freeSalesByTier: { casual, refurbished, professional, enterprise } }
+   Note: `claimed` is never settable here — it's an atomic counter only
+   ever incremented at vendor signup.
+====================================================== */
+router.put('/founding-seller', async (req, res) => {
+  try {
+    const { cap, freeSalesByTier = {} } = req.body;
+    const update = {};
+
+    if (cap != null) {
+      const v = Number(cap);
+      if (isNaN(v) || v < 0) return res.status(400).json({ error: 'Invalid cap' });
+      update['foundingSeller.cap'] = v;
+    }
+
+    for (const tier of TIERS) {
+      if (freeSalesByTier[tier] !== undefined) {
+        const v = Number(freeSalesByTier[tier]);
+        if (isNaN(v) || v < 0) return res.status(400).json({ error: `Invalid free-sales limit for ${tier}` });
+        update[`foundingSeller.freeSalesByTier.${tier}`] = v;
+      }
+    }
+
+    const cfg = await PlatformConfig.findOneAndUpdate(
+      { _key: 'global' },
+      { $set: update },
+      { upsert: true, new: true }
+    );
+
+    res.json({ ok: true, foundingSeller: cfg.foundingSeller });
+  } catch (err) {
+    console.error('Founding seller config PUT error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
