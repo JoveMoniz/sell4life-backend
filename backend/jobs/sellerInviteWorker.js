@@ -21,7 +21,10 @@ export async function processSellerInvites() {
     createdAt: { $lte: cutoff },
     active: true,
     banned: { $ne: true },
-    emailVerified: true,
+    // Deliberately NOT gated on emailVerified — turns out most real
+    // signups never click the verification link, and a welcome/invite
+    // email isn't sensitive enough to require it first (worst case an
+    // invalid address just bounces harmlessly).
     // UK-only for now — matches the existing DAC7/EU-selling gate; inviting
     // a non-UK buyer to become a seller doesn't make sense while real EU
     // sales are still blocked platform-wide.
