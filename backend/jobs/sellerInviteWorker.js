@@ -22,6 +22,10 @@ export async function processSellerInvites() {
     active: true,
     banned: { $ne: true },
     emailVerified: true,
+    // UK-only for now — matches the existing DAC7/EU-selling gate; inviting
+    // a non-UK buyer to become a seller doesn't make sense while real EU
+    // sales are still blocked platform-wide.
+    country: 'GB',
   })
     .select('email name')
     .limit(BATCH_LIMIT)

@@ -345,6 +345,7 @@ router.post('/backfill-welcome', authMiddleware, adminMiddleware, async (req, re
       active: true,
       banned: { $ne: true },
       emailVerified: true,
+      country: 'GB', // UK-only for now — see sellerInviteWorker.js
     }).select('email name').lean();
 
     let welcomed = 0;
