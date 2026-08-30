@@ -433,4 +433,60 @@ router.post('/backfill-email-log', authMiddleware, adminMiddleware, async (req, 
   }
 });
 
+/* ======================================================
+   SEND CUSTOM EMAIL — TARGETED (ADMIN)
+   Sends one of the two marketing templates (current saved content) to a
+   chosen audience, bypassing the normal automated eligibility checks
+   (country, "not already a vendor", delay) — this is a deliberate manual
+   send, not the automated welcome/invite flow.
+   Body: { template: 'welcome'|'seller_invite', mode: 'individual'|'tier',
+           email? (mode=individual), tier? (mode=tier) }
+====================================================== */
+router.post('/send-custom-email', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { template, mode } = req.body;
+    if (!['welcome', 'seller_invite'].includes(template)) {
+      return res.status(400).json({ error: 'Invalid template' });
+    }
+    const mailFn = template === 'welcome' ? mailWelcome : mailSellerInvite;
+
+    let recipients = [];
+
+    if (mode === 'individual') {
+      const email = String(req.body.email || '').toLowerCase().trim();
+      if (!email) return res.status(400).json({ error: 'Email is required' });
+      const user = await User.findOne({ email }).select('email name').lean();
+      if (!user) return res.status(404).json({ error: 'No user found with that email' });
+      recipients = [user];
+    } else if (mode === 'tier') {
+      const VALID_TIERS = ['casual', 'refurbished', 'professional', 'enterprise'];
+      const tier = req.body.tier;
+      if (!VALID_TIERS.includes(tier)) return res.status(400).json({ error: 'Invalid tier' });
+      const vendors = await Vendor.find({ type: tier }).select('userId').lean();
+      const userIds = vendors.map(v => v.userId).filter(Boolean);
+      recipients = await User.find({ _id: { $in: userIds } }).select('email name').lean();
+    } else {
+      return res.status(400).json({ error: 'Invalid mode' });
+    }
+
+    let sent = 0;
+    const results = [];
+    for (const user of recipients) {
+      try {
+        await mailFn({ to: user.email, name: user.name });
+        await EmailLog.create({ type: template, to: user.email, userId: user._id, userName: user.name });
+        sent++;
+        results.push({ email: user.email, action: 'sent' });
+      } catch (err) {
+        results.push({ email: user.email, action: 'failed', error: err.message });
+      }
+    }
+
+    res.json({ ok: true, totalRecipients: recipients.length, sent, results });
+  } catch (err) {
+    console.error('Send custom email error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
