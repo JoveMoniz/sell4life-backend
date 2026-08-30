@@ -4,7 +4,7 @@ import PlatformConfig from '../models/platformConfig.js';
 import Vendor from '../models/vendor.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
-import { countVendorPaidOrders } from '../utils/vendorBalance.js';
+import { getFoundingSellerStatus } from '../utils/vendorBalance.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -143,22 +143,27 @@ router.get('/vendors', async (req, res) => {
       getPlatformConfig(),
     ]);
 
-    // Only enrolled Founding Sellers need their real "used" count — cheap
-    // in practice since there are at most `foundingSeller.cap` of them.
+    // Only enrolled Founding Sellers need their real status — cheap in
+    // practice since there are at most `foundingSeller.cap` of them.
     const foundingVendors = vendors.filter(v => v.foundingSeller?.enrolled);
-    const usedCounts = await Promise.all(
-      foundingVendors.map(v => countVendorPaidOrders(v._id))
+    const statuses = await Promise.all(
+      foundingVendors.map(v => getFoundingSellerStatus(v))
     );
-    const usedById = {};
-    foundingVendors.forEach((v, i) => { usedById[String(v._id)] = usedCounts[i]; });
+    const statusById = {};
+    foundingVendors.forEach((v, i) => { statusById[String(v._id)] = statuses[i]; });
 
     const rows = vendors.map(v => {
       const tierRate = cfg.commissionByTier?.[v.type];
-      const effective = v.commissionOverride != null
+      const normalEffective = v.commissionOverride != null
         ? v.commissionOverride
         : tierRate != null
           ? tierRate
           : cfg.commissionDefault;
+      const founding = statusById[String(v._id)] || null;
+      // While a Founding Seller's free window is still active, what they're
+      // actually being charged right now is 0% — showing the normal tier
+      // rate here would misrepresent their real current fee.
+      const effective = founding?.active ? 0 : normalEffective;
       return {
         _id:                v._id,
         storeName:          v.storeName,
@@ -167,12 +172,15 @@ router.get('/vendors', async (req, res) => {
         status:             v.status,
         commissionOverride: v.commissionOverride,
         effectiveRate:      effective,
-        foundingSeller: v.foundingSeller?.enrolled
+        normalEffectiveRate: normalEffective,
+        foundingSeller: founding
           ? {
               enrolled:       true,
+              active:         founding.active,
               joinedAt:       v.foundingSeller.joinedAt,
-              freeSalesLimit: v.foundingSeller.freeSalesLimit,
-              freeSalesUsed:  Math.min(usedById[String(v._id)] ?? 0, v.foundingSeller.freeSalesLimit ?? 0),
+              freeSalesLimit: founding.limit,
+              freeSalesUsed:  founding.used,
+              freeSalesRemaining: founding.remaining,
             }
           : null,
       };
