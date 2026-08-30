@@ -388,4 +388,49 @@ router.post('/backfill-welcome', authMiddleware, adminMiddleware, async (req, re
   }
 });
 
+/* ======================================================
+   BACKFILL EMAIL LOG (ADMIN, ONE-OFF)
+   Users who were already emailed via /backfill-welcome before EmailLog
+   existed have no log entries — they only have sellerInviteEmailSentAt.
+   Creates synthetic welcome + seller_invite log rows (dated at that
+   timestamp) for every user who was actually emailed, so the Marketing
+   Emails log shows the complete picture. Skips anyone who already has a
+   log entry (so re-running this is harmless) and anyone who's currently
+   a vendor (they were "skipped-already-vendor" — never actually emailed).
+====================================================== */
+router.post('/backfill-email-log', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const candidates = await User.find({
+      sellerInviteEmailSentAt: { $ne: null },
+    }).select('email name sellerInviteEmailSentAt').lean();
+
+    let created = 0;
+    let skippedAlreadyLogged = 0;
+    let skippedVendor = 0;
+
+    for (const user of candidates) {
+      const alreadyLogged = await EmailLog.exists({ userId: user._id, type: 'welcome' });
+      if (alreadyLogged) { skippedAlreadyLogged++; continue; }
+
+      const isVendor = await Vendor.exists({ userId: user._id });
+      if (isVendor) { skippedVendor++; continue; }
+
+      const at = user.sellerInviteEmailSentAt;
+      // createdAt passed explicitly — Mongoose's timestamps plugin only
+      // auto-sets it when absent, so this backdates the log entry to when
+      // the email actually went out instead of "now".
+      await EmailLog.create([
+        { type: 'welcome', to: user.email, userId: user._id, userName: user.name, createdAt: at },
+        { type: 'seller_invite', to: user.email, userId: user._id, userName: user.name, createdAt: at },
+      ]);
+      created += 2;
+    }
+
+    res.json({ ok: true, totalCandidates: candidates.length, logEntriesCreated: created, skippedAlreadyLogged, skippedVendor });
+  } catch (err) {
+    console.error('Backfill email log error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
