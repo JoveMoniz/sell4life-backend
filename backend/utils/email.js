@@ -6,6 +6,7 @@
 // ======================================================
 
 import { Resend } from 'resend';
+import { getEmailTemplate } from '../models/emailTemplate.js';
 
 let _client = null;
 
@@ -254,33 +255,44 @@ export function mailRefundConfirmed({ to, orderRef, amount }) {
   });
 }
 
-export function mailWelcome({ to, name }) {
+// Renders a marketing-email template (structured, admin-editable fields —
+// see models/emailTemplate.js) into the same visual shell every other
+// email here uses. {{name}} in heading/body is substituted with the
+// recipient's title-cased name; a blank name falls back to "there".
+export function renderMarketingEmail(tpl, { name, ctaColor = '#0b6b6a' } = {}) {
+  const displayName = titleCase(name) || 'there';
+  const sub = (s) => (s || '').replace(/\{\{name\}\}/g, displayName);
+  const bodyParas = sub(tpl.body).split(/\n\s*\n/).map(p =>
+    `<p style="margin:0 0 10px;color:#374151">${p}</p>`
+  ).join('');
+  const cta = tpl.ctaText && tpl.ctaUrl
+    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="background:${ctaColor};color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">${tpl.ctaText}</a></p>`
+    : '';
+
+  return `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+    ${logoHeader}
+    <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">${sub(tpl.heading)}</p>
+    ${bodyParas}
+    ${cta}
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+    <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
+  </div>`;
+}
+
+export async function mailWelcome({ to, name }) {
+  const tpl = await getEmailTemplate('welcome');
   return sendMail({
     to,
-    subject: 'Welcome to Sell4Life!',
-    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
-      ${logoHeader}
-      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Welcome, ${titleCase(name) || 'there'}! 🎉</p>
-      <p style="margin:0 0 10px;color:#374151">Thanks for joining Sell4Life — we're glad you're here. We're an early, growing marketplace of independent sellers across the UK — browse what's listed, message sellers directly with questions, and even make an offer on selected listings.</p>
-      <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/shop/" style="background:#0b6b6a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Browsing</a></p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
-      <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
-    </div>`,
+    subject: tpl.subject,
+    html: renderMarketingEmail(tpl, { name, ctaColor: '#0b6b6a' }),
   });
 }
 
-export function mailSellerInvite({ to, name }) {
+export async function mailSellerInvite({ to, name }) {
+  const tpl = await getEmailTemplate('seller_invite');
   return sendMail({
     to,
-    subject: 'Got something sitting around? Sell it for free on Sell4Life',
-    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
-      ${logoHeader}
-      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Turn clutter into cash</p>
-      <p style="margin:0 0 10px;color:#374151">Hi ${titleCase(name) || 'there'}, quick thought — if you've got anything sitting around unused (old electronics, clothes, furniture, whatever), you can list it on Sell4Life in a couple of minutes with a free Casual seller account. No monthly fees, no upfront cost — you only pay when it sells.</p>
-      <p style="margin:0 0 10px;color:#374151">We're also running a <strong>Founding Seller</strong> promotion right now — early sellers get a limited number of sales completely free of platform commission.</p>
-      <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/sell/" style="background:#f28c28;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Selling — It's Free</a></p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
-      <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
-    </div>`,
+    subject: tpl.subject,
+    html: renderMarketingEmail(tpl, { name, ctaColor: '#f28c28' }),
   });
 }

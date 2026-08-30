@@ -7,6 +7,8 @@ import adminMiddleware from '../middleware/adminMiddleware.js';
 import { getFoundingSellerStatus } from '../utils/vendorBalance.js';
 import User from '../models/user.js';
 import EmailLog from '../models/emailLog.js';
+import EmailTemplate, { getEmailTemplate } from '../models/emailTemplate.js';
+import { renderMarketingEmail } from '../utils/email.js';
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -345,6 +347,74 @@ router.get('/marketing-emails/log', async (req, res) => {
     res.json({ logs });
   } catch (err) {
     console.error('Marketing emails log error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+const TEMPLATE_KEYS = ['welcome', 'seller_invite'];
+
+/* ======================================================
+   GET /api/admin/config/email-templates
+   Returns both editable templates.
+====================================================== */
+router.get('/email-templates', async (_req, res) => {
+  try {
+    const templates = {};
+    for (const key of TEMPLATE_KEYS) {
+      templates[key] = await getEmailTemplate(key);
+    }
+    res.json({ templates });
+  } catch (err) {
+    console.error('Email templates GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/email-templates/:key
+   Body: { subject, heading, body, ctaText, ctaUrl }
+====================================================== */
+router.put('/email-templates/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!TEMPLATE_KEYS.includes(key)) return res.status(400).json({ error: 'Unknown template' });
+
+    const { subject, heading, body, ctaText, ctaUrl } = req.body;
+    if (!subject?.trim() || !heading?.trim() || !body?.trim()) {
+      return res.status(400).json({ error: 'Subject, heading and body are required' });
+    }
+
+    const tpl = await EmailTemplate.findOneAndUpdate(
+      { key },
+      { $set: { subject: subject.trim(), heading: heading.trim(), body: body.trim(), ctaText: (ctaText || '').trim(), ctaUrl: (ctaUrl || '').trim() } },
+      { upsert: true, new: true }
+    );
+
+    res.json({ ok: true, template: tpl });
+  } catch (err) {
+    console.error('Email template PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /api/admin/config/email-templates/:key/preview
+   Renders the current (unsaved-safe — pass body in query? no, just
+   renders the SAVED template) template with a sample name, for admin
+   to sanity-check formatting before/after saving.
+====================================================== */
+router.post('/email-templates/:key/preview', async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!TEMPLATE_KEYS.includes(key)) return res.status(400).json({ error: 'Unknown template' });
+    const { subject, heading, body, ctaText, ctaUrl } = req.body;
+    const html = renderMarketingEmail(
+      { subject, heading, body, ctaText, ctaUrl },
+      { name: 'Sample Name', ctaColor: key === 'welcome' ? '#0b6b6a' : '#f28c28' }
+    );
+    res.json({ subject, html });
+  } catch (err) {
+    console.error('Email template preview error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
