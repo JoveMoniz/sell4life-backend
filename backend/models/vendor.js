@@ -164,13 +164,15 @@ const vendorSchema = new mongoose.Schema(
     },
 
     // Founding Seller program — set once at registration if a spot was
-    // available. freeSalesLimit is a SNAPSHOT of the tier's configured
-    // limit at signup time, so a later admin change to the program config
-    // doesn't retroactively change what this seller was promised.
+    // available. freeSalesLimit and rate are SNAPSHOTS of the program's
+    // configured values at signup time, so a later admin change (e.g.
+    // raising the cap or lowering the discount for a "wave 2") doesn't
+    // retroactively change what this seller was promised.
     foundingSeller: {
       enrolled:       { type: Boolean, default: false },
       joinedAt:       { type: Date, default: null },
       freeSalesLimit: { type: Number, default: null },
+      rate:           { type: Number, default: null }, // 0 = fully free; legacy enrollees (before this field existed) treated as 0 by getFoundingSellerStatus
     },
   },
   { timestamps: true }

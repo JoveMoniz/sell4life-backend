@@ -161,9 +161,9 @@ router.get('/vendors', async (req, res) => {
           : cfg.commissionDefault;
       const founding = statusById[String(v._id)] || null;
       // While a Founding Seller's free window is still active, what they're
-      // actually being charged right now is 0% — showing the normal tier
-      // rate here would misrepresent their real current fee.
-      const effective = founding?.active ? 0 : normalEffective;
+      // actually being charged right now is their own snapshotted founding
+      // rate — showing the normal tier rate here would misrepresent it.
+      const effective = founding?.active ? founding.rate : normalEffective;
       return {
         _id:                v._id,
         storeName:          v.storeName,
@@ -181,6 +181,7 @@ router.get('/vendors', async (req, res) => {
               freeSalesLimit: founding.limit,
               freeSalesUsed:  founding.used,
               freeSalesRemaining: founding.remaining,
+              rate:           founding.rate,
             }
           : null,
       };
@@ -208,19 +209,28 @@ router.get('/founding-seller', async (_req, res) => {
 
 /* ======================================================
    PUT /api/admin/config/founding-seller
-   Body: { cap, freeSalesByTier: { casual, refurbished, professional, enterprise } }
+   Body: { cap, rate, freeSalesByTier: { casual, refurbished, professional, enterprise } }
    Note: `claimed` is never settable here — it's an atomic counter only
-   ever incremented at vendor signup.
+   ever incremented at vendor signup. `cap` and `rate` are snapshotted onto
+   each vendor at signup, so changing either here (e.g. raising the cap or
+   lowering the discount for a "wave 2") only affects new signups from that
+   point on — already-enrolled sellers keep whatever they joined under.
 ====================================================== */
 router.put('/founding-seller', async (req, res) => {
   try {
-    const { cap, freeSalesByTier = {} } = req.body;
+    const { cap, rate, freeSalesByTier = {} } = req.body;
     const update = {};
 
     if (cap != null) {
       const v = Number(cap);
       if (isNaN(v) || v < 0) return res.status(400).json({ error: 'Invalid cap' });
       update['foundingSeller.cap'] = v;
+    }
+
+    if (rate != null) {
+      const v = Number(rate);
+      if (isNaN(v) || v < 0 || v > 1) return res.status(400).json({ error: 'Invalid rate' });
+      update['foundingSeller.rate'] = v;
     }
 
     for (const tier of TIERS) {
