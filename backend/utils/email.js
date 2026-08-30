@@ -261,7 +261,7 @@ export function mailWelcome({ to, name }) {
     html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
       ${logoHeader}
       <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Welcome, ${titleCase(name) || 'there'}! 🎉</p>
-      <p style="margin:0 0 10px;color:#374151">Thanks for joining Sell4Life — we're glad you're here. Browse thousands of products from independent sellers across the UK, message sellers directly with questions, and even make an offer on selected listings.</p>
+      <p style="margin:0 0 10px;color:#374151">Thanks for joining Sell4Life — we're glad you're here. We're an early, growing marketplace of independent sellers across the UK — browse what's listed, message sellers directly with questions, and even make an offer on selected listings.</p>
       <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/shop/" style="background:#0b6b6a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Browsing</a></p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
       <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
