@@ -112,9 +112,21 @@ router.post('/create', authMiddleware, async (req, res) => {
     // if the condition still holds at the moment it runs).
     const platformCfg = await getPlatformConfig();
     const foundingCap = platformCfg.foundingSeller?.cap ?? 0;
+    // $lt alone doesn't match a document where foundingSeller.claimed is
+    // missing entirely (e.g. the admin config was only ever partially $set
+    // via dot-notation, which creates foundingSeller without a claimed
+    // field since the admin route deliberately never sets it) — MongoDB
+    // treats a missing field as "doesn't match $lt", not as 0, so the $or
+    // below is required or this silently never enrolls anyone.
     const foundingClaim = foundingCap > 0
       ? await PlatformConfig.findOneAndUpdate(
-          { _key: 'global', 'foundingSeller.claimed': { $lt: foundingCap } },
+          {
+            _key: 'global',
+            $or: [
+              { 'foundingSeller.claimed': { $lt: foundingCap } },
+              { 'foundingSeller.claimed': { $exists: false } },
+            ],
+          },
           { $inc: { 'foundingSeller.claimed': 1 } },
           { new: true }
         )
