@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
 import EmailVerification from '../models/emailVerification.js';
 import authMiddleware from '../middleware/authMiddleware.js';
-import { mailEmailVerification } from '../utils/email.js';
+import { mailEmailVerification, mailWelcome } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -166,6 +166,20 @@ router.post('/register', async (req, res) => {
         await mailEmailVerification({ to: user.email, name: user.name, verifyUrl });
       } catch (e) {
         console.error('Verification email error:', e.message);
+      }
+    })();
+
+    /* ======================================================
+       SEND WELCOME EMAIL (background) — the delayed "got stuff to
+       sell?" seller-invite email is handled separately by
+       sellerInviteWorker.js, a couple of days later.
+    ====================================================== */
+
+    (async () => {
+      try {
+        await mailWelcome({ to: user.email, name: user.name });
+      } catch (e) {
+        console.error('Welcome email error:', e.message);
       }
     })();
 

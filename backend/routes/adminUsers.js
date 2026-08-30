@@ -7,6 +7,7 @@ import Order from '../models/order.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
+import { mailWelcome, mailSellerInvite } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -324,6 +325,57 @@ router.get('/:id/orders', authMiddleware, adminMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Admin buyer orders error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   BACKFILL WELCOME + SELLER-INVITE EMAILS (ADMIN, ONE-OFF)
+   For users who registered before mailWelcome()/the seller-invite
+   worker existed. Sends the welcome email plus an immediate seller
+   invite (skipping the normal 2-day delay, since these users are
+   already well past it) to every non-vendor, non-admin user who
+   hasn't been sent the invite yet — safe to run more than once.
+====================================================== */
+router.post('/backfill-welcome', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const users = await User.find({
+      role: 'user',
+      sellerInviteEmailSentAt: null,
+      active: true,
+      banned: { $ne: true },
+      emailVerified: true,
+    }).select('email name').lean();
+
+    let welcomed = 0;
+    let invited = 0;
+    let skippedAlreadyVendor = 0;
+    const results = [];
+
+    for (const user of users) {
+      const isVendor = await Vendor.exists({ userId: user._id });
+      if (isVendor) {
+        await User.updateOne({ _id: user._id }, { sellerInviteEmailSentAt: new Date() });
+        skippedAlreadyVendor++;
+        results.push({ email: user.email, action: 'skipped-already-vendor' });
+        continue;
+      }
+
+      try {
+        await mailWelcome({ to: user.email, name: user.name });
+        welcomed++;
+        await mailSellerInvite({ to: user.email, name: user.name });
+        invited++;
+        await User.updateOne({ _id: user._id }, { sellerInviteEmailSentAt: new Date() });
+        results.push({ email: user.email, action: 'sent' });
+      } catch (err) {
+        results.push({ email: user.email, action: 'failed', error: err.message });
+      }
+    }
+
+    res.json({ ok: true, totalCandidates: users.length, welcomed, invited, skippedAlreadyVendor, results });
+  } catch (err) {
+    console.error('Backfill welcome error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

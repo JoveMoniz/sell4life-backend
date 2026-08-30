@@ -241,3 +241,34 @@ export function mailRefundConfirmed({ to, orderRef, amount }) {
     </div>`,
   });
 }
+
+export function mailWelcome({ to, name }) {
+  return sendMail({
+    to,
+    subject: 'Welcome to Sell4Life!',
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Welcome, ${name || 'there'}! 🎉</p>
+      <p style="margin:0 0 10px;color:#374151">Thanks for joining Sell4Life — we're glad you're here. Browse thousands of products from independent sellers across the UK, message sellers directly with questions, and even make an offer on selected listings.</p>
+      <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/shop/" style="background:#0b6b6a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Browsing</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
+    </div>`,
+  });
+}
+
+export function mailSellerInvite({ to, name }) {
+  return sendMail({
+    to,
+    subject: 'Got something sitting around? Sell it for free on Sell4Life',
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Turn clutter into cash</p>
+      <p style="margin:0 0 10px;color:#374151">Hi ${name || 'there'}, quick thought — if you've got anything sitting around unused (old electronics, clothes, furniture, whatever), you can list it on Sell4Life in a couple of minutes with a free Casual seller account. No monthly fees, no upfront cost — you only pay when it sells.</p>
+      <p style="margin:0 0 10px;color:#374151">We're also running a <strong>Founding Seller</strong> promotion right now — early sellers get a limited number of sales completely free of platform commission.</p>
+      <p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}/sell/" style="background:#f28c28;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600">Start Selling — It's Free</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life</p>
+    </div>`,
+  });
+}

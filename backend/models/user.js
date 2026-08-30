@@ -153,6 +153,18 @@ const userSchema = new mongoose.Schema(
     },
 
     /* =================================
+       MARKETING / LIFECYCLE EMAILS
+    ================================= */
+
+    // Set once the delayed "got stuff to sell?" seller-invite email has
+    // been sent — prevents the worker from re-sending it, and doubles as
+    // the marker for whether a user has already been through onboarding.
+    sellerInviteEmailSentAt: {
+      type: Date,
+      default: null,
+    },
+
+    /* =================================
        FUTURE FLEXIBILITY
     ================================= */
 
