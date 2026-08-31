@@ -42,11 +42,18 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
       ];
     }
 
-    const usersRaw = await User.find(filter)
+    // Searching sorts alphabetically (by name) so results are predictable
+    // regardless of account age; plain browsing (no query) stays newest-first.
+    const usersQuery = User.find(filter)
       .select('email name username role active banned emailVerified phone country defaultShippingAddress lastLogin ordersCount totalSpent createdAt')
-      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+    if (q) {
+      usersQuery.collation({ locale: 'en', strength: 2 }).sort({ name: 1, email: 1 });
+    } else {
+      usersQuery.sort({ createdAt: -1 });
+    }
+    const usersRaw = await usersQuery;
 
     const userIds = usersRaw.map(u => u._id);
 
