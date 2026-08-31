@@ -21,6 +21,7 @@ import Product from '../models/product.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import stripe from '../config/stripe.js';
+import { prefixRegex, wordPrefixRegex } from '../utils/searchRegex.js';
 
 const router = express.Router();
 
@@ -55,11 +56,11 @@ router.get('/', async (req, res) => {
 
     if (q) {
       const users = await User.find({
-        email: { $regex: q, $options: 'i' },
+        email: prefixRegex(q),
       }).select('_id');
 
       filter.$or = [
-        { storeName: { $regex: q, $options: 'i' } },
+        { storeName: wordPrefixRegex(q) },
         { userId: { $in: users.map((u) => u._id) } },
       ];
     }
