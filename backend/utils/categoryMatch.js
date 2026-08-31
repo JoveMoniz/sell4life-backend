@@ -84,7 +84,17 @@ function overlapScore(candidateWords, targetWords) {
 }
 
 const CATEGORY_THRESHOLD = 0.5;
-const SUBCATEGORY_THRESHOLD = 0.5;
+// Higher than CATEGORY_THRESHOLD deliberately: most of our subcategory
+// names are only 2 words (e.g. "Cycling Helmets", "Road Bikes"), so at 0.5
+// a SINGLE shared generic word — like "cycling", which every "Cycling ___"
+// subcategory under Sports shares — was enough to hit the threshold. With
+// many sibling subcategories tying on that same lone word, whichever one
+// happened to iterate first won essentially at random (confirmed: "Bicycle
+// Frame Bag" matched "Cycling Helmets", "Bike Bags" matched "Road Bikes").
+// 0.6 requires a real majority of a subcategory's own words to be present,
+// not just its parent category's word — a 2-word name now needs both
+// words, not one.
+const SUBCATEGORY_THRESHOLD = 0.6;
 
 // Matches a CJ category path onto our category + (best-effort) subcategory.
 // subcategory is only ever set above a real confidence threshold — a wrong
