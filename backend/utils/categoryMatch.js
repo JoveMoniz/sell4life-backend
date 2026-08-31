@@ -109,12 +109,36 @@ const CATEGORY_KEYWORDS = {
 
 const STOPWORDS = new Set(['and', 'the', 'for', 'with', 'of', 'a', 'an', 'to', 'in', 'on']);
 
+// "Mountain Bike Phone Mount Handlebar Holder" contains both words of the
+// subcategory "Mountain Bikes" — a perfect, unbeatable overlap score —
+// even though the product is an accessory FOR a mountain bike, not the
+// bike itself. Same failure for "Laptop Stand" vs bare "Laptops". When a
+// title contains one of these words, subcategory matching only considers
+// candidates that ALSO contain an accessory word — "Cycling Accessories"
+// or "Laptop Stands & Accessories" over "Mountain Bikes"/"Laptops" — so a
+// whole-product subcategory can't win just because its name happens to be
+// a substring of a longer accessory title.
+// Deliberately narrow — each of these is only rarely the core product
+// itself. Broader-seeming words like 'mat', 'bag', 'case', 'rack', 'pad',
+// 'tray' or 'hook' were tried and reverted: they're too often the actual
+// product ("Yoga Mat", "Tote Bag", "Shoe Rack", "Pencil Case" are all
+// standalone products, not accessories for something else), and wrongly
+// suppressed their own correct whole-product subcategory match.
+const ACCESSORY_WORDS = new Set(['mount', 'holder', 'stand', 'kit', 'adapter', 'adaptor', 'clip', 'strap',
+  'cover', 'sleeve', 'dock', 'guard', 'protector', 'accessory', 'accessories', 'part', 'spare', 'replacement']);
+
 // Crude singular/plural fold ("creams" -> "cream", "phones" -> "phone") so
 // "Face Creams" matches "Face Cream" — CJ's and our own naming rarely agree
 // on plurality even when they mean the same thing. Left alone below length
 // 4 so short real words ("gas", "bus") don't get mangled.
 function singularize(word) {
-  return word.length > 4 && word.endsWith('s') ? word.slice(0, -1) : word;
+  if (word.length <= 4 || !word.endsWith('s')) return word;
+  // "-ies" -> "-y" ("accessories" -> "accessory", "batteries" -> "battery")
+  // — the old plain slice(0,-1) produced "accessorie"/"batterie", which
+  // then silently failed to match anything (e.g. an ACCESSORY_WORDS check
+  // for "accessory" never fired since the real value was "accessorie").
+  if (word.endsWith('ies') && word.length > 5) return word.slice(0, -3) + 'y';
+  return word.slice(0, -1);
 }
 
 function words(str) {
@@ -203,7 +227,16 @@ function matchWords(targetWords) {
   // design) — on a tie, prefer the more specific (more-worded) subcategory
   // name ("Laptop Stands & Accessories" over plain "Laptops" for a path
   // that actually says "Laptop Stands", even though both technically match).
-  const siblings = SUBCATEGORIES[bestCategory] || [];
+  const allSiblings = SUBCATEGORIES[bestCategory] || [];
+  // If the title itself signals "this is an accessory/part", restrict
+  // candidates to subcategories that are themselves accessory-flavored —
+  // unless none exist in this category, in which case there's nothing
+  // better to fall back to.
+  const titleIsAccessory = targetWords.some((w) => ACCESSORY_WORDS.has(w));
+  const accessorySiblings = titleIsAccessory
+    ? allSiblings.filter((s) => words(s).some((w) => ACCESSORY_WORDS.has(w)))
+    : [];
+  const siblings = accessorySiblings.length ? accessorySiblings : allSiblings;
   let bestSub = null;
   let bestSubScore = 0;
   let bestSubWordCount = 0;
