@@ -1,9 +1,14 @@
 // ======================================================
-// CJ CATEGORY → SELL4LIFE CATEGORY MATCHING
+// CATEGORY MATCHING — from a product title, or from CJ's category path
 // CJ's own category taxonomy (returned as a "/"-separated path like
-// "Home & Garden / Home Storage / Home Office Storage") doesn't correspond
-// to ours, so this does a best-effort keyword match onto our fixed
-// category + subcategory list instead of copying CJ's names in directly.
+// "Home & Garden / Home Storage / Home Office Storage") is often too
+// generic to reflect what a product actually is — CJ suppliers frequently
+// dump small accessories under broad buckets like "Home & Garden"
+// regardless of real use ("Bike Top Tube Bag" landed under
+// "Home > Office & Study Furniture"). A product's own title is a much
+// stronger signal ("Water-Resistant Bike Top Tube Bag" is unambiguous), so
+// matchProductTitle() is tried first; matchCjCategory() (CJ's path) is
+// only a fallback when the title itself doesn't score above threshold.
 //
 // data/productSubcategories.json is a generated snapshot of
 // frontend/assets/js/vendor-add-product.js's subcategoriesMap — the two
@@ -41,17 +46,38 @@ const CATEGORY_NAMES = {
   software:    'Software & Digital',
 };
 
-// CJ's own top-level category names often don't share a word with ours
-// (e.g. CJ's "Computer & Office" vs our "Electronics") — extra keywords
-// per category catch the common cases without needing CJ's exact taxonomy.
+// Real product titles use much richer, more specific vocabulary than CJ's
+// coarse category paths ("Bike Top Tube Bag" vs just "Home & Garden") —
+// these lists are deliberately broad so a title's own words can pull it
+// toward the right category even when CJ's own path is generic or wrong.
 const CATEGORY_KEYWORDS = {
-  electronics: ['computer', 'computers', 'pc', 'laptop', 'phone', 'cellphone', 'tech', 'gadgets', 'digital'],
-  automotive:  ['car', 'cars', 'vehicle', 'auto'],
-  health:      ['beauty', 'cosmetic', 'cosmetics', 'wellness'],
-  home:        ['kitchen', 'furniture', 'garden', 'household'],
-  sports:      ['fitness', 'outdoor', 'gym'],
-  toys:        ['hobbies', 'hobby'],
-  baby:        ['kids', 'children', 'infant'],
+  electronics: ['computer', 'laptop', 'pc', 'phone', 'cellphone', 'smartphone', 'tablet', 'tech', 'gadget',
+    'digital', 'camera', 'headphone', 'earphone', 'earbud', 'speaker', 'charger', 'cable', 'adapter',
+    'monitor', 'keyboard', 'mouse', 'printer', 'router', 'drive', 'battery', 'powerbank', 'smartwatch',
+    'television', 'projector', 'microphone', 'webcam', 'usb', 'bluetooth', 'wireless', 'led'],
+  automotive:  ['car', 'vehicle', 'auto', 'tyre', 'tire', 'motorcycle', 'motorbike', 'dashboard', 'dashcam',
+    'wheel', 'engine', 'windshield', 'bumper'],
+  health:      ['beauty', 'cosmetic', 'skincare', 'makeup', 'wellness', 'massage', 'shaver', 'razor',
+    'toothbrush', 'supplement', 'vitamin', 'facial', 'skin', 'nail', 'cream'],
+  home:        ['kitchen', 'furniture', 'garden', 'household', 'storage', 'organizer', 'organiser', 'shelf',
+    'shelving', 'rack', 'decor', 'curtain', 'bedding', 'pillow', 'cushion', 'lamp', 'bathroom', 'towel',
+    'rug', 'mat', 'vase', 'candle', 'cookware', 'utensil', 'appliance', 'sofa', 'chair', 'table', 'mattress',
+    'wardrobe', 'drawer', 'cabinet', 'blanket', 'duvet'],
+  sports:      ['fitness', 'outdoor', 'gym', 'cycling', 'bike', 'bicycle', 'camping', 'hiking', 'yoga',
+    'running', 'football', 'basketball', 'tennis', 'golf', 'swim', 'swimming', 'ski', 'fishing', 'helmet',
+    'workout', 'exercise', 'sport'],
+  toys:        ['hobby', 'hobbies', 'puzzle', 'game', 'lego', 'doll', 'figure', 'rc', 'drone', 'toy'],
+  baby:        ['kids', 'children', 'infant', 'toddler', 'stroller', 'pram', 'diaper', 'nappy', 'crib',
+    'pacifier', 'baby'],
+  pets:        ['dog', 'cat', 'pet', 'leash', 'collar', 'aquarium', 'kennel'],
+  arts:        ['craft', 'paint', 'brush', 'canvas', 'sewing', 'knitting', 'yarn', 'drawing', 'sketch'],
+  office:      ['stationery', 'pen', 'pencil', 'notebook', 'desk', 'folder', 'binder', 'office'],
+  antiques:    ['vintage', 'collectible', 'antique', 'coin', 'stamp'],
+  travel:      ['luggage', 'suitcase', 'backpack', 'passport', 'travel'],
+  software:    ['digital', 'app', 'license', 'licence', 'subscription', 'software'],
+  fashion:     ['clothing', 'shirt', 'dress', 'shoe', 'jewelry', 'jewellery', 'watch', 'sunglasses', 'hat',
+    'scarf', 'glove', 'jacket', 'coat', 'trouser', 'jean', 'skirt', 'sock', 'belt', 'wallet', 'handbag'],
+  food:        ['snack', 'drink', 'tea', 'coffee', 'spice', 'sauce', 'food'],
 };
 
 const STOPWORDS = new Set(['and', 'the', 'for', 'with', 'of', 'a', 'an', 'to', 'in', 'on']);
@@ -75,7 +101,7 @@ function words(str) {
 
 // Fraction of candidateWords that also appear in targetWords — biased
 // toward short, specific names (like ours) matching cleanly against a
-// longer path (CJ's), rather than the other way round.
+// longer path (CJ's, or a product title), rather than the other way round.
 function overlapScore(candidateWords, targetWords) {
   if (!candidateWords.length) return 0;
   const targetSet = new Set(targetWords);
@@ -96,24 +122,49 @@ const CATEGORY_THRESHOLD = 0.5;
 // words, not one.
 const SUBCATEGORY_THRESHOLD = 0.6;
 
-// Matches a CJ category path onto our category + (best-effort) subcategory.
+// Both add-product.js and edit-product.js store subcategory as a slug
+// (e.g. "Garden Furniture & Parasols" -> "garden-furniture-parasols"),
+// never the raw display name — matching that exact slugification so the
+// vendor's subcategory dropdown actually selects the stored value instead
+// of silently matching nothing.
+const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+// Shared scoring core — matches a bag of words (from either a CJ category
+// path or a product title) onto our category + (best-effort) subcategory.
 // subcategory is only ever set above a real confidence threshold — a wrong
 // specific guess is worse than leaving it blank for the vendor to pick.
-export function matchCjCategory(cjCategoryName) {
-  if (!cjCategoryName) return { category: null, subcategory: null };
+function matchWords(targetWords) {
+  if (!targetWords.length) return { category: null, subcategory: null };
 
-  const segments = String(cjCategoryName).split('/').map((s) => s.trim()).filter(Boolean);
-  const pathWords = words(segments.join(' '));
-  if (!pathWords.length) return { category: null, subcategory: null };
-
+  // A title genuinely about a category tends to mention SEVERAL of its
+  // keywords ("Cable Organizer With Phone Stand" hits both "cable" and
+  // "phone" for electronics), while an incidental feature mention is
+  // usually just one word ("...with Touchscreen Phone Holder" on an
+  // otherwise bike-related title) — so more distinct keyword hits scores
+  // higher, rather than every hit flattening to the same 0.6. When two
+  // categories still tie (equal hit count, e.g. exactly one keyword each),
+  // fall back to whichever match appears EARLIEST in the source words —
+  // titles conventionally lead with the core item and trail off into
+  // secondary features — rather than whichever category happens to be
+  // listed first in CATEGORY_NAMES.
   let bestCategory = null;
   let bestCategoryScore = 0;
+  let bestCategoryPos = Infinity;
   for (const [id, name] of Object.entries(CATEGORY_NAMES)) {
-    let score = overlapScore(words(name), pathWords);
-    const keywordHit = (CATEGORY_KEYWORDS[id] || []).some((kw) => pathWords.includes(singularize(kw)));
-    if (keywordHit) score = Math.max(score, 0.6);
-    if (score > bestCategoryScore) {
+    let score = overlapScore(words(name), targetWords);
+    const nameWords = new Set(words(name));
+    let pos = targetWords.findIndex((w) => nameWords.has(w));
+    const hitKeywords = (CATEGORY_KEYWORDS[id] || []).filter((kw) => targetWords.includes(singularize(kw)));
+    if (hitKeywords.length) {
+      const keywordScore = 0.55 + 0.05 * Math.min(hitKeywords.length, 4);
+      const firstHitPos = Math.min(...hitKeywords.map((kw) => targetWords.indexOf(singularize(kw))));
+      if (score < keywordScore) { score = keywordScore; pos = firstHitPos; }
+      else if (pos === -1 || firstHitPos < pos) { pos = firstHitPos; }
+    }
+    if (pos === -1) pos = Infinity;
+    if (score > bestCategoryScore || (score === bestCategoryScore && pos < bestCategoryPos)) {
       bestCategoryScore = score;
+      bestCategoryPos = pos;
       bestCategory = id;
     }
   }
@@ -122,14 +173,14 @@ export function matchCjCategory(cjCategoryName) {
   }
 
   // On a tie, prefer the more specific (more-worded) subcategory name —
-  // "Laptop Stands & Accessories" over plain "Laptops" for a CJ path that
+  // "Laptop Stands & Accessories" over plain "Laptops" for a path that
   // actually says "Laptop Stands", even though both technically match.
   let bestSub = null;
   let bestSubScore = 0;
   let bestSubWordCount = 0;
   for (const sub of SUBCATEGORIES[bestCategory] || []) {
     const subWords = words(sub);
-    const score = overlapScore(subWords, pathWords);
+    const score = overlapScore(subWords, targetWords);
     if (score > bestSubScore || (score === bestSubScore && score > 0 && subWords.length > bestSubWordCount)) {
       bestSubScore = score;
       bestSub = sub;
@@ -137,15 +188,21 @@ export function matchCjCategory(cjCategoryName) {
     }
   }
 
-  // Both add-product.js and edit-product.js store subcategory as a slug
-  // (e.g. "Garden Furniture & Parasols" -> "garden-furniture-parasols"),
-  // never the raw display name — matching that exact slugification here so
-  // the vendor's subcategory dropdown actually selects the stored value
-  // instead of silently matching nothing.
-  const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
   return {
     category: bestCategory,
     subcategory: bestSubScore >= SUBCATEGORY_THRESHOLD ? slugify(bestSub) : null,
   };
+}
+
+export function matchCjCategory(cjCategoryName) {
+  if (!cjCategoryName) return { category: null, subcategory: null };
+  const segments = String(cjCategoryName).split('/').map((s) => s.trim()).filter(Boolean);
+  return matchWords(words(segments.join(' ')));
+}
+
+// Matches a product's own title/name onto our category + subcategory —
+// tried before matchCjCategory() (see file header for why).
+export function matchProductTitle(title) {
+  if (!title) return { category: null, subcategory: null };
+  return matchWords(words(title));
 }
