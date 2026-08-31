@@ -53,31 +53,58 @@ const CATEGORY_NAMES = {
 const CATEGORY_KEYWORDS = {
   electronics: ['computer', 'laptop', 'pc', 'phone', 'cellphone', 'smartphone', 'tablet', 'tech', 'gadget',
     'digital', 'camera', 'headphone', 'earphone', 'earbud', 'speaker', 'charger', 'cable', 'adapter',
-    'monitor', 'keyboard', 'mouse', 'printer', 'router', 'drive', 'battery', 'powerbank', 'smartwatch',
-    'television', 'projector', 'microphone', 'webcam', 'usb', 'bluetooth', 'wireless', 'led'],
+    'monitor', 'keyboard', 'mouse', 'printer', 'router', 'drive', 'ssd', 'hdd', 'battery', 'powerbank',
+    'smartwatch', 'television', 'tv', 'projector', 'microphone', 'webcam', 'usb', 'bluetooth', 'wireless',
+    'led', 'hdmi', 'consol', 'console', 'controller', 'gimbal', 'tripod', 'lens', 'scanner', 'modem',
+    'converter', 'amplifier', 'transmitter', 'receiver'],
   automotive:  ['car', 'vehicle', 'auto', 'tyre', 'tire', 'motorcycle', 'motorbike', 'dashboard', 'dashcam',
-    'wheel', 'engine', 'windshield', 'bumper'],
+    'wheel', 'engine', 'windshield', 'bumper', 'exhaust', 'brake', 'suspension', 'headlight', 'taillight',
+    'steering', 'seatcover', 'gps', 'obd'],
   health:      ['beauty', 'cosmetic', 'skincare', 'makeup', 'wellness', 'massage', 'shaver', 'razor',
-    'toothbrush', 'supplement', 'vitamin', 'facial', 'skin', 'nail', 'cream'],
+    'toothbrush', 'supplement', 'vitamin', 'facial', 'skin', 'nail', 'cream', 'lotion', 'serum', 'perfume',
+    'fragrance', 'lipstick', 'mascara', 'brush', 'hairdryer', 'straightener', 'trimmer', 'epilator', 'thermometer'],
   home:        ['kitchen', 'furniture', 'garden', 'household', 'storage', 'organizer', 'organiser', 'shelf',
     'shelving', 'rack', 'decor', 'curtain', 'bedding', 'pillow', 'cushion', 'lamp', 'bathroom', 'towel',
     'rug', 'mat', 'vase', 'candle', 'cookware', 'utensil', 'appliance', 'sofa', 'chair', 'table', 'mattress',
-    'wardrobe', 'drawer', 'cabinet', 'blanket', 'duvet'],
+    'wardrobe', 'drawer', 'cabinet', 'blanket', 'duvet', 'mirror', 'clock', 'basket', 'hanger', 'hook',
+    'holder', 'stand', 'bin', 'dispenser', 'mop', 'broom', 'vacuum', 'planter', 'plant', 'fan', 'heater',
+    'humidifier', 'diffuser', 'nightlight', 'mug', 'cup', 'plate', 'bowl', 'cutlery', 'kettle', 'teapot',
+    'tumbler', 'jug', 'tray', 'saucepan', 'pan', 'pot', 'chopping board', 'oven', 'fridge', 'refrigerator'],
   sports:      ['fitness', 'outdoor', 'gym', 'cycling', 'bike', 'bicycle', 'camping', 'hiking', 'yoga',
     'running', 'football', 'basketball', 'tennis', 'golf', 'swim', 'swimming', 'ski', 'fishing', 'helmet',
-    'workout', 'exercise', 'sport'],
-  toys:        ['hobby', 'hobbies', 'puzzle', 'game', 'lego', 'doll', 'figure', 'rc', 'drone', 'toy'],
-  baby:        ['kids', 'children', 'infant', 'toddler', 'stroller', 'pram', 'diaper', 'nappy', 'crib',
-    'pacifier', 'baby'],
-  pets:        ['dog', 'cat', 'pet', 'leash', 'collar', 'aquarium', 'kennel'],
-  arts:        ['craft', 'paint', 'brush', 'canvas', 'sewing', 'knitting', 'yarn', 'drawing', 'sketch'],
-  office:      ['stationery', 'pen', 'pencil', 'notebook', 'desk', 'folder', 'binder', 'office'],
-  antiques:    ['vintage', 'collectible', 'antique', 'coin', 'stamp'],
-  travel:      ['luggage', 'suitcase', 'backpack', 'passport', 'travel'],
-  software:    ['digital', 'app', 'license', 'licence', 'subscription', 'software'],
+    'workout', 'exercise', 'sport', 'saddle', 'pedal', 'dumbbell', 'resistance', 'treadmill', 'skateboard',
+    'tent', 'backpacking', 'climbing', 'boxing', 'badminton', 'volleyball', 'archery', 'kayak', 'surf'],
+  toys:        ['hobby', 'hobbies', 'puzzle', 'game', 'lego', 'doll', 'figure', 'rc', 'drone', 'toy',
+    'building block', 'plush', 'kite', 'slime', 'boardgame'],
+  // Deliberately NOT 'kids'/'children' — those describe an intended
+  // audience, not a product type, and would otherwise outrank the actual
+  // product-type keyword on plenty of non-baby items ("Kids Educational
+  // Building Block Toy Set" wrongly matched baby over toys via "kids").
+  // 'infant'/'toddler' stay — those are baby-gear-specific in practice.
+  baby:        ['infant', 'toddler', 'stroller', 'pram', 'diaper', 'nappy', 'crib',
+    'pacifier', 'baby', 'bib', 'teether', 'babyproof', 'highchair', 'carrier', 'nursery'],
+  pets:        ['dog', 'cat', 'pet', 'leash', 'collar', 'aquarium', 'kennel', 'litter', 'feeder', 'chew',
+    'harness', 'terrarium', 'birdcage'],
+  arts:        ['craft', 'paint', 'brush', 'canvas', 'sewing', 'knitting', 'yarn', 'drawing', 'sketch',
+    'calligraphy', 'embroidery', 'glue', 'glitter', 'scrapbook', 'origami', 'beading'],
+  office:      ['stationery', 'pen', 'pencil', 'notebook', 'desk', 'folder', 'binder', 'office', 'stapler',
+    'eraser', 'marker', 'highlighter', 'whiteboard', 'calculator', 'planner', 'diary'],
+  // Deliberately NOT 'vintage'/'retro' — those are near-universal STYLE
+  // adjectives ("vintage wallet", "retro lamp") used across fashion, home
+  // decor etc. far more often than they mean an actual antique/collectible
+  // item, and wrongly outranked the real product type ("Vintage Leather
+  // Wallet" matched antiques over fashion via "vintage" alone).
+  antiques:    ['collectible', 'antique', 'coin', 'stamp', 'memorabilia'],
+  travel:      ['luggage', 'suitcase', 'backpack', 'passport', 'travel', 'duffel', 'carryon', 'trolley'],
+  software:    ['digital', 'app', 'license', 'licence', 'subscription', 'software', 'download', 'key'],
   fashion:     ['clothing', 'shirt', 'dress', 'shoe', 'jewelry', 'jewellery', 'watch', 'sunglasses', 'hat',
-    'scarf', 'glove', 'jacket', 'coat', 'trouser', 'jean', 'skirt', 'sock', 'belt', 'wallet', 'handbag'],
-  food:        ['snack', 'drink', 'tea', 'coffee', 'spice', 'sauce', 'food'],
+    'scarf', 'glove', 'jacket', 'coat', 'trouser', 'jean', 'skirt', 'sock', 'belt', 'wallet', 'handbag',
+    'purse', 'necklace', 'bracelet', 'earring', 'ring', 'legging', 'hoodie', 'sweater', 'sneaker', 'boot',
+    'sandal', 'heel', 'lingerie', 'swimwear', 'bikini'],
+  food:        ['snack', 'drink', 'tea', 'coffee', 'spice', 'sauce', 'food', 'chocolate', 'candy', 'beverage',
+    'seasoning', 'condiment'],
+  books:       ['book', 'novel', 'magazine', 'textbook', 'ebook', 'journal', 'comic', 'dictionary',
+    'notebook', 'diary', 'planner', 'cookbook', 'audiobook', 'manga'],
 };
 
 const STOPWORDS = new Set(['and', 'the', 'for', 'with', 'of', 'a', 'an', 'to', 'in', 'on']);
