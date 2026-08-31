@@ -2195,6 +2195,15 @@ const item = findOrderItem(order, itemId);
 
       pushUniqueHistory(order, status, `${vendor.storeName} marked "${item.name}" as ${status}`);
 
+      // vendorOrders[].status is a separately-stored field the buyer's
+      // order-detail page reads for its per-vendor badge — recompute it
+      // here too, or the badge silently lags behind the real item status.
+      const vendorOrderEntry = order.vendorOrders.find(vo => String(vo.vendorId) === String(vendor._id));
+      if (vendorOrderEntry) {
+        const vendorItems = order.items.filter(i => String(i.vendorId) === String(vendor._id));
+        vendorOrderEntry.status = getDerivedVendorStatus(vendorOrderEntry, vendorItems);
+      }
+
       await order.save();
       res.json({ success: true });
     } catch (err) {
