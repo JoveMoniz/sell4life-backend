@@ -18,7 +18,7 @@ import Conversation from '../models/conversation.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getOrderStatusBatch } from '../utils/shippingProviders/cjdropshipping.js';
 import { pushUniqueHistory } from '../utils/historyLogic.js';
-import { mailOrderShipped } from '../utils/email.js';
+import { mailOrderShipped, mailOrderDelivered } from '../utils/email.js';
 import { getDerivedVendorStatus } from '../utils/orderLogic.js';
 
 // CJ statuses that mean "still in flight" — anything else (SHIPPED,
@@ -89,6 +89,63 @@ export async function notifyBuyerShipped(order, item, vendor, trackNum, carrierS
     result.messageSent = true;
   } catch (e) {
     console.error('[cj-order-status-sync] shipped message error:', e.message);
+    result.messageError = e.message;
+  }
+
+  return result;
+}
+
+// Same shape as notifyBuyerShipped, for the Delivered transition — called
+// from both this worker and vendor.js's manual "mark Delivered" route
+// (dynamic-imported there, same way adminOrders.js already imports
+// processCjOrderStatusSync), so there's one source of truth for what
+// "notify the buyer their item was delivered" actually does.
+export async function notifyBuyerDelivered(order, item, vendor) {
+  const result = { emailSent: false, emailError: null, messageSent: false, messageError: null };
+
+  try {
+    const buyer = await User.findById(order.user).lean();
+    if (buyer?.email) {
+      await mailOrderDelivered({
+        to: buyer.email,
+        orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
+        storeName: vendor.storeName,
+      });
+      result.emailSent = true;
+    } else {
+      result.emailError = 'buyer has no email on file';
+    }
+  } catch (e) {
+    console.error('[order-delivered] email error:', e.message);
+    result.emailError = e.message;
+  }
+
+  try {
+    let convo = await Conversation.findOne({ buyer: order.user, vendor: vendor._id, product: item.productId });
+    if (!convo) {
+      const product = await Product.findById(item.productId).select('name slug').lean();
+      const buyerUser = await User.findById(order.user).select('name username').lean();
+      convo = new Conversation({
+        product:     item.productId,
+        productName: product?.name || item.name || 'Product',
+        productSlug: product?.slug || '',
+        buyer:       order.user,
+        buyerName:   buyerUser?.name || buyerUser?.username || 'Buyer',
+        vendor:      vendor._id,
+        vendorName:  vendor.storeName || 'Seller',
+      });
+    }
+    convo.messages.push({
+      sender:     vendor.userId,
+      senderRole: 'vendor',
+      body:       `✅ Delivered — "${item.name}" has arrived`,
+    });
+    convo.unreadBuyer += 1;
+    convo.lastMessageAt = new Date();
+    await convo.save();
+    result.messageSent = true;
+  } catch (e) {
+    console.error('[order-delivered] message error:', e.message);
     result.messageError = e.message;
   }
 
@@ -230,6 +287,14 @@ export async function processCjOrderStatusSync() {
           pushUniqueHistory(order, 'Delivered', 'CJ tracking sync — supplier reports this item delivered');
           touchedOrders.add(order);
           summary.updated++;
+
+          const notifyResult = await notifyBuyerDelivered(order, item, vendor);
+          if (notifyResult.emailError || notifyResult.messageError) {
+            summary.details.push({
+              vendorId: String(vendor._id), storeName: vendor.storeName, orderId: String(order._id),
+              error: `Delivered notification partially failed — email: ${notifyResult.emailError || 'ok'}, message: ${notifyResult.messageError || 'ok'}`,
+            });
+          }
         }
         // CANCELLED on CJ's side is deliberately not mirrored here — that's
         // a vendor/admin decision on our side, not something CJ's status
