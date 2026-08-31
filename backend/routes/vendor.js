@@ -46,6 +46,7 @@ import { getProductImages as cjGetProductImages } from '../utils/shippingProvide
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
+import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
 
@@ -1119,29 +1120,76 @@ router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requ
 // touches category/subcategory once both are set. Explicit, one-click,
 // per-product only — never run automatically. For products that got a
 // wrong auto-match before a categoryMatch.js fix landed.
-router.post('/products/:id/rematch-category', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+// Purely internal — reads the product's own title, no CJ credentials or
+// CJ link required, no external API call. Available to every vendor tier.
+router.post('/products/:id/rematch-category', authMiddleware, requireApprovedVendor, async (req, res) => {
   try {
     const vendor = req.vendor;
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
     const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id }).lean();
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    const rawCred = vendor.supplierCredentials?.cjdropshipping;
-    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
-
-    const credential = decryptCredential(rawCred);
-    const r = await syncProductFromCj(product, credential, { forceCategory: true });
-
-    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ', cjSearchDebug: r.cjSearchDebug || null });
-    if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
-    if (!r.categoryDebug?.matched?.category) {
-      return res.status(422).json({ error: 'No confident category match for this product\'s CJ listing — leave it set manually.', categoryDebug: r.categoryDebug || null });
+    const r = await rematchProductCategoryFromTitle(product, { force: true });
+    if (r.status === 'no-match') {
+      return res.status(422).json({ error: 'No confident category match for this product\'s title — leave it set manually.', matched: r.matched });
     }
     const updated = await Product.findById(product._id).select('category subcategory').lean();
-    return res.json({ ok: true, category: updated.category, subcategory: updated.subcategory, categoryDebug: r.categoryDebug });
+    return res.json({ ok: true, category: updated.category, subcategory: updated.subcategory, matched: r.matched });
   } catch (err) {
     console.error('[rematch-category]', err);
     return res.status(500).json({ error: 'Category re-match failed' });
+  }
+});
+
+// Bulk version of the above — same title-only, no-CJ matching, run over a
+// selection (or every product) at once. Explicit, selection-scoped, never
+// triggered automatically.
+router.post('/products/bulk-rematch-category', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  const vendor = req.vendor;
+  const requestedIds = Array.isArray(req.body?.ids)
+    ? req.body.ids.filter(id => mongoose.Types.ObjectId.isValid(id))
+    : [];
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
+  const send = obj => { if (!clientGone && !res.writableEnded) res.write(JSON.stringify(obj) + '\n'); };
+
+  try {
+    const query = { vendor: vendor._id };
+    if (requestedIds.length) query._id = { $in: requestedIds };
+    const targets = await Product.find(query).select('_id name category subcategory').lean().limit(500);
+
+    send({ type: 'start', total: targets.length });
+
+    let updated = 0, failed = 0, skipped = 0;
+    for (let i = 0; i < targets.length; i++) {
+      if (clientGone) break;
+      const product = targets[i];
+      send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
+      const r = await rematchProductCategoryFromTitle(product, { force: true });
+      if (r.status === 'updated') {
+        updated++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', category: r.matched.category, subcategory: r.matched.subcategory });
+      } else if (r.status === 'no-match') {
+        failed++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed' });
+      } else {
+        skipped++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
+      }
+    }
+
+    send({ type: 'done', total: targets.length, updated, failed, skipped });
+  } catch (err) {
+    console.error('[bulk-rematch-category]', err);
+    send({ type: 'error', message: err.message });
+  } finally {
+    if (!res.writableEnded) res.end();
   }
 });
 
