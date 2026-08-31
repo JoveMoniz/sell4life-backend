@@ -67,11 +67,18 @@ router.get('/', async (req, res) => {
     /* ===============================
        FETCH VENDORS
     =============================== */
-    const vendorsRaw = await Vendor.find(filter)
+    // Searching sorts alphabetically (by store name) so results are
+    // predictable regardless of account age; plain browsing stays newest-first.
+    const vendorsQuery = Vendor.find(filter)
       .populate('userId', 'email')
-      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+    if (q) {
+      vendorsQuery.collation({ locale: 'en', strength: 2 }).sort({ storeName: 1 });
+    } else {
+      vendorsQuery.sort({ createdAt: -1 });
+    }
+    const vendorsRaw = await vendorsQuery;
 
     /* ===============================
        ADD STATS (ORDERS / REVENUE)
