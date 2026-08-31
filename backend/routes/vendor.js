@@ -2205,6 +2205,15 @@ const item = findOrderItem(order, itemId);
       }
 
       await order.save();
+
+      if (status === 'Delivered') {
+        // Reuse the same email + in-app message the CJ sync worker sends —
+        // one source of truth for what "delivered" tells the buyer,
+        // regardless of whether a human or CJ triggered it.
+        const { notifyBuyerDelivered } = await import('../jobs/cjOrderStatusSyncWorker.js');
+        notifyBuyerDelivered(order, item, vendor).catch(e => console.error('Delivered notification error:', e.message));
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error('Item fulfillment error:', err);
