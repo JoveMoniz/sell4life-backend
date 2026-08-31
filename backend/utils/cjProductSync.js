@@ -6,7 +6,7 @@ import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
 import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth, getShippingCostDiagnostic } from './shippingProviders/cjdropshipping.js';
 import { decryptCredential } from './shippingProviders/registry.js';
-import { matchCjCategory } from './categoryMatch.js';
+import { matchCjCategory, matchProductTitle } from './categoryMatch.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
 // Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
@@ -136,29 +136,38 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
     ...(result.supplierUrl ? { supplierUrl: result.supplierUrl } : {}),
   };
 
-  // Auto-fill category/subcategory from CJ's own taxonomy when they're
-  // still empty — CJ's category names don't match ours, so this is a
-  // best-effort keyword match (see categoryMatch.js), not a direct copy.
-  // Each field is only ever filled when genuinely empty — never overwrites
-  // a vendor's own manual choice on a later sync. forceCategory (an
-  // explicit, one-click, per-product "Re-match Category" action — never
-  // triggered by a routine sync) opts out of that guard, for products that
-  // got a wrong auto-match before a categoryMatch.js fix landed and need
-  // re-deriving with the corrected logic.
-  let categoryDebug = { cjCategoryName: result.cjCategoryName || null, matched: null, reason: null };
+  // Auto-fill category/subcategory when still empty. The product's own
+  // title is tried FIRST — CJ suppliers often dump small accessories under
+  // generic buckets ("Bike Top Tube Bag" landed under CJ's "Home & Garden")
+  // regardless of what the item actually is, whereas a title like that is
+  // unambiguous. CJ's own category path is only a fallback when the title
+  // itself doesn't score above threshold (see categoryMatch.js). Each field
+  // is only ever filled when genuinely empty — never overwrites a vendor's
+  // own manual choice on a later sync. forceCategory (an explicit,
+  // one-click, per-product "Re-match Category" action — never triggered by
+  // a routine sync) opts out of that guard, for products that got a wrong
+  // auto-match before a categoryMatch.js fix landed and need re-deriving.
+  let categoryDebug = { cjCategoryName: result.cjCategoryName || null, titleMatch: null, matched: null, source: null, reason: null };
   if (forceCategory || !product.category || !product.subcategory) {
-    if (!result.cjCategoryName) {
-      categoryDebug.reason = 'CJ did not return a categoryName for this product';
-    } else {
-      const matched = matchCjCategory(result.cjCategoryName);
-      categoryDebug.matched = matched;
-      if (!matched.category) categoryDebug.reason = 'No category scored above the match threshold';
-      if ((forceCategory || !product.category) && matched.category) updateDoc.category = matched.category;
-      // subcategory always follows the freshly-matched category — carrying
-      // over an old subcategory string from an unrelated category would be
-      // its own kind of wrong pairing.
-      if ((forceCategory || !product.subcategory) && matched.category) updateDoc.subcategory = matched.subcategory || null;
+    const titleMatched = matchProductTitle(product.name);
+    categoryDebug.titleMatch = titleMatched;
+    let matched = titleMatched;
+    categoryDebug.source = 'title';
+    if (!matched.category) {
+      if (!result.cjCategoryName) {
+        categoryDebug.reason = 'Title had no confident match, and CJ did not return a categoryName either';
+      } else {
+        matched = matchCjCategory(result.cjCategoryName);
+        categoryDebug.source = 'cj-category';
+        if (!matched.category) categoryDebug.reason = 'Neither title nor CJ category scored above the match threshold';
+      }
     }
+    categoryDebug.matched = matched;
+    if ((forceCategory || !product.category) && matched.category) updateDoc.category = matched.category;
+    // subcategory always follows the freshly-matched category — carrying
+    // over an old subcategory string from an unrelated category would be
+    // its own kind of wrong pairing.
+    if ((forceCategory || !product.subcategory) && matched.category) updateDoc.subcategory = matched.subcategory || null;
   } else {
     categoryDebug.reason = 'Product already had category/subcategory set — left untouched';
   }
