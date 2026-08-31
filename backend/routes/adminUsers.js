@@ -10,6 +10,7 @@ import adminMiddleware from '../middleware/adminMiddleware.js';
 import { mailWelcome, mailSellerInvite } from '../utils/email.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
 import EmailLog from '../models/emailLog.js';
+import { prefixRegex, wordPrefixRegex } from '../utils/searchRegex.js';
 
 const router = express.Router();
 
@@ -36,9 +37,9 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
 
     if (q) {
       filter.$or = [
-        { email:    { $regex: q, $options: 'i' } },
-        { name:     { $regex: q, $options: 'i' } },
-        { username: { $regex: q, $options: 'i' } },
+        { email:    prefixRegex(q) },
+        { name:     wordPrefixRegex(q) },
+        { username: prefixRegex(q) },
       ];
     }
 
