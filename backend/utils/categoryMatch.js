@@ -199,19 +199,55 @@ function matchWords(targetWords) {
     return { category: null, subcategory: null };
   }
 
-  // On a tie, prefer the more specific (more-worded) subcategory name —
-  // "Laptop Stands & Accessories" over plain "Laptops" for a path that
-  // actually says "Laptop Stands", even though both technically match.
+  // Primary pass: plain word-overlap fraction (unchanged from the original
+  // design) — on a tie, prefer the more specific (more-worded) subcategory
+  // name ("Laptop Stands & Accessories" over plain "Laptops" for a path
+  // that actually says "Laptop Stands", even though both technically match).
+  const siblings = SUBCATEGORIES[bestCategory] || [];
   let bestSub = null;
   let bestSubScore = 0;
   let bestSubWordCount = 0;
-  for (const sub of SUBCATEGORIES[bestCategory] || []) {
+  for (const sub of siblings) {
     const subWords = words(sub);
     const score = overlapScore(subWords, targetWords);
     if (score > bestSubScore || (score === bestSubScore && score > 0 && subWords.length > bestSubWordCount)) {
       bestSubScore = score;
       bestSub = sub;
       bestSubWordCount = subWords.length;
+    }
+  }
+
+  // Fallback pass: many subcategory names pair two distinct items
+  // ("Glasses & Mugs", "Pots & Pans") — a title about just one of them
+  // ("Ceramic Coffee Mug Set") can only ever hit 1 of 2 words, capping the
+  // overlap fraction at 50%, always short of threshold, even though "mug"
+  // alone is a perfectly reliable signal. Only reached when the primary
+  // pass found nothing, so it never overrides an already-confident match.
+  // Trusts a SINGLE hit only when that word is distinctive — it doesn't
+  // also appear in any sibling subcategory's name (unlike "cycling", which
+  // repeats across several "Cycling ___" subcategories and must not let a
+  // single stray mention pick one of them at random).
+  if (bestSubScore < SUBCATEGORY_THRESHOLD) {
+    const wordFrequency = {};
+    for (const sib of siblings) {
+      for (const w of new Set(words(sib))) wordFrequency[w] = (wordFrequency[w] || 0) + 1;
+    }
+    const targetSet = new Set(targetWords);
+    let fallbackSub = null;
+    let fallbackHits = 0;
+    for (const sub of siblings) {
+      const subWords = words(sub);
+      const distinctiveHits = subWords.filter((w) => wordFrequency[w] === 1 && targetSet.has(w));
+      if (distinctiveHits.length > fallbackHits) {
+        fallbackHits = distinctiveHits.length;
+        fallbackSub = sub;
+      } else if (distinctiveHits.length > 0 && distinctiveHits.length === fallbackHits && fallbackSub) {
+        fallbackSub = null; // two candidates tied on distinctive hits — genuinely ambiguous, don't guess
+      }
+    }
+    if (fallbackSub) {
+      bestSub = fallbackSub;
+      bestSubScore = SUBCATEGORY_THRESHOLD; // clears the return-value gate below
     }
   }
 
