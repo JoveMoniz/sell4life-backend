@@ -138,12 +138,19 @@ const ACCESSORY_WORDS = new Set(['mount', 'holder', 'stand', 'kit', 'adapter', '
 // on plurality even when they mean the same thing. Left alone below length
 // 4 so short real words ("gas", "bus") don't get mangled.
 function singularize(word) {
-  if (word.length <= 4 || !word.endsWith('s')) return word;
+  // length > 3 (not > 4): protects real 3-letter words ending in 's'
+  // ("gas", "bus") from being mangled, while still folding 4-letter
+  // plurals like "mats"/"pans"/"pots"/"rugs" — the previous > 4 threshold
+  // silently left EVERY 4-letter plural unsingularized, so a title saying
+  // "Yoga Mat" (singular) could never match a subcategory named "Yoga
+  // Mats & Accessories" (plural) even though they're obviously the same
+  // word.
+  if (word.length <= 3 || !word.endsWith('s')) return word;
   // "-ies" -> "-y" ("accessories" -> "accessory", "batteries" -> "battery")
   // — the old plain slice(0,-1) produced "accessorie"/"batterie", which
   // then silently failed to match anything (e.g. an ACCESSORY_WORDS check
   // for "accessory" never fired since the real value was "accessorie").
-  if (word.endsWith('ies') && word.length > 5) return word.slice(0, -3) + 'y';
+  if (word.endsWith('ies') && word.length > 4) return word.slice(0, -3) + 'y';
   return word.slice(0, -1);
 }
 
@@ -256,39 +263,18 @@ function matchWords(targetWords) {
     }
   }
 
-  // Fallback pass: many subcategory names pair two distinct items
-  // ("Glasses & Mugs", "Pots & Pans") — a title about just one of them
-  // ("Ceramic Coffee Mug Set") can only ever hit 1 of 2 words, capping the
-  // overlap fraction at 50%, always short of threshold, even though "mug"
-  // alone is a perfectly reliable signal. Only reached when the primary
-  // pass found nothing, so it never overrides an already-confident match.
-  // Trusts a SINGLE hit only when that word is distinctive — it doesn't
-  // also appear in any sibling subcategory's name (unlike "cycling", which
-  // repeats across several "Cycling ___" subcategories and must not let a
-  // single stray mention pick one of them at random).
-  if (bestSubScore < SUBCATEGORY_THRESHOLD) {
-    const wordFrequency = {};
-    for (const sib of siblings) {
-      for (const w of new Set(words(sib))) wordFrequency[w] = (wordFrequency[w] || 0) + 1;
-    }
-    const targetSet = new Set(targetWords);
-    let fallbackSub = null;
-    let fallbackHits = 0;
-    for (const sub of siblings) {
-      const subWords = words(sub);
-      const distinctiveHits = subWords.filter((w) => wordFrequency[w] === 1 && targetSet.has(w));
-      if (distinctiveHits.length > fallbackHits) {
-        fallbackHits = distinctiveHits.length;
-        fallbackSub = sub;
-      } else if (distinctiveHits.length > 0 && distinctiveHits.length === fallbackHits && fallbackSub) {
-        fallbackSub = null; // two candidates tied on distinctive hits — genuinely ambiguous, don't guess
-      }
-    }
-    if (fallbackSub) {
-      bestSub = fallbackSub;
-      bestSubScore = SUBCATEGORY_THRESHOLD; // clears the return-value gate below
-    }
-  }
+  // A "distinctive single word" fallback pass was tried here (to catch
+  // paired subcategory names like "Glasses & Mugs" where a title only
+  // mentions one half) and then REMOVED: verified against a real 40-product
+  // batch, it recovered a few good matches ("mug" -> Glasses & Mugs) but
+  // also produced confident wrong ones on ordinary ambiguous words — "tube"
+  // is unique to "Resistance Bands & Tubes" within Sports, so "Bike...
+  // Upper Tube Bag" (a bike frame part) matched fitness resistance tubes;
+  // "hand" similarly pulled "Vacuum Storage Bags...Hand Pump" into "Hand
+  // Tools". Being unique WITHIN our own subcategory list says nothing
+  // about being unambiguous in real language. Leaving subcategory blank
+  // for the vendor to pick is better than a confident wrong guess, so only
+  // the primary (0.6 overlap) pass above is trusted now.
 
   return {
     category: bestCategory,
