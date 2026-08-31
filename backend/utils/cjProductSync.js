@@ -161,13 +161,37 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         categoryDebug.source = 'cj-category';
         if (!matched.category) categoryDebug.reason = 'Neither title nor CJ category scored above the match threshold';
       }
+    } else if (!matched.subcategory && result.cjCategoryName) {
+      // Title confidently placed the category but couldn't pin a
+      // subcategory (common — titles are often too short/generic for that
+      // level of detail). Only use CJ's path to help fill just the
+      // subcategory, and only when CJ independently agrees on the same
+      // category — never adopt a subcategory whose parent category
+      // disagrees with the one we already trust from the title.
+      const cjMatched = matchCjCategory(result.cjCategoryName);
+      if (cjMatched.category === matched.category && cjMatched.subcategory) {
+        matched = { category: matched.category, subcategory: cjMatched.subcategory };
+        categoryDebug.source = 'title+cj-subcategory';
+      }
     }
     categoryDebug.matched = matched;
     if ((forceCategory || !product.category) && matched.category) updateDoc.category = matched.category;
     // subcategory always follows the freshly-matched category — carrying
     // over an old subcategory string from an unrelated category would be
-    // its own kind of wrong pairing.
-    if ((forceCategory || !product.subcategory) && matched.category) updateDoc.subcategory = matched.subcategory || null;
+    // its own kind of wrong pairing, so a genuine category CHANGE clears
+    // it (to the new match, or to null if the new category has no
+    // confident subcategory either). But when forceCategory re-confirms
+    // the SAME category and simply can't pin a subcategory this time
+    // (titles are often too short/generic for that level of detail), an
+    // existing subcategory is left alone rather than wiped to null —
+    // "force re-match" means "replace with something better if found",
+    // not "erase a value the algorithm can no longer independently prove".
+    const categoryChanged = matched.category && matched.category !== product.category;
+    if (matched.category && (categoryChanged || !product.subcategory)) {
+      updateDoc.subcategory = matched.subcategory || null;
+    } else if (matched.category && matched.subcategory && matched.subcategory !== product.subcategory) {
+      updateDoc.subcategory = matched.subcategory;
+    }
   } else {
     categoryDebug.reason = 'Product already had category/subcategory set — left untouched';
   }
