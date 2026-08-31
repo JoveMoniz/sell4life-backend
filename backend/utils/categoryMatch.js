@@ -198,7 +198,8 @@ const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|
 // subcategory is only ever set above a real confidence threshold — a wrong
 // specific guess is worse than leaving it blank for the vendor to pick.
 function matchWords(targetWords) {
-  if (!targetWords.length) return { category: null, subcategory: null };
+  if (!targetWords.length) return { category: null, subcategory: null, debug: { targetWords, categoryScores: [], subcategoryScores: [] } };
+  const categoryScores = [];
 
   // A title genuinely about a category tends to mention SEVERAL of its
   // keywords ("Cable Organizer With Phone Stand" hits both "cable" and
@@ -226,14 +227,17 @@ function matchWords(targetWords) {
       else if (pos === -1 || firstHitPos < pos) { pos = firstHitPos; }
     }
     if (pos === -1) pos = Infinity;
+    categoryScores.push({ id, score: Math.round(score * 100) / 100 });
     if (score > bestCategoryScore || (score === bestCategoryScore && pos < bestCategoryPos)) {
       bestCategoryScore = score;
       bestCategoryPos = pos;
       bestCategory = id;
     }
   }
+  categoryScores.sort((a, b) => b.score - a.score);
+  const debugBase = { targetWords, categoryScores: categoryScores.slice(0, 5) };
   if (!bestCategory || bestCategoryScore < CATEGORY_THRESHOLD) {
-    return { category: null, subcategory: null };
+    return { category: null, subcategory: null, debug: { ...debugBase, subcategoryScores: [] } };
   }
 
   // Primary pass: plain word-overlap fraction (unchanged from the original
@@ -253,15 +257,18 @@ function matchWords(targetWords) {
   let bestSub = null;
   let bestSubScore = 0;
   let bestSubWordCount = 0;
+  const subcategoryScores = [];
   for (const sub of siblings) {
     const subWords = words(sub);
     const score = overlapScore(subWords, targetWords);
+    subcategoryScores.push({ name: sub, score: Math.round(score * 100) / 100 });
     if (score > bestSubScore || (score === bestSubScore && score > 0 && subWords.length > bestSubWordCount)) {
       bestSubScore = score;
       bestSub = sub;
       bestSubWordCount = subWords.length;
     }
   }
+  subcategoryScores.sort((a, b) => b.score - a.score);
 
   // A "distinctive single word" fallback pass was tried here (to catch
   // paired subcategory names like "Glasses & Mugs" where a title only
@@ -279,6 +286,7 @@ function matchWords(targetWords) {
   return {
     category: bestCategory,
     subcategory: bestSubScore >= SUBCATEGORY_THRESHOLD ? slugify(bestSub) : null,
+    debug: { ...debugBase, subcategoryScores: subcategoryScores.slice(0, 5), titleIsAccessory },
   };
 }
 
