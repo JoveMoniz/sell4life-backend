@@ -24,7 +24,12 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
     const { q } = req.query;
 
     const page = Number(req.query.page) || 1;
-    const limit = 20;
+    // A search query needs a wider net than plain browsing — otherwise a
+    // match can be pushed past the page cutoff by newer non-matching
+    // accounts (results are sorted by createdAt, not by search relevance),
+    // making it look like search only "kicks in" once enough characters
+    // are typed to shrink the match count back under the limit.
+    const limit = q ? 100 : 20;
     const skip = (page - 1) * limit;
 
     const filter = {};
