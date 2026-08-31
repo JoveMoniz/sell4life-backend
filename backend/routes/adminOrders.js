@@ -308,6 +308,52 @@ router.post('/cj-status-sync-run', authMiddleware, adminMiddleware, async (req, 
 });
 
 /* ======================================================
+   ONE-OFF — BACKFILL STALE vendorOrders[].status
+   order.vendorOrders[].status is a stored field, not derived on read —
+   it only got recomputed on buyer-initiated cancel/return actions, so any
+   order where a vendor advanced fulfillment status (manually, or via the
+   CJ sync worker before its own fix) has a per-vendor badge on the buyer's
+   order page that's stuck behind the real item status. Recomputes every
+   order's vendorOrders[].status from its current items and saves only
+   the ones that actually changed. Safe to run more than once.
+   Remove once confirmed no longer needed.
+====================================================== */
+router.post('/backfill-vendor-status', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ 'vendorOrders.0': { $exists: true } });
+    let ordersChecked = 0;
+    let ordersUpdated = 0;
+    const errors = [];
+
+    for (const order of orders) {
+      ordersChecked++;
+      let changed = false;
+      for (const vo of order.vendorOrders) {
+        const vendorItems = order.items.filter(i => String(i.vendorId) === String(vo.vendorId));
+        const derived = getDerivedVendorStatus(vo, vendorItems);
+        if (derived !== vo.status) {
+          vo.status = derived;
+          changed = true;
+        }
+      }
+      if (changed) {
+        try {
+          await order.save();
+          ordersUpdated++;
+        } catch (err) {
+          errors.push({ orderId: String(order._id), error: err.message });
+        }
+      }
+    }
+
+    res.json({ ordersChecked, ordersUpdated, errors });
+  } catch (err) {
+    console.error('Backfill vendor status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    TEMPORARY — BACKFILL MISSING CARRIER ON AN ALREADY-SHIPPED
    CJ ITEM
    Items that got marked Shipped before the logisticName fallback
