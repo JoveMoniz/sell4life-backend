@@ -1294,6 +1294,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
           sku:    col(r, 'sku'),
           image:  col(r, 'image1') || '',
           color:  '',
+          supplierVariantRef: col(r, 'suppliervariantref'),
         };
       }) : [];
 
@@ -1303,6 +1304,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
 
       try {
         const supplierRef  = col(firstRow, 'suppliervariantref');
+        const supplierUrl  = col(firstRow, 'supplierurl');
         const supplierName = col(firstRow, 'suppliername');
         const baseCost     = parseFloat(col(firstRow, 'costprice'));
         const costPrice    = Number.isFinite(baseCost) ? baseCost : undefined;
@@ -1333,7 +1335,12 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             ...(parseFloat(col(firstRow, 'compareprice')) ? { comparePrice: parseFloat(col(firstRow, 'compareprice')) } : {}),
             ...(col(firstRow, 'sku')           ? { sku: col(firstRow, 'sku') }         : {}),
             ...(supplierName                   ? { supplier: supplierName }             : {}),
-            ...(supplierRef                    ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+            ...(supplierUrl                    ? { supplierUrl }                        : {}),
+            // Only meaningful for a single-SKU import — variants[] above
+            // already carries its own per-variant supplierVariantRef when
+            // variants exist, so this would otherwise just be a stale,
+            // never-read top-level value once a product has real variants.
+            ...(supplierRef && !variants.length ? { supplierVariantRef: supplierRef }   : {}),
           };
           await Product.updateOne({ _id: existing._id }, { $set: updateFields });
           updated.push(existing._id);
@@ -1363,7 +1370,8 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             variants,
             active: false,
             supplier:     supplierName || undefined,
-            ...(supplierRef ? { metadata: { supplierVariantRef: supplierRef } } : {}),
+            supplierUrl:  supplierUrl || undefined,
+            ...(supplierRef && !variants.length ? { supplierVariantRef: supplierRef } : {}),
           });
           await product.save();
           created.push(product._id);
