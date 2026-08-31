@@ -354,6 +354,58 @@ router.post('/backfill-vendor-status', authMiddleware, adminMiddleware, async (r
 });
 
 /* ======================================================
+   ONE-OFF — BACKFILL MISSED "DELIVERED" NOTIFICATIONS
+   The buyer email + in-app message for a Delivered item only just started
+   firing — every item that reached Delivered before that fix shipped never
+   got one, and never will on its own (the notify call only fires on the
+   live Shipped -> Delivered transition, which has already happened for
+   these). Sends the same notifyBuyerDelivered() used by the live flow to
+   every currently-Delivered item once. Safe to run more than once IF no
+   new items reach Delivered between runs — it does not track which items
+   were already backfilled, so re-running after the live flow has since
+   notified some of them would double-message those. Remove once run.
+====================================================== */
+router.post('/backfill-delivered-notifications', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { notifyBuyerDelivered } = await import('../jobs/cjOrderStatusSyncWorker.js');
+    const orders = await Order.find({ 'items.status': 'Delivered' });
+
+    let itemsChecked = 0;
+    let notified = 0;
+    const errors = [];
+
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (item.status !== 'Delivered') continue;
+        itemsChecked++;
+        try {
+          const vendor = await Vendor.findById(item.vendorId).lean();
+          if (!vendor) {
+            errors.push({ orderId: String(order._id), itemId: String(item._id), error: 'Vendor not found' });
+            continue;
+          }
+          const result = await notifyBuyerDelivered(order, item, vendor);
+          if (result.emailSent || result.messageSent) notified++;
+          if (result.emailError || result.messageError) {
+            errors.push({
+              orderId: String(order._id), itemId: String(item._id),
+              error: `email: ${result.emailError || 'ok'}, message: ${result.messageError || 'ok'}`,
+            });
+          }
+        } catch (err) {
+          errors.push({ orderId: String(order._id), itemId: String(item._id), error: err.message });
+        }
+      }
+    }
+
+    res.json({ itemsChecked, notified, errors });
+  } catch (err) {
+    console.error('Backfill delivered notifications error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ======================================================
    TEMPORARY — BACKFILL MISSING CARRIER ON AN ALREADY-SHIPPED
    CJ ITEM
    Items that got marked Shipped before the logisticName fallback
