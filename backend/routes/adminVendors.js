@@ -39,7 +39,9 @@ router.get('/', async (req, res) => {
     const { q, status } = req.query;
 
     const page = Number(req.query.page) || 1;
-    const limit = 20;
+    // Wider net for search than plain browsing — see matching comment in
+    // adminUsers.js's GET '/' route for why.
+    const limit = q ? 100 : 20;
     const skip = (page - 1) * limit;
 
     /* ===============================
