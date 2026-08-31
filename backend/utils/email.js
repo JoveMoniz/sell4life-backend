@@ -291,10 +291,10 @@ export function renderMarketingEmail(tpl, { name, ctaColor = '#0b6b6a' } = {}) {
   const [ctaMain, ...ctaRest] = (tpl.ctaText || '').split(/\s*—\s*/);
   const ctaSub = ctaRest.join(' — ');
   const ctaLabel = ctaSub
-    ? `${ctaMain}<span style="font-size:8px;font-weight:400;opacity:.85"> — ${ctaSub}</span>`
+    ? `${ctaMain}<span style="font-size:7px;font-weight:400;opacity:.85"> — ${ctaSub}</span>`
     : ctaMain;
   const cta = tpl.ctaText && tpl.ctaUrl
-    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:7px 12px;border-radius:6px;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap">${ctaLabel}</a></p>`
+    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:6px 10px;border-radius:5px;text-decoration:none;font-size:9px;font-weight:600;white-space:nowrap">${ctaLabel}</a></p>`
     : '';
 
   return `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
