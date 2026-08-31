@@ -125,7 +125,13 @@ const STOPWORDS = new Set(['and', 'the', 'for', 'with', 'of', 'a', 'an', 'to', '
 // standalone products, not accessories for something else), and wrongly
 // suppressed their own correct whole-product subcategory match.
 const ACCESSORY_WORDS = new Set(['mount', 'holder', 'stand', 'kit', 'adapter', 'adaptor', 'clip', 'strap',
-  'cover', 'sleeve', 'dock', 'guard', 'protector', 'accessory', 'accessories', 'part', 'spare', 'replacement']);
+  'cover', 'sleeve', 'dock', 'guard', 'protector', 'accessory', 'accessories', 'part', 'spare', 'replacement',
+  // 'bag' re-added: "Mountain Bike Saddle Bag" was still matching whole-
+  // vehicle "Mountain Bikes" since 'bag' wasn't triggering the accessory
+  // filter. A standalone bag product ("Tote Bag") isn't hurt by this —
+  // that only affects which subcategory wins WITHIN the category already
+  // chosen; it doesn't change the category itself.
+  'bag']);
 
 // Crude singular/plural fold ("creams" -> "cream", "phones" -> "phone") so
 // "Face Creams" matches "Face Cream" — CJ's and our own naming rarely agree
