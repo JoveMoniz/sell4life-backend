@@ -103,7 +103,12 @@ export function scaleVariantPricesToTarget(variants, targetPrice) {
 // Returns { status: 'skipped'|'updated'|'failed', count?, videos?, variantsSynced?, note?, error? }
 export async function syncProductFromCj(product, credential, { forceCategory = false } = {}) {
   const pidOverride = cjPidFromUrl(product.supplierUrl);
-  const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
+  // Falls back to the top-level fields for a single-SKU import, which has
+  // an empty variants[] (no per-row attributes → no variant built at all)
+  // and would otherwise have no way to be found on CJ despite a vendor
+  // having supplied a Supplier Variant ID/SKU during CSV import.
+  const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean)
+    || product.supplierVariantRef || product.sku;
   if (!vid && !pidOverride) return { status: 'skipped' };
 
   const result = await cjGetProductImages(vid, product.name, credential, pidOverride);

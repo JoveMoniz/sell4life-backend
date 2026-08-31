@@ -50,6 +50,14 @@ const variantSchema = new mongoose.Schema(
     // CJ's internal variant id (numeric), captured during CJ sync.
     // Required for freight quotes — CJ's freight API rejects human SKUs.
     cjVid: { type: String, default: '' },
+
+    // A vendor-supplied CJ variant identifier from a bulk CSV import, used
+    // to find this product on CJ before any sync has ever run (cjVid above
+    // only exists AFTER a successful sync, so it can't bootstrap the first
+    // one). cjProductSync.js's syncProductFromCj() has always read this
+    // exact field name — it just never existed on the schema, so a
+    // vendor's "Supplier Variant ID" CSV column silently went nowhere.
+    supplierVariantRef: { type: String, default: '' },
   },
   { _id: false }
 );
@@ -223,6 +231,17 @@ const productSchema = new mongoose.Schema(
     },
 
     supplierUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Same purpose as variantSchema's supplierVariantRef, for products
+    // imported without variants (a single-SKU CSV row builds an empty
+    // variants[] — see routes/vendor.js's /products/import) — otherwise a
+    // single-SKU import had literally nowhere to store a vendor-supplied
+    // CJ variant id at all.
+    supplierVariantRef: {
       type: String,
       default: '',
       trim: true,
