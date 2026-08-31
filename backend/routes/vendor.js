@@ -1009,6 +1009,10 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
   const requestedIds = Array.isArray(req.body?.ids)
     ? req.body.ids.filter(id => mongoose.Types.ObjectId.isValid(id))
     : [];
+  // Explicit, one-click, selection-scoped bulk action — never triggered by
+  // a routine sync. See the per-product /rematch-category route for why
+  // this bypasses the "only fill when empty" guard.
+  const forceCategory = req.body?.forceCategory === true;
 
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Transfer-Encoding', 'chunked');
@@ -1026,11 +1030,15 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     const query = { vendor: vendor._id };
     if (requestedIds.length) query._id = { $in: requestedIds };
     const allProducts = await Product.find(query)
-      .select('_id name variants images supplierUrl videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5').lean();
+      .select('_id name category subcategory variants images supplierUrl supplierVariantRef sku videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5').lean();
 
-    // Target every product that has at least one variant with a SKU — no image-count gate
+    // Target every product CJ-syncable via any of the paths
+    // syncProductFromCj actually checks: a variant ref/SKU, OR (for a
+    // single-SKU product with no variants at all) a top-level
+    // supplierVariantRef/sku, OR a pasted supplierUrl.
     const targets = allProducts.filter(p =>
       (p.variants || []).some(v => v.supplierVariantRef || v.sku)
+      || p.supplierVariantRef || p.sku || p.supplierUrl
     ).slice(0, 500);
 
     send({ type: 'start', total: targets.length });
@@ -1050,7 +1058,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       const product = targets[i];
       send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
 
-      const r = await syncProductFromCj(product, credential);
+      const r = await syncProductFromCj(product, credential, { forceCategory });
       if (r.status === 'updated') {
         updated++;
         if (r.note === 'variant-fallback') {
@@ -1061,7 +1069,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
         if (r.variantMatchDebug?.cjVariantsFound === 0) noCjVariants++;
         if (!sampleVideoApiDebug && r.variantMatchDebug?.videoApi) sampleVideoApiDebug = r.variantMatchDebug.videoApi;
         if (!r.categoryDebug?.cjCategoryName) noCategoryReturned++;
-        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.shipping != null ? { shipping: r.shipping } : {}), ...(r.note ? { note: r.note } : {}) });
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', count: r.count, videos: r.videos, variantsSynced: r.variantsSynced, ...(r.shipping != null ? { shipping: r.shipping } : {}), ...(r.note ? { note: r.note } : {}), ...(forceCategory ? { category: r.categoryDebug?.matched?.category || null, subcategory: r.categoryDebug?.matched?.subcategory || null } : {}) });
       } else if (r.status === 'skipped') {
         skipped++;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
