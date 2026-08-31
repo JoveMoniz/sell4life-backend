@@ -26,9 +26,13 @@ import { mailOrderShipped } from '../utils/email.js';
 const CJ_IN_FLIGHT = new Set(['CREATED', 'UNPAID', 'PENDING', 'PROCESSING', 'UNSHIPPED']);
 
 // Never touch an item outside these buyer-facing states — an active
-// cancel/return flow (or an item already Shipped/Delivered) must never
-// be overwritten by an out-of-band CJ update.
-export const TOUCHABLE_STATUSES = new Set(['Pending', 'Processing']);
+// cancel/return flow (or an item already Delivered) must never be
+// overwritten by an out-of-band CJ update. 'Shipped' IS included: the
+// DELIVERED-transition logic below only fires when item.status is already
+// 'Shipped', so excluding it here would mean the query above never even
+// surfaces a shipped item again — CJ reporting DELIVERED would then have
+// no in-flight item left to apply it to, silently and permanently.
+export const TOUCHABLE_STATUSES = new Set(['Pending', 'Processing', 'Shipped']);
 
 export async function notifyBuyerShipped(order, item, vendor, trackNum, carrierStr) {
   // Mirrors vendor.js's PATCH /orders/:id/items/:itemId/tracking route —
@@ -189,7 +193,12 @@ export async function processCjOrderStatusSync() {
           continue;
         }
 
-        if (s.orderStatus === 'SHIPPED' && s.trackNumber) {
+        // item.status !== 'Shipped' guard: now that Shipped items stay
+        // pollable (so a later DELIVERED can still land), CJ will keep
+        // reporting SHIPPED on every tick for an item still in transit —
+        // without this it'd re-touch/re-save the order every poll for
+        // no real change.
+        if (s.orderStatus === 'SHIPPED' && s.trackNumber && item.status !== 'Shipped') {
           const wasAlreadyTracked = !!item.trackingNumber;
           item.trackingNumber = s.trackNumber;
           if (s.trackingProvider) item.carrier = s.trackingProvider;
