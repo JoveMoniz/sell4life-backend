@@ -101,7 +101,7 @@ export function scaleVariantPricesToTarget(variants, targetPrice) {
 // When the vendor has saved a CJ link in supplierUrl, that product is fetched
 // directly (no fuzzy search) — the manual override for wrong matches.
 // Returns { status: 'skipped'|'updated'|'failed', count?, videos?, variantsSynced?, note?, error? }
-export async function syncProductFromCj(product, credential) {
+export async function syncProductFromCj(product, credential, { forceCategory = false } = {}) {
   const pidOverride = cjPidFromUrl(product.supplierUrl);
   const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
   if (!vid && !pidOverride) return { status: 'skipped' };
@@ -135,17 +135,24 @@ export async function syncProductFromCj(product, credential) {
   // still empty — CJ's category names don't match ours, so this is a
   // best-effort keyword match (see categoryMatch.js), not a direct copy.
   // Each field is only ever filled when genuinely empty — never overwrites
-  // a vendor's own manual choice on a later sync.
+  // a vendor's own manual choice on a later sync. forceCategory (an
+  // explicit, one-click, per-product "Re-match Category" action — never
+  // triggered by a routine sync) opts out of that guard, for products that
+  // got a wrong auto-match before a categoryMatch.js fix landed and need
+  // re-deriving with the corrected logic.
   let categoryDebug = { cjCategoryName: result.cjCategoryName || null, matched: null, reason: null };
-  if (!product.category || !product.subcategory) {
+  if (forceCategory || !product.category || !product.subcategory) {
     if (!result.cjCategoryName) {
       categoryDebug.reason = 'CJ did not return a categoryName for this product';
     } else {
       const matched = matchCjCategory(result.cjCategoryName);
       categoryDebug.matched = matched;
       if (!matched.category) categoryDebug.reason = 'No category scored above the match threshold';
-      if (!product.category && matched.category) updateDoc.category = matched.category;
-      if (!product.subcategory && matched.subcategory) updateDoc.subcategory = matched.subcategory;
+      if ((forceCategory || !product.category) && matched.category) updateDoc.category = matched.category;
+      // subcategory always follows the freshly-matched category — carrying
+      // over an old subcategory string from an unrelated category would be
+      // its own kind of wrong pairing.
+      if ((forceCategory || !product.subcategory) && matched.category) updateDoc.subcategory = matched.subcategory || null;
     }
   } else {
     categoryDebug.reason = 'Product already had category/subcategory set — left untouched';

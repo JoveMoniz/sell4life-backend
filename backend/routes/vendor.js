@@ -1106,6 +1106,37 @@ router.post('/products/:id/cj-sync', authMiddleware, requireApprovedVendor, requ
   }
 });
 
+// Re-derives category/subcategory from CJ's current category name and
+// overwrites whatever is stored — unlike the plain sync above, which never
+// touches category/subcategory once both are set. Explicit, one-click,
+// per-product only — never run automatically. For products that got a
+// wrong auto-match before a categoryMatch.js fix landed.
+router.post('/products/:id/rematch-category', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
+  try {
+    const vendor = req.vendor;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid product ID' });
+    const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id }).lean();
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const rawCred = vendor.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return res.status(400).json({ error: 'No CJ credentials — go to Store Settings → Connect Supplier' });
+
+    const credential = decryptCredential(rawCred);
+    const r = await syncProductFromCj(product, credential, { forceCategory: true });
+
+    if (r.status === 'failed')  return res.status(404).json({ error: r.error || 'No match found on CJ', cjSearchDebug: r.cjSearchDebug || null });
+    if (r.status === 'skipped') return res.status(400).json({ error: 'No CJ variant SKU found on this product' });
+    if (!r.categoryDebug?.matched?.category) {
+      return res.status(422).json({ error: 'No confident category match for this product\'s CJ listing — leave it set manually.', categoryDebug: r.categoryDebug || null });
+    }
+    const updated = await Product.findById(product._id).select('category subcategory').lean();
+    return res.json({ ok: true, category: updated.category, subcategory: updated.subcategory, categoryDebug: r.categoryDebug });
+  } catch (err) {
+    console.error('[rematch-category]', err);
+    return res.status(500).json({ error: 'Category re-match failed' });
+  }
+});
+
 router.get('/products/:id/cj-images', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   try {
     const vendor  = req.vendor;
