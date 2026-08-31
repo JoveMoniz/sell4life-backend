@@ -19,6 +19,7 @@ import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getOrderStatusBatch } from '../utils/shippingProviders/cjdropshipping.js';
 import { pushUniqueHistory } from '../utils/historyLogic.js';
 import { mailOrderShipped } from '../utils/email.js';
+import { getDerivedVendorStatus } from '../utils/orderLogic.js';
 
 // CJ statuses that mean "still in flight" — anything else (SHIPPED,
 // DELIVERED, CANCELLED) is either terminal or handled by the mapping
@@ -241,6 +242,16 @@ export async function processCjOrderStatusSync() {
 
     for (const order of touchedOrders) {
       try {
+        // order.vendorOrders[].status is a separately-stored field the
+        // buyer's order-detail page reads for its per-vendor badge — it's
+        // NOT derived on the fly like the item/order status, so an item
+        // status change above (Processing/Shipped/Delivered) is invisible
+        // to the buyer until this is explicitly recomputed and saved too.
+        const vendorOrder = order.vendorOrders.find(vo => String(vo.vendorId) === String(vendor._id));
+        if (vendorOrder) {
+          const vendorItems = order.items.filter(i => String(i.vendorId) === String(vendor._id));
+          vendorOrder.status = getDerivedVendorStatus(vendorOrder, vendorItems);
+        }
         await order.save();
       } catch (err) {
         summary.errors++;
