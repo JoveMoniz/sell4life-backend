@@ -285,8 +285,16 @@ export function renderMarketingEmail(tpl, { name, ctaColor = '#0b6b6a' } = {}) {
   const bodyParas = sub(tpl.body).split(/\n\s*\n/).map(p =>
     `<p style="margin:0 0 10px;color:#374151">${p}</p>`
   ).join('');
+  // A ctaText like "Start Selling — It's Free" gets the part after the dash
+  // rendered smaller/lighter, so the button reads as one main label with a
+  // secondary note rather than two words of equal visual weight.
+  const [ctaMain, ...ctaRest] = (tpl.ctaText || '').split(/\s*—\s*/);
+  const ctaSub = ctaRest.join(' — ');
+  const ctaLabel = ctaSub
+    ? `${ctaMain}<span style="font-size:8px;font-weight:400;opacity:.85"> — ${ctaSub}</span>`
+    : ctaMain;
   const cta = tpl.ctaText && tpl.ctaUrl
-    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:11px;font-weight:600;white-space:nowrap">${tpl.ctaText}</a></p>`
+    ? `<p style="margin:16px 0"><a href="${process.env.FRONTEND_URL || 'https://sell4life.com'}${tpl.ctaUrl}" style="display:inline-block;background:${ctaColor};color:#fff;padding:7px 12px;border-radius:6px;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap">${ctaLabel}</a></p>`
     : '';
 
   return `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
