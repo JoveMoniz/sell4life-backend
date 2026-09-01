@@ -476,4 +476,95 @@ router.get('/funnel', async (req, res) => {
   }
 });
 
+/* ======================================================
+   GET /sessions — recent sessions that reached at least a given funnel
+   stage, each with its full event trail. Built so a specific drop-off
+   (e.g. "who abandoned checkout, and what country were they in") can be
+   diagnosed directly instead of guessed at from separate aggregate
+   tables — /countries and /funnel can't be cross-referenced today.
+====================================================== */
+const STAGE_ORDER = ['pageview', 'product_view', 'add_to_cart', 'checkout_start'];
+
+router.get('/sessions', async (req, res) => {
+  try {
+    const period = req.query.period;
+    const minStage = STAGE_ORDER.includes(req.query.minStage) ? req.query.minStage : 'add_to_cart';
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+    // Any event at-or-past the requested stage qualifies the session —
+    // e.g. minStage=add_to_cart also pulls in sessions that got as far as
+    // checkout_start, not only ones that stopped exactly at add_to_cart.
+    const stageTypes = STAGE_ORDER.slice(STAGE_ORDER.indexOf(minStage));
+    const eventMatch = { isBot: false, isInternal: false, type: { $in: stageTypes }, ...dateFilterFor('timestamp', period) };
+
+    const sessionIds = await AnalyticsEvent.distinct('sessionId', eventMatch);
+    if (!sessionIds.length) return res.json([]);
+
+    const sessions = await AnalyticsSession
+      .find({ sessionId: { $in: sessionIds }, isBot: false, isInternal: false })
+      .sort({ startedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    if (!sessions.length) return res.json([]);
+
+    const events = await AnalyticsEvent
+      .find({ sessionId: { $in: sessions.map((s) => s.sessionId) } })
+      .sort({ timestamp: 1 })
+      .select('sessionId type path title metadata timestamp')
+      .lean();
+
+    const eventsBySession = {};
+    events.forEach((e) => {
+      (eventsBySession[e.sessionId] = eventsBySession[e.sessionId] || []).push(e);
+    });
+
+    // Best-effort only — orders don't store a sessionId, so this infers a
+    // likely match by "same logged-in user, paid within a couple of hours
+    // of the session" rather than a guaranteed link. Good enough to tell
+    // an admin "yes, they did buy shortly after" vs "no, they didn't."
+    const userIds = [...new Set(sessions.filter((s) => s.userId).map((s) => String(s.userId)))];
+    const orders = userIds.length
+      ? await Order.find({ user: { $in: userIds }, paymentStatus: { $in: PAID } }).select('user createdAt total').lean()
+      : [];
+
+    res.json(sessions.map((s) => {
+      const windowEnd = new Date((s.lastSeenAt || s.startedAt).getTime() + 2 * 3600 * 1000);
+      const purchasedNearby = s.userId
+        ? orders.some((o) => String(o.user) === String(s.userId) && o.createdAt >= s.startedAt && o.createdAt <= windowEnd)
+        : false;
+
+      return {
+        sessionId: s.sessionId,
+        startedAt: s.startedAt,
+        lastSeenAt: s.lastSeenAt,
+        durationSec: s.durationSec,
+        country: s.country,
+        region: s.region,
+        city: s.city,
+        device: s.device,
+        browser: s.browser,
+        os: s.os,
+        entryPage: s.entryPage,
+        exitPage: s.exitPage,
+        trafficSource: s.trafficSource,
+        referrerDomain: s.referrerDomain,
+        isNewVisitor: s.isNewVisitor,
+        loggedIn: !!s.userId,
+        purchasedNearby,
+        events: (eventsBySession[s.sessionId] || []).map((e) => ({
+          type: e.type,
+          path: e.path,
+          title: e.title,
+          metadata: e.metadata,
+          timestamp: e.timestamp,
+        })),
+      };
+    }));
+  } catch (err) {
+    console.error('[admin-analytics] sessions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
