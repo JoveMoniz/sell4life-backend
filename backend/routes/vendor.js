@@ -1171,7 +1171,12 @@ router.post('/products/bulk-rematch-category', authMiddleware, requireApprovedVe
       if (clientGone) break;
       const product = targets[i];
       send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
+      const beforeCat = product.category, beforeSub = product.subcategory;
       const r = await rematchProductCategoryFromTitle(product, { force: true });
+      // Printed to the Render server log (not just the response) so results
+      // can be copy-pasted as plain text for diagnosis — one line per
+      // product, showing exactly what changed and the near-miss scores.
+      console.log(`[bulk-rematch] "${product.name}" | was: ${beforeCat || '—'}/${beforeSub || '—'} | now: ${r.matched?.category || '—'}/${r.matched?.subcategory || '—'} | status: ${r.status} | top categories: ${JSON.stringify(r.matched?.debug?.categoryScores)} | top subcats: ${JSON.stringify(r.matched?.debug?.subcategoryScores)}`);
       if (r.status === 'updated') {
         updated++;
         send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', category: r.matched.category, subcategory: r.matched.subcategory });
