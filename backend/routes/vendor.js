@@ -45,7 +45,7 @@ import { getProvider, listProviders, encryptCredential, decryptCredential } from
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
-import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
+import { syncProductFromCj } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
