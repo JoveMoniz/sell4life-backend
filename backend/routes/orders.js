@@ -288,6 +288,7 @@ router.post('/guest-checkout', async (req, res) => {
         role: 'user',
         emailVerified: false,
         passwordSet: false,
+        guestOrigin: true,
       });
     }
 
