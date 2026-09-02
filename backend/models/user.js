@@ -99,12 +99,26 @@ const userSchema = new mongoose.Schema(
     },
 
     // false only for accounts auto-created by guest checkout, which get an
-    // unusable placeholder password hash at creation — distinguishes "never
-    // chose a password" (guest, exempt from the email-verify gate until they
-    // claim it) from every normal signup, which defaults to true.
+    // unusable placeholder password hash at creation — flips to true the
+    // moment they claim the account (POST /account/set-password or the
+    // password-reset email link). Drives which UI/flow applies right now;
+    // see guestOrigin below for the *permanent* record of how the account
+    // started, which is what the email-verify exemption actually keys on.
     passwordSet: {
       type: Boolean,
       default: true,
+    },
+
+    // true only for accounts created by guest checkout, and never flips
+    // back — unlike passwordSet, this persists even after the buyer claims
+    // the account. Exempts them from the email-verify gate permanently: a
+    // completed Stripe payment is a stronger anti-fraud signal than email
+    // verification would add, and losing access to their own order history
+    // the moment they claim their account would defeat the point of
+    // offering guest checkout at all. See middleware/authMiddleware.js.
+    guestOrigin: {
+      type: Boolean,
+      default: false,
     },
 
     /* =================================

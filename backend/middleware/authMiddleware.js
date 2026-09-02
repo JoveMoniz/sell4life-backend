@@ -45,7 +45,7 @@ export default async function authMiddleware(req, res, next) {
     ====================================================== */
 
     const user = await User.findById(decoded.id).select(
-      '_id name username email role active banned emailVerified passwordSet createdAt'
+      '_id name username email role active banned emailVerified guestOrigin createdAt'
     );
 
     if (!user) {
@@ -86,14 +86,14 @@ export default async function authMiddleware(req, res, next) {
 
     const requestPath = req.originalUrl.split('?')[0];
 
-    // Guest-checkout accounts (never chose their own password) are exempt —
-    // they were never asked to sign up, so there's nothing to "verify" yet.
-    // The gate re-applies the moment they claim the account with a real
-    // password (see routes/orders.js guest-checkout and routes/account.js
-    // set-password, both of which flip passwordSet to true).
-    const isUnclaimedGuest = user.passwordSet === false;
-
-    if (user.role !== 'admin' && !isUnclaimedGuest && mustVerifyEmail(user) && !EMAIL_VERIFY_ALLOWLIST.includes(requestPath)) {
+    // Guest-checkout accounts are permanently exempt — a completed Stripe
+    // payment is a stronger anti-fraud signal than email verification would
+    // add, and this must survive claiming the account (setting a password)
+    // too, or the buyer loses access to their own order history the moment
+    // they do the exact thing this flow asked them to do. See
+    // routes/orders.js's guest-checkout route, which sets guestOrigin once
+    // and never unsets it.
+    if (user.role !== 'admin' && !user.guestOrigin && mustVerifyEmail(user) && !EMAIL_VERIFY_ALLOWLIST.includes(requestPath)) {
       return res.status(403).json({
         error: 'Please verify your email to continue.',
         code: 'EMAIL_UNVERIFIED',
