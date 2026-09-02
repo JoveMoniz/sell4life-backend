@@ -7,6 +7,7 @@ import Vendor from '../models/vendor.js';
 import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth, getShippingCostDiagnostic } from './shippingProviders/cjdropshipping.js';
 import { decryptCredential } from './shippingProviders/registry.js';
 import { matchCjCategory, matchProductTitle } from './categoryMatch.js';
+import { matchProductTitleAI } from './aiCategoryMatch.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
 // Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
@@ -149,7 +150,13 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   // auto-match before a categoryMatch.js fix landed and need re-deriving.
   let categoryDebug = { cjCategoryName: result.cjCategoryName || null, titleMatch: null, matched: null, source: null, reason: null };
   if (forceCategory || !product.category || !product.subcategory) {
-    const titleMatched = matchProductTitle(product.name);
+    let titleMatched;
+    try {
+      titleMatched = await matchProductTitleAI(product.name);
+    } catch (err) {
+      console.error('[aiCategoryMatch] falling back to keyword matching:', err.message);
+      titleMatched = matchProductTitle(product.name);
+    }
     categoryDebug.titleMatch = titleMatched;
     let matched = titleMatched;
     categoryDebug.source = 'title';
