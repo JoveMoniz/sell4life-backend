@@ -98,6 +98,15 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    // false only for accounts auto-created by guest checkout, which get an
+    // unusable placeholder password hash at creation — distinguishes "never
+    // chose a password" (guest, exempt from the email-verify gate until they
+    // claim it) from every normal signup, which defaults to true.
+    passwordSet: {
+      type: Boolean,
+      default: true,
+    },
+
     /* =================================
        PROFILE DETAILS
     ================================= */

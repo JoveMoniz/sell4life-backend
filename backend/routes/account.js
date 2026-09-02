@@ -41,7 +41,12 @@ router.get('/me', async (req, res) => {
   try {
     const user = await getUser(req, res);
     if (!user) return;
-    res.json({ name: user.name, email: user.email, defaultShippingAddress: user.defaultShippingAddress || null });
+    res.json({
+      name: user.name,
+      email: user.email,
+      defaultShippingAddress: user.defaultShippingAddress || null,
+      passwordSet: user.passwordSet !== false,
+    });
   } catch (err) {
     console.error('Account GET error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -105,6 +110,38 @@ router.patch('/me', async (req, res) => {
     });
   } catch (err) {
     console.error('Account update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   CLAIM A GUEST-CHECKOUT ACCOUNT — set a first password.
+   Only works for accounts created by guest checkout (passwordSet:false)
+   — a normal account must use PATCH /me with currentPassword instead,
+   so this can never be used to hijack a real account's password.
+====================================================== */
+router.post('/set-password', async (req, res) => {
+  try {
+    const user = await getUser(req, res);
+    if (!user) return;
+
+    if (user.passwordSet !== false) {
+      return res.status(400).json({ error: 'This account already has a password. Use account settings to change it.' });
+    }
+
+    const { password } = req.body;
+    if (!password || String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const bcrypt = (await import('bcryptjs')).default;
+    user.password = await bcrypt.hash(password, 10);
+    user.passwordSet = true;
+    await user.save();
+
+    res.json({ message: 'Password set — you can now sign in with it any time.' });
+  } catch (err) {
+    console.error('Set-password error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
