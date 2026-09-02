@@ -498,4 +498,46 @@ router.put('/eu-selling', async (req, res) => {
   }
 });
 
+/* ======================================================
+   SUBCATEGORY SUGGESTIONS — pending proposals from the AI category
+   matcher (aiCategoryMatch.js) for a product it couldn't place in any
+   existing subcategory. Never auto-applied; approving here only marks
+   the status. Actually adding an approved subcategory to the taxonomy
+   is a separate, deliberate multi-file change (backend JSON + both
+   frontend environments' dropdown data) — not automated on purpose,
+   since a bad add here would fragment the taxonomy everything else
+   (filters, search, tag suggestions) depends on.
+====================================================== */
+router.get('/subcategory-suggestions', async (req, res) => {
+  try {
+    const SubcategorySuggestion = (await import('../models/subcategorySuggestion.js')).default;
+    const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
+    const suggestions = await SubcategorySuggestion.find({ status }).sort({ updatedAt: -1 }).lean();
+    res.json({ suggestions });
+  } catch (err) {
+    console.error('Subcategory suggestions GET error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/subcategory-suggestions/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'status must be approved or rejected' });
+    }
+    const SubcategorySuggestion = (await import('../models/subcategorySuggestion.js')).default;
+    const updated = await SubcategorySuggestion.findByIdAndUpdate(
+      req.params.id,
+      { status, reviewedAt: new Date() },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Suggestion not found' });
+    res.json({ ok: true, suggestion: updated });
+  } catch (err) {
+    console.error('Subcategory suggestions PATCH error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

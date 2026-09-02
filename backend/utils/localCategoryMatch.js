@@ -14,12 +14,12 @@ import Product from '../models/product.js';
 import { matchProductTitle } from './categoryMatch.js';
 import { matchProductTitleAI } from './aiCategoryMatch.js';
 
-async function classify(title) {
+async function classify(product) {
   try {
-    return await matchProductTitleAI(title);
+    return await matchProductTitleAI(product.name, product);
   } catch (err) {
     console.error('[aiCategoryMatch] falling back to keyword matching:', err.message);
-    return matchProductTitle(title);
+    return matchProductTitle(product.name);
   }
 }
 
@@ -36,7 +36,7 @@ export async function rematchProductCategoryFromTitle(product, { force = false }
     return { status: 'skipped', matched: null };
   }
 
-  const matched = await classify(product.name);
+  const matched = await classify(product);
   if (!matched.category) {
     return { status: 'no-match', matched };
   }

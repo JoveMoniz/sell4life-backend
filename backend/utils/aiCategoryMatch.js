@@ -40,6 +40,11 @@ const ClassificationSchema = z.object({
   // below, which never trusts this string without confirming it's an
   // actual member of that category's list.
   subcategory: z.string().nullable(),
+  // Only meaningful when subcategory is null — a candidate new subcategory
+  // name, proposed only after Claude has already checked it isn't just a
+  // reword of something already in the list. Logged for human review, never
+  // applied automatically. See models/subcategorySuggestion.js.
+  suggestedNewSubcategory: z.string().nullable(),
 });
 
 function taxonomyPromptBlock() {
@@ -48,12 +53,15 @@ function taxonomyPromptBlock() {
 
 const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category, and — only if you are genuinely confident — a subcategory copied exactly from that category's list below. If no subcategory clearly fits (e.g. the title is too generic or short), return null for subcategory rather than guessing. Never invent a category or subcategory that isn't in this list.
 
+If, and only if, no existing subcategory in your chosen category fits: first double-check whether this is really just a reword of something already on the list (e.g. "Cycling Bags" is the same real thing as "Cycling Accessories" — don't propose it). Only if you're confident this is a genuinely distinct, common product type with no reasonable existing match, propose ONE concise new subcategory name in suggestedNewSubcategory, Title Case, matching the style of the existing list (e.g. "Bike Panniers & Bags"). Otherwise leave suggestedNewSubcategory null. Never propose a new subcategory when subcategory above is already filled in.
+
 Categories and their subcategories:
 ${taxonomyPromptBlock()}`;
 
 // Same shape as categoryMatch.js's matchProductTitle() — {category, subcategory}
-// — so it's a drop-in replacement wherever that was called.
-export async function matchProductTitleAI(title) {
+// — so it's a drop-in replacement wherever that was called. `product` (optional)
+// is only used to attach context to a logged suggestion, never for matching.
+export async function matchProductTitleAI(title, product = null) {
   const clean = String(title || '').trim();
   if (!clean) return { category: null, subcategory: null };
 
@@ -75,5 +83,33 @@ export async function matchProductTitleAI(title) {
     if (match) subcategory = slugify(match);
   }
 
+  if (!subcategory && parsed.suggestedNewSubcategory) {
+    logSubcategorySuggestion(parsed.category, parsed.suggestedNewSubcategory, clean, product);
+  }
+
   return { category: parsed.category, subcategory };
+}
+
+// Fire-and-forget — a logging failure must never break the actual
+// classification result the caller is waiting on.
+async function logSubcategorySuggestion(category, name, title, product) {
+  try {
+    const { default: SubcategorySuggestion } = await import('../models/subcategorySuggestion.js');
+    const normalized = String(name).trim();
+    await SubcategorySuggestion.findOneAndUpdate(
+      { category, nameLower: normalized.toLowerCase() },
+      {
+        $setOnInsert: { category, name: normalized, nameLower: normalized.toLowerCase(), status: 'pending' },
+        $push: {
+          examples: {
+            $each: [{ productId: product?._id, title: product?.name || title }],
+            $slice: -5,
+          },
+        },
+      },
+      { upsert: true }
+    );
+  } catch (err) {
+    console.error('[aiCategoryMatch] failed to log subcategory suggestion:', err.message);
+  }
 }
