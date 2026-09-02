@@ -1,12 +1,27 @@
 // ======================================================
 // LOCAL TITLE-BASED CATEGORY MATCHING — no CJ dependency
-// Runs matchProductTitle() against a product's own name and writes the
-// result directly to the database. Available to every vendor, on every
-// tier, with no supplier credentials and no external API call involved —
-// this is a purely internal Sell4Life operation.
+// Runs a real Claude classification (aiCategoryMatch.js) against a
+// product's own name and writes the result directly to the database.
+// Available to every vendor, on every tier, with no supplier credentials
+// involved — the only external call this makes is to Anthropic's API,
+// not any dropshipping supplier.
+//
+// Falls back to the old word-overlap matcher (categoryMatch.js) if the AI
+// call fails (missing/invalid API key, rate limit, network issue) — a
+// worse match beats a hard failure for a background operation like this.
 // ======================================================
 import Product from '../models/product.js';
 import { matchProductTitle } from './categoryMatch.js';
+import { matchProductTitleAI } from './aiCategoryMatch.js';
+
+async function classify(title) {
+  try {
+    return await matchProductTitleAI(title);
+  } catch (err) {
+    console.error('[aiCategoryMatch] falling back to keyword matching:', err.message);
+    return matchProductTitle(title);
+  }
+}
 
 // Applies a fresh title-based match to one product and saves it.
 // force: true means a full, unconditional overwrite of both category and
@@ -21,7 +36,7 @@ export async function rematchProductCategoryFromTitle(product, { force = false }
     return { status: 'skipped', matched: null };
   }
 
-  const matched = matchProductTitle(product.name);
+  const matched = await classify(product.name);
   if (!matched.category) {
     return { status: 'no-match', matched };
   }
