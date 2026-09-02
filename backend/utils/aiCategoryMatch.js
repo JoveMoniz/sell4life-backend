@@ -51,9 +51,11 @@ function taxonomyPromptBlock() {
   return CATEGORY_KEYS.map((cat) => `${cat}: ${taxonomy[cat].join(' | ')}`).join('\n');
 }
 
-const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category, and — only if you are genuinely confident — a subcategory copied exactly from that category's list below. If no subcategory clearly fits (e.g. the title is too generic or short), return null for subcategory rather than guessing. Never invent a category or subcategory that isn't in this list.
+const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category, and — only if you are genuinely confident — a subcategory copied exactly from that category's list below.
 
-If, and only if, no existing subcategory in your chosen category fits: first double-check whether this is really just a reword of something already on the list (e.g. "Cycling Bags" is the same real thing as "Cycling Accessories" — don't propose it). Only if you're confident this is a genuinely distinct, common product type with no reasonable existing match, propose ONE concise new subcategory name in suggestedNewSubcategory, Title Case, matching the style of the existing list (e.g. "Bike Panniers & Bags"). Otherwise leave suggestedNewSubcategory null. Never propose a new subcategory when subcategory above is already filled in.
+Do not force-fit a product into a subcategory that's only a loose or tangential match just because it's the closest thing on the list — a wrong subcategory is worse than none. If nothing on the list is a genuinely good fit for the category you picked, leave subcategory null and consider proposing a new one instead (see below), rather than picking the least-bad existing option.
+
+If, and only if, no existing subcategory in your chosen category is a genuinely good fit: first double-check whether this is really just a reword of something already on the list (e.g. "Cycling Bags" is the same real thing as "Cycling Accessories" — don't propose it in that case). Otherwise, if you can name a clear, commonly-recognized product type this actually is that isn't covered, propose ONE concise new subcategory name in suggestedNewSubcategory, Title Case, matching the style of the existing list (e.g. "Bike Panniers & Bags", "Beekeeping Equipment", "Metal Detecting"). If you genuinely can't tell from the title alone (too generic/short), leave both subcategory and suggestedNewSubcategory null rather than guessing either way. Never propose a new subcategory when subcategory above is already filled in.
 
 Categories and their subcategories:
 ${taxonomyPromptBlock()}`;
