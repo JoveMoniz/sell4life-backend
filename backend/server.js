@@ -214,7 +214,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260902g';
+const APP_VERSION = '20260902h';
 
 // ======================================================
 // VERSION ENDPOINT
@@ -223,20 +223,6 @@ app.get('/api/version', (req, res) => {
   res.json({
     version: APP_VERSION,
   });
-});
-
-// ======================================================
-// TEMP DEBUG — REMOVE after use.
-// ======================================================
-app.get('/api/debug/test-ai-category', async (req, res) => {
-  try {
-    const { matchProductTitleAI } = await import('./utils/aiCategoryMatch.js');
-    const title = req.query.title || '';
-    const result = await matchProductTitleAI(title);
-    res.json({ title, result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ======================================================
