@@ -71,8 +71,9 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Account not found.' });
     }
 
-    const bcrypt    = (await import('bcryptjs')).default;
-    user.password   = await bcrypt.hash(password, 10);
+    const bcrypt      = (await import('bcryptjs')).default;
+    user.password     = await bcrypt.hash(password, 10);
+    user.passwordSet  = true; // claims a guest-checkout account, if that's what this was
     await user.save();
 
     // Invalidate all reset tokens for this email

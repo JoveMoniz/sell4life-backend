@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import express from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 
 import User from '../models/user.js';
 import EmailVerification from '../models/emailVerification.js';
@@ -9,79 +8,9 @@ import EmailLog from '../models/emailLog.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailEmailVerification, mailWelcome } from '../utils/email.js';
 import { lookupCountry } from '../utils/geoip.js';
+import { COOKIE_OPTS, generateBaseUsername, createUniqueUsername, createToken } from '../utils/authTokens.js';
 
 const router = express.Router();
-
-/* ======================================================
-   CONFIG
-====================================================== */
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  console.error('❌ JWT_SECRET is not defined');
-  process.exit(1);
-}
-
-const TOKEN_EXPIRES = '3d';
-
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
-  maxAge: 3 * 24 * 60 * 60 * 1000,
-};
-
-/* ======================================================
-   USERNAME HELPERS
-====================================================== */
-
-function generateBaseUsername(name) {
-  const connectors = ['da', 'de', 'do', 'dos', 'das', 'van', 'von', 'al'];
-
-  const parts = name
-    .toLowerCase()
-    .split(' ')
-    .filter((p) => p && !connectors.includes(p));
-
-  const first = parts[0] || '';
-  const last = parts[parts.length - 1] || '';
-
-  return (first + last).replace(/[^a-z0-9]/g, '');
-}
-
-async function createUniqueUsername(base) {
-  let username = base.toLowerCase();
-  let counter = 1;
-
-  while (await User.findOne({ username })) {
-    username = base.toLowerCase() + counter;
-
-    counter++;
-  }
-
-  return username;
-}
-
-/* ======================================================
-   TOKEN GENERATOR
-====================================================== */
-
-function createToken(user) {
-  return jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      type: 'access',
-    },
-
-    JWT_SECRET,
-
-    {
-      expiresIn: TOKEN_EXPIRES,
-    }
-  );
-}
 
 /* ======================================================
    REGISTER USER

@@ -5,6 +5,8 @@
 
 import express from 'express';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 import {
   canRequestCancel,
@@ -20,6 +22,7 @@ import { findOrderItem, validateReturnRequest, applyReturnRequest } from '../uti
 import Vendor from '../models/vendor.js';
 import Order from '../models/order.js';
 import Product from '../models/product.js';
+import User from '../models/user.js';
 
 import stripe from '../config/stripe.js';
 
@@ -27,6 +30,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
+import { COOKIE_OPTS, generateBaseUsername, createUniqueUsername, createToken } from '../utils/authTokens.js';
 
 const router = express.Router();
 
@@ -87,141 +91,218 @@ function normalizeOrder(order) {
    CREATE PAYMENT INTENT
 ====================================================== */
 
+// Shared by the authenticated and guest checkout routes — item validation,
+// pricing, the EU-selling gate, and PaymentIntent creation are identical
+// either way, the only difference is where buyerId/vendor come from.
+async function createOrderPaymentIntent({ items, buyerId, vendor }) {
+  if (!Array.isArray(items) || !items.length) {
+    const err = new Error('Invalid cart data');
+    err.status = 400;
+    throw err;
+  }
+
+  const normalizedItems = await Promise.all(
+    items.map(async (item) => {
+      if (!mongoose.Types.ObjectId.isValid(item.productId)) {
+        throw new Error('Invalid productId');
+      }
+
+      const product = await Product.findById(item.productId);
+
+      if (!product) throw new Error('Product not found');
+      if (!product.vendor) throw new Error('Product has no vendor');
+      if (!product.active || product.archived) {
+        throw new Error('Product not available');
+      }
+
+      if (vendor && String(product.vendor) === String(vendor._id)) {
+        throw new Error('You cannot buy your own product');
+      }
+
+      const quantity = Math.min(99, Math.max(1, parseInt(item.quantity, 10) || 1));
+      if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100) {
+        throw new Error('Invalid quantity');
+      }
+
+      // Resolve the selected variant (if any) so price/stock reflect what
+      // the buyer actually saw and added to cart, not just the base
+      // product — variants can have their own price and stock, independent
+      // of the base product fields, and the charge must match the display.
+      const variantSku = item.variantSku || '';
+      const matchedVariant = variantSku
+        ? (product.variants || []).find(v => v.sku && v.sku.trim() === variantSku.trim())
+        : null;
+
+      const effectiveStock = (matchedVariant?.stock != null) ? matchedVariant.stock : product.stock;
+      if (product.trackInventory && effectiveStock < quantity) {
+        throw new Error(`${product.name} is out of stock`);
+      }
+
+      // An accepted offer always wins over listed/variant price — it's a
+      // single-unit agreement, re-verified against our own stored message,
+      // never taken from the client. Offered items ignore variants (offers
+      // are only ever possible on casual/refurbished listings, which can't
+      // have variants at all). Guests can't have a pending offer (offers
+      // require an account), so item.offerMessageId is simply absent for them.
+      let price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
+      let offerMessageId = null;
+      if (item.offerMessageId) {
+        const offer = await resolveAcceptedOffer({
+          offerMessageId: item.offerMessageId,
+          buyerId,
+          productId: product._id,
+        });
+        if (!offer) throw new Error('This offer is no longer valid.');
+        price = offer.amount;
+        offerMessageId = String(offer.msg._id);
+      }
+
+      const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
+      const subtotal = Number((price * quantity).toFixed(2));
+      return {
+        productId: product._id,
+        vendorId: product.vendor,
+
+        variantSku,
+        sku: product.sku || '',
+
+        name: product.name,
+        price,
+        quantity,
+        subtotal,
+        shippingCost,
+
+        image: matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
+
+        attributes: item.attributes || {},
+        offerMessageId,
+      };
+    })
+  );
+
+  // A completed sale is what starts the clock on DAC7 (EU digital
+  // platform reporting) registration for the platform, which isn't
+  // sorted yet — so real checkout stays blocked for any non-GB vendor
+  // until an admin flips euSellingEnabled on. Listing/browsing an EU
+  // vendor's products is unaffected, only completing a real purchase.
+  const cfg = await getPlatformConfig();
+  if (!cfg.euSellingEnabled) {
+    const vendorIds = [...new Set(normalizedItems.map((item) => String(item.vendorId)))];
+    const sellingVendors = await Vendor.find({ _id: { $in: vendorIds } }).select('country storeName');
+    const blockedVendor = sellingVendors.find((v) => v.country && v.country !== 'GB');
+    if (blockedVendor) {
+      const err = new Error(`"${blockedVendor.storeName}" isn't available for purchase yet — international seller payouts are still being finalized. Please check back soon.`);
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const subtotal = Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
+  const shippingAmount = Number(normalizedItems.reduce((sum, item) => sum + item.shippingCost, 0).toFixed(2));
+  const total = Number((subtotal + shippingAmount).toFixed(2));
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(total * 100),
+    currency: 'gbp',
+    automatic_payment_methods: { enabled: true },
+    metadata: {
+      userId: String(buyerId),
+      shipping: String(shippingAmount),
+      items: JSON.stringify(
+        normalizedItems.map((item) => ({
+          productId: String(item.productId),
+          quantity: item.quantity,
+          variantSku: item.variantSku || '',
+          offerMessageId: item.offerMessageId || '',
+        }))
+      ),
+    },
+  });
+
+  return {
+    clientSecret: paymentIntent.client_secret,
+    paymentIntentId: paymentIntent.id,
+    shipping: shippingAmount,
+  };
+}
+
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
-    const { items } = req.body;
-
-    if (!Array.isArray(items) || !items.length) {
-      return res.status(400).json({ error: 'Invalid cart data' });
-    }
-
     const vendor = await Vendor.findOne({ userId: req.user._id });
-
-    const normalizedItems = await Promise.all(
-      items.map(async (item) => {
-        if (!mongoose.Types.ObjectId.isValid(item.productId)) {
-          throw new Error('Invalid productId');
-        }
-
-        const product = await Product.findById(item.productId);
-
-        if (!product) throw new Error('Product not found');
-        if (!product.vendor) throw new Error('Product has no vendor');
-        if (!product.active || product.archived) {
-          throw new Error('Product not available');
-        }
-
-        if (vendor && String(product.vendor) === String(vendor._id)) {
-          throw new Error('You cannot buy your own product');
-        }
-
-        const quantity = Math.min(99, Math.max(1, parseInt(item.quantity, 10) || 1));
-        if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100) {
-          throw new Error('Invalid quantity');
-        }
-
-        // Resolve the selected variant (if any) so price/stock reflect what
-        // the buyer actually saw and added to cart, not just the base
-        // product — variants can have their own price and stock, independent
-        // of the base product fields, and the charge must match the display.
-        const variantSku = item.variantSku || '';
-        const matchedVariant = variantSku
-          ? (product.variants || []).find(v => v.sku && v.sku.trim() === variantSku.trim())
-          : null;
-
-        const effectiveStock = (matchedVariant?.stock != null) ? matchedVariant.stock : product.stock;
-        if (product.trackInventory && effectiveStock < quantity) {
-          throw new Error(`${product.name} is out of stock`);
-        }
-
-        // An accepted offer always wins over listed/variant price — it's a
-        // single-unit agreement, re-verified against our own stored message,
-        // never taken from the client. Offered items ignore variants (offers
-        // are only ever possible on casual/refurbished listings, which can't
-        // have variants at all).
-        let price = Number((matchedVariant?.price != null) ? matchedVariant.price : product.price);
-        let offerMessageId = null;
-        if (item.offerMessageId) {
-          const offer = await resolveAcceptedOffer({
-            offerMessageId: item.offerMessageId,
-            buyerId: req.user._id,
-            productId: product._id,
-          });
-          if (!offer) throw new Error('This offer is no longer valid.');
-          price = offer.amount;
-          offerMessageId = String(offer.msg._id);
-        }
-
-        const shippingCost = product.shipIncluded ? 0 : Number(product.shippingCost || 0);
-        const subtotal = Number((price * quantity).toFixed(2));
-        return {
-          productId: product._id,
-          vendorId: product.vendor,
-
-          variantSku,
-          sku: product.sku || '',
-
-          name: product.name,
-          price,
-          quantity,
-          subtotal,
-          shippingCost,
-
-          image: matchedVariant?.image || product.images?.[0] || '/assets/images/products/sell4life-placeholder.png',
-
-          attributes: item.attributes || {},
-          offerMessageId,
-        };
-      })
-    );
-
-    // A completed sale is what starts the clock on DAC7 (EU digital
-    // platform reporting) registration for the platform, which isn't
-    // sorted yet — so real checkout stays blocked for any non-GB vendor
-    // until an admin flips euSellingEnabled on. Listing/browsing an EU
-    // vendor's products is unaffected, only completing a real purchase.
-    const cfg = await getPlatformConfig();
-    if (!cfg.euSellingEnabled) {
-      const vendorIds = [...new Set(normalizedItems.map((item) => String(item.vendorId)))];
-      const sellingVendors = await Vendor.find({ _id: { $in: vendorIds } }).select('country storeName');
-      const blockedVendor = sellingVendors.find((v) => v.country && v.country !== 'GB');
-      if (blockedVendor) {
-        return res.status(400).json({
-          error: `"${blockedVendor.storeName}" isn't available for purchase yet — international seller payouts are still being finalized. Please check back soon.`,
-        });
-      }
-    }
-
-    const subtotal = Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
-    const shippingAmount = Number(normalizedItems.reduce((sum, item) => sum + item.shippingCost, 0).toFixed(2));
-    const total = Number((subtotal + shippingAmount).toFixed(2));
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(total * 100),
-      currency: 'gbp',
-      automatic_payment_methods: { enabled: true },
-      metadata: {
-        userId: String(req.user._id),
-        shipping: String(shippingAmount),
-        items: JSON.stringify(
-          normalizedItems.map((item) => ({
-            productId: String(item.productId),
-            quantity: item.quantity,
-            variantSku: item.variantSku || '',
-            offerMessageId: item.offerMessageId || '',
-          }))
-        ),
-      },
-    });
-
-    res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      shipping: shippingAmount,
-    });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor });
+    res.json(result);
   } catch (err) {
     console.error('PAYMENT ERROR:', err);
-    res.status(500).json({
+    res.status(err.status || 500).json({
+      error: err.message || 'Payment error',
+    });
+  }
+});
+
+/* ======================================================
+   GUEST CHECKOUT — no account required. Auto-creates a lightweight
+   User (unusable placeholder password, passwordSet: false) so every
+   later step (shipping-address, the Stripe webhook, viewing the order,
+   messaging) reuses the exact same authenticated pipeline a real
+   account uses — the only thing deferred is the buyer ever choosing
+   their own password. See middleware/authMiddleware.js for the
+   passwordSet-based email-verify exemption this relies on.
+====================================================== */
+router.post('/guest-checkout', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').toLowerCase().trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'A valid email is required' });
+    }
+
+    let user = await User.findOne({ email });
+
+    if (user && user.passwordSet !== false) {
+      // A real, already-claimed account owns this email — never silently
+      // fold a guest order into someone else's account.
+      return res.status(409).json({
+        error: 'An account already exists with this email. Please sign in to continue.',
+        code: 'ACCOUNT_EXISTS',
+      });
+    }
+
+    if (!user) {
+      const namePart = email.split('@')[0].replace(/[^a-zA-Z]/g, '') || 'Guest';
+      const name = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+      const baseUsername = generateBaseUsername(name) || 'guest';
+      const username = await createUniqueUsername(baseUsername);
+      // Unusable placeholder — nobody can log in with it; passwordSet:false
+      // is what actually marks this as an unclaimed guest account.
+      const placeholderPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+
+      user = await User.create({
+        name,
+        username,
+        email,
+        password: placeholderPassword,
+        role: 'user',
+        emailVerified: false,
+        passwordSet: false,
+      });
+    }
+
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor: null });
+    const token = createToken(user);
+
+    res.cookie('s4l_token', token, COOKIE_OPTS).json({
+      ...result,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('GUEST CHECKOUT ERROR:', err);
+    res.status(err.status || 500).json({
       error: err.message || 'Payment error',
     });
   }
