@@ -214,7 +214,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260902d';
+const APP_VERSION = '20260902e';
 
 // ======================================================
 // VERSION ENDPOINT
@@ -223,6 +223,19 @@ app.get('/api/version', (req, res) => {
   res.json({
     version: APP_VERSION,
   });
+});
+
+// ======================================================
+// TEMP DEBUG — read-only, list pending taxonomy suggestions. REMOVE after use.
+// ======================================================
+app.get('/api/debug/list-suggestions', async (req, res) => {
+  try {
+    const { default: SubcategorySuggestion } = await import('./models/subcategorySuggestion.js');
+    const suggestions = await SubcategorySuggestion.find({}).sort({ updatedAt: -1 }).limit(30).lean();
+    res.json({ suggestions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ======================================================
