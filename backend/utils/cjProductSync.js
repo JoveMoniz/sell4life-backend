@@ -152,7 +152,7 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   if (forceCategory || !product.category || !product.subcategory) {
     let titleMatched;
     try {
-      titleMatched = await matchProductTitleAI(product.name);
+      titleMatched = await matchProductTitleAI(product.name, product);
     } catch (err) {
       console.error('[aiCategoryMatch] falling back to keyword matching:', err.message);
       titleMatched = matchProductTitle(product.name);
