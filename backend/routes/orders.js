@@ -30,7 +30,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
-import { COOKIE_OPTS, generateBaseUsername, createUniqueUsername, createToken } from '../utils/authTokens.js';
+import { COOKIE_OPTS, createUniqueUsername, createToken } from '../utils/authTokens.js';
 
 const router = express.Router();
 
@@ -269,7 +269,12 @@ router.post('/guest-checkout', async (req, res) => {
     if (!user) {
       const namePart = email.split('@')[0].replace(/[^a-zA-Z]/g, '') || 'Guest';
       const name = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-      const baseUsername = generateBaseUsername(name) || 'guest';
+      // Not generateBaseUsername() — that concatenates first+last name for
+      // a real "First Last" signup, which duplicates a single machine-
+      // derived word onto itself (e.g. "guesttest" -> "guesttestguesttest")
+      // and can overflow the 20-char username limit. Guests get a plain
+      // slug from the email's local part instead.
+      const baseUsername = namePart.toLowerCase().slice(0, 15) || 'guest';
       const username = await createUniqueUsername(baseUsername);
       // Unusable placeholder — nobody can log in with it; passwordSet:false
       // is what actually marks this as an unclaimed guest account.
