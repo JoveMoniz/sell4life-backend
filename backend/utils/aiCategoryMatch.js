@@ -45,17 +45,32 @@ const ClassificationSchema = z.object({
   // reword of something already in the list. Logged for human review, never
   // applied automatically. See models/subcategorySuggestion.js.
   suggestedNewSubcategory: z.string().nullable(),
+  // Only meaningful alongside suggestedNewSubcategory — realistic buyer
+  // search terms for that proposed subcategory, same style as the existing
+  // hand-written tag lists (frontend/assets/js/vendor-add-product.js's
+  // TAG_SUGGESTIONS), so an approved subcategory doesn't start with zero
+  // tag suggestions for vendors.
+  suggestedTags: z.array(z.string()).nullable(),
+  // category above is always one of the real 17 (a product needs a working
+  // category to function on the site) — this is a separate, much rarer
+  // signal that even the best of those 17 was a poor fit, with a proposed
+  // new top-level category name. Unlike subcategory, this should almost
+  // never fire: 17 categories plus "other" as a catch-all already covers
+  // nearly everything a marketplace like this would sell.
+  suggestedNewCategory: z.string().nullable(),
 });
 
 function taxonomyPromptBlock() {
   return CATEGORY_KEYS.map((cat) => `${cat}: ${taxonomy[cat].join(' | ')}`).join('\n');
 }
 
-const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category, and — only if you are genuinely confident — a subcategory copied exactly from that category's list below.
+const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category (you must always pick one of the 17 below, even if imperfect — "other" is the catch-all for anything that doesn't fit elsewhere), and — only if you are genuinely confident — a subcategory copied exactly from that category's list below.
+
+Separately: if you genuinely believe NONE of the 17 categories (including "other") capture what this product family really is — not just this one item, but a whole recognizable class of products that would keep coming up — propose a concise new top-level category name in suggestedNewCategory, Title Case (e.g. "Musical Instruments" if that were missing). This should be rare. Do not propose one just because a subcategory is missing — that's what suggestedNewSubcategory below is for. Leave suggestedNewCategory null in almost every case.
 
 Do not force-fit a product into a subcategory that's only a loose or tangential match just because it's the closest thing on the list — a wrong subcategory is worse than none. If nothing on the list is a genuinely good fit for the category you picked, leave subcategory null and consider proposing a new one instead (see below), rather than picking the least-bad existing option.
 
-If, and only if, no existing subcategory in your chosen category is a genuinely good fit: first double-check whether this is really just a reword of something already on the list (e.g. "Cycling Bags" is the same real thing as "Cycling Accessories" — don't propose it in that case). Otherwise, if you can name a clear, commonly-recognized product type this actually is that isn't covered, propose ONE concise new subcategory name in suggestedNewSubcategory, Title Case, matching the style of the existing list (e.g. "Bike Panniers & Bags", "Beekeeping Equipment", "Metal Detecting"). If you genuinely can't tell from the title alone (too generic/short), leave both subcategory and suggestedNewSubcategory null rather than guessing either way. Never propose a new subcategory when subcategory above is already filled in.
+If, and only if, no existing subcategory in your chosen category is a genuinely good fit: first double-check whether this is really just a reword of something already on the list (e.g. "Cycling Bags" is the same real thing as "Cycling Accessories" — don't propose it in that case). Otherwise, if you can name a clear, commonly-recognized product type this actually is that isn't covered, propose ONE concise new subcategory name in suggestedNewSubcategory, Title Case, matching the style of the existing list (e.g. "Bike Panniers & Bags", "Beekeeping Equipment", "Metal Detecting") — and when you do, also fill suggestedTags with 8-15 realistic lowercase buyer search terms for that subcategory (the same style a UK shopper would type into a search box — e.g. for "Metal Detecting": "metal detector", "treasure hunting", "gold detector", "metal detecting accessories"). If you genuinely can't tell from the title alone (too generic/short), leave subcategory, suggestedNewSubcategory, and suggestedTags all null rather than guessing. Never propose a new subcategory or tags when subcategory above is already filled in.
 
 Categories and their subcategories:
 ${taxonomyPromptBlock()}`;
@@ -86,7 +101,25 @@ export async function matchProductTitleAI(title, product = null) {
   }
 
   if (!subcategory && parsed.suggestedNewSubcategory) {
-    logSubcategorySuggestion(parsed.category, parsed.suggestedNewSubcategory, clean, product);
+    logTaxonomySuggestion({
+      level: 'subcategory',
+      category: parsed.category,
+      name: parsed.suggestedNewSubcategory,
+      tags: parsed.suggestedTags,
+      title: clean,
+      product,
+    });
+  }
+
+  if (parsed.suggestedNewCategory) {
+    logTaxonomySuggestion({
+      level: 'category',
+      category: null,
+      name: parsed.suggestedNewCategory,
+      tags: null,
+      title: clean,
+      product,
+    });
   }
 
   return { category: parsed.category, subcategory };
@@ -94,14 +127,26 @@ export async function matchProductTitleAI(title, product = null) {
 
 // Fire-and-forget — a logging failure must never break the actual
 // classification result the caller is waiting on.
-async function logSubcategorySuggestion(category, name, title, product) {
+async function logTaxonomySuggestion({ level, category, name, tags, title, product }) {
   try {
     const { default: SubcategorySuggestion } = await import('../models/subcategorySuggestion.js');
     const normalized = String(name).trim();
+    const cleanTags = Array.isArray(tags)
+      ? [...new Set(tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 20)
+      : [];
     await SubcategorySuggestion.findOneAndUpdate(
-      { category, nameLower: normalized.toLowerCase() },
+      { level, category, nameLower: normalized.toLowerCase() },
       {
-        $setOnInsert: { category, name: normalized, nameLower: normalized.toLowerCase(), status: 'pending' },
+        // Set once, only on first sighting — tags shouldn't drift between
+        // repeat sightings of the same proposed name.
+        $setOnInsert: {
+          level,
+          category,
+          name: normalized,
+          nameLower: normalized.toLowerCase(),
+          status: 'pending',
+          suggestedTags: cleanTags,
+        },
         $push: {
           examples: {
             $each: [{ productId: product?._id, title: product?.name || title }],
@@ -112,6 +157,6 @@ async function logSubcategorySuggestion(category, name, title, product) {
       { upsert: true }
     );
   } catch (err) {
-    console.error('[aiCategoryMatch] failed to log subcategory suggestion:', err.message);
+    console.error('[aiCategoryMatch] failed to log taxonomy suggestion:', err.message);
   }
 }
