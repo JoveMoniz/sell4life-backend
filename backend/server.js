@@ -214,7 +214,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260902i';
+const APP_VERSION = '20260902j';
 
 // ======================================================
 // VERSION ENDPOINT
@@ -223,25 +223,6 @@ app.get('/api/version', (req, res) => {
   res.json({
     version: APP_VERSION,
   });
-});
-
-// ======================================================
-// TEMP DEBUG — REMOVE once confirmed.
-// ======================================================
-app.get('/api/debug/test-ai-category', async (req, res) => {
-  try {
-    const { matchProductTitleAI } = await import('./utils/aiCategoryMatch.js');
-    const { default: SubcategorySuggestion } = await import('./models/subcategorySuggestion.js');
-    const title = req.query.title || '';
-    const started = Date.now();
-    const result = await matchProductTitleAI(title);
-    await new Promise((r) => setTimeout(r, 800)); // let fire-and-forget logging land
-    const suggestions = await SubcategorySuggestion.find({}).sort({ updatedAt: -1 }).limit(10).lean();
-    res.json({ title, result, ms: Date.now() - started, pendingSuggestions: suggestions });
-  } catch (err) {
-    console.error('[debug/test-ai-category]', err);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ======================================================
