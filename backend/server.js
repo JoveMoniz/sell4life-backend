@@ -226,6 +226,24 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — subcategory-suggestion test route. REMOVE once confirmed.
+// ======================================================
+app.get('/api/debug/test-ai-category', async (req, res) => {
+  try {
+    const { matchProductTitleAI } = await import('./utils/aiCategoryMatch.js');
+    const { default: SubcategorySuggestion } = await import('./models/subcategorySuggestion.js');
+    const title = req.query.title || '';
+    const started = Date.now();
+    const result = await matchProductTitleAI(title);
+    const suggestions = await SubcategorySuggestion.find({}).sort({ updatedAt: -1 }).limit(10).lean();
+    res.json({ title, result, ms: Date.now() - started, pendingSuggestions: suggestions });
+  } catch (err) {
+    console.error('[debug/test-ai-category]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
