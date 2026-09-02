@@ -49,7 +49,7 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
   try {
     const vendor = req.vendor;
 
-    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, collectionOnly, shippingScope, shippingCountries, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
+    const { name, description, shortDescription, bulletPoints, price, images, stock, category, subcategory, tags, shippingCost, shipIncluded, collectionOnly, shippingScope, shippingCountries, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, estDeliveryMinDays, estDeliveryMaxDays, active, freeReturns, supplier, supplierUrl, condition, acceptOffers } = req.body;
 
     const VALID_SHIPPING_SCOPES = ['worldwide', 'uk', 'uk_eu', 'custom'];
 
@@ -95,6 +95,11 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       slug: uniqueSlug,
       vendor: vendor._id,
       shippingCost: Number(shippingCost) >= 0 ? Number(shippingCost) : 0,
+      // Single source of truth for whether the buyer pays this at checkout
+      // (see create-payment-intent, which zeroes shippingCost when true) —
+      // shippingCost above is kept regardless, as the markup calculator's
+      // reference figure.
+      shipIncluded: !!shipIncluded,
       collectionOnly: !!collectionOnly,
       shippingScope: VALID_SHIPPING_SCOPES.includes(shippingScope) ? shippingScope : 'worldwide',
       shippingCountries: Array.isArray(shippingCountries)
