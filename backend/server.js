@@ -214,7 +214,7 @@ app.use((err, req, res, next) => {
 // GLOBAL APP VERSION
 // Changes every backend restart
 // ======================================================
-const APP_VERSION = '20260902b';
+const APP_VERSION = '20260902c';
 
 // ======================================================
 // VERSION ENDPOINT
@@ -223,24 +223,6 @@ app.get('/api/version', (req, res) => {
   res.json({
     version: APP_VERSION,
   });
-});
-
-// ======================================================
-// TEMP DEBUG — AI category match test route. Verifies the real
-// ANTHROPIC_API_KEY env var end-to-end without needing vendor auth.
-// REMOVE once the AI category-match rebuild is confirmed working.
-// ======================================================
-app.get('/api/debug/test-ai-category', async (req, res) => {
-  try {
-    const { matchProductTitleAI } = await import('./utils/aiCategoryMatch.js');
-    const title = req.query.title || '';
-    const started = Date.now();
-    const result = await matchProductTitleAI(title);
-    res.json({ title, result, ms: Date.now() - started });
-  } catch (err) {
-    console.error('[debug/test-ai-category]', err);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ======================================================
