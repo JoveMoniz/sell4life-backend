@@ -512,7 +512,9 @@ router.get('/subcategory-suggestions', async (req, res) => {
   try {
     const SubcategorySuggestion = (await import('../models/subcategorySuggestion.js')).default;
     const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
-    const suggestions = await SubcategorySuggestion.find({ status }).sort({ updatedAt: -1 }).lean();
+    const query = { status };
+    if (['category', 'subcategory'].includes(req.query.level)) query.level = req.query.level;
+    const suggestions = await SubcategorySuggestion.find(query).sort({ updatedAt: -1 }).lean();
     res.json({ suggestions });
   } catch (err) {
     console.error('Subcategory suggestions GET error:', err);
