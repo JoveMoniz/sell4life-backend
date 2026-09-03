@@ -74,6 +74,16 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Snapshot of the raw supplier (CJ) title, taken the first time AI
+    // listing generation overwrites `name` with a buyer-facing rewrite —
+    // lets the vendor's edit page show which supplier product this is
+    // ("Edit: <supplierTitle>") even after `name` no longer matches it.
+    // Never set for products whose name was never AI-generated.
+    supplierTitle: {
+      type: String,
+      default: '',
+    },
+
     description: {
       type: String,
       default: '',
