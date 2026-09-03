@@ -225,59 +225,6 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// TEMP DEBUG — list every product for one vendor (all statuses, not just
-// the public storefront's active-only view), flagging which ones still
-// look untouched by AI listing generation (empty shortDescription/
-// bulletPoints — the two fields the generator always fills together with
-// title). Remove after use.
-app.get('/api/_debug-vendor-products/:vendorId', async (req, res) => {
-  try {
-    const { default: Product } = await import('./models/product.js');
-    const products = await Product.find({ vendor: req.params.vendorId })
-      .select('_id name shortDescription bulletPoints slug active archived').lean();
-    res.json({
-      total: products.length,
-      products: products.map(p => ({
-        _id: p._id, name: p.name, slug: p.slug, active: p.active, archived: p.archived,
-        neverGenerated: !p.shortDescription || !p.bulletPoints,
-      })),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// TEMP DEBUG — fix stale slugs on products that WERE already AI-generated
-// (non-empty shortDescription/bulletPoints) but whose slug still reflects
-// the old pre-generation title, because the generator ran before the
-// slug-regeneration fix existed. Pure DB housekeeping, no AI calls. Remove
-// after use.
-app.post('/api/_debug-fix-slugs/:vendorId', async (req, res) => {
-  try {
-    const { default: Product } = await import('./models/product.js');
-    const { generateSlug } = await import('./routes/products.js');
-    const products = await Product.find({ vendor: req.params.vendorId })
-      .select('_id name shortDescription bulletPoints slug').lean();
-    const fixed = [];
-    for (const p of products) {
-      if (!p.shortDescription || !p.bulletPoints) continue; // never generated — leave alone
-      const baseSlug = generateSlug(p.name);
-      if (p.slug === baseSlug) continue; // already matches, nothing to do
-      let uniqueSlug = baseSlug;
-      let counter = 1;
-      while (await Product.findOne({ slug: uniqueSlug, _id: { $ne: p._id } })) {
-        uniqueSlug = `${baseSlug}-${counter}`;
-        counter++;
-      }
-      await Product.updateOne({ _id: p._id }, { $set: { slug: uniqueSlug } });
-      fixed.push({ _id: p._id, name: p.name, oldSlug: p.slug, newSlug: uniqueSlug });
-    }
-    res.json({ fixedCount: fixed.length, fixed });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
