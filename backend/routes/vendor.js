@@ -47,6 +47,7 @@ import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIP
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
+import { generateProductListingAI } from '../utils/aiListingGenerate.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
 
@@ -1192,6 +1193,68 @@ router.post('/products/bulk-rematch-category', authMiddleware, requireApprovedVe
     send({ type: 'done', total: targets.length, updated, failed, skipped });
   } catch (err) {
     console.error('[bulk-rematch-category]', err);
+    send({ type: 'error', message: err.message });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+});
+
+// AI-generates title, short/full description, bullet points and
+// category/subcategory from a product's existing title/description + its
+// own already-synced photos (claude-sonnet-5, vision-enabled — see
+// utils/aiListingGenerate.js). Same NDJSON streaming shape as
+// bulk-rematch-category above; capped lower than that route's 500 since
+// each item here does a vision call + long-form generation, not a single
+// cheap classification.
+router.post('/products/bulk-generate-listing', authMiddleware, requireApprovedVendor, express.json(), async (req, res) => {
+  const vendor = req.vendor;
+  const requestedIds = Array.isArray(req.body?.ids)
+    ? req.body.ids.filter(id => mongoose.Types.ObjectId.isValid(id))
+    : [];
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
+  const send = obj => { if (!clientGone && !res.writableEnded) res.write(JSON.stringify(obj) + '\n'); };
+
+  try {
+    const query = { vendor: vendor._id };
+    if (requestedIds.length) query._id = { $in: requestedIds };
+    const targets = await Product.find(query)
+      .select('_id name description images category subcategory active').lean().limit(100);
+
+    send({ type: 'start', total: targets.length, activeCount: targets.filter(p => p.active).length });
+
+    let updated = 0, failed = 0, skipped = 0;
+    for (let i = 0; i < targets.length; i++) {
+      if (clientGone) break;
+      const product = targets[i];
+      send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
+
+      try {
+        const generated = await generateProductListingAI(product);
+        if (!generated) {
+          skipped++;
+          send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
+          continue;
+        }
+        await Product.updateOne({ _id: product._id }, { $set: generated });
+        updated++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'updated', ...generated });
+      } catch (itemErr) {
+        console.error(`[bulk-generate-listing] "${product.name}":`, itemErr.message);
+        failed++;
+        send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'failed', reason: itemErr.message });
+      }
+    }
+
+    send({ type: 'done', total: targets.length, updated, failed, skipped });
+  } catch (err) {
+    console.error('[bulk-generate-listing]', err);
     send({ type: 'error', message: err.message });
   } finally {
     if (!res.writableEnded) res.end();

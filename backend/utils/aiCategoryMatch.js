@@ -18,16 +18,17 @@ const taxonomy = JSON.parse(
   fs.readFileSync(path.join(here, '../data/productSubcategories.json'), 'utf8')
 );
 
-const CATEGORY_KEYS = Object.keys(taxonomy);
+export const CATEGORY_KEYS = Object.keys(taxonomy);
+export { taxonomy };
 
 // Same slug convention the old categoryMatch.js used — subcategory is
 // always stored as a slug ("cycling-accessories"), never the display
 // string ("Cycling Accessories"), so this stays a drop-in replacement
 // for anything already reading product.subcategory.
-const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+export const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 let client = null;
-function getClient() {
+export function getClient() {
   if (!client) client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
   return client;
 }
@@ -60,8 +61,20 @@ const ClassificationSchema = z.object({
   suggestedNewCategory: z.string().nullable(),
 });
 
-function taxonomyPromptBlock() {
+export function taxonomyPromptBlock() {
   return CATEGORY_KEYS.map((cat) => `${cat}: ${taxonomy[cat].join(' | ')}`).join('\n');
+}
+
+// Validates a Claude-proposed subcategory string against the real taxonomy
+// list for the given category — never trust the string verbatim, only a
+// confirmed case-insensitive match against an actual list member. Shared
+// with aiListingGenerate.js so both callers apply the exact same safety
+// check instead of two copies drifting apart.
+export function validateSubcategory(category, proposedSubcategory) {
+  if (!proposedSubcategory) return null;
+  const validSubs = taxonomy[category] || [];
+  const match = validSubs.find((s) => s.toLowerCase() === proposedSubcategory.toLowerCase());
+  return match ? slugify(match) : null;
 }
 
 const SYSTEM_PROMPT = `You are a product categorization assistant for a UK online marketplace. Given a product's title, pick the single best-fitting category (you must always pick one of the 17 below, even if imperfect — "other" is the catch-all for anything that doesn't fit elsewhere), and — only if you are genuinely confident — a subcategory copied exactly from that category's list below.
@@ -93,12 +106,7 @@ export async function matchProductTitleAI(title, product = null) {
   const parsed = response.parsed_output;
   if (!parsed) return { category: null, subcategory: null };
 
-  let subcategory = null;
-  if (parsed.subcategory) {
-    const validSubs = taxonomy[parsed.category] || [];
-    const match = validSubs.find((s) => s.toLowerCase() === parsed.subcategory.toLowerCase());
-    if (match) subcategory = slugify(match);
-  }
+  const subcategory = validateSubcategory(parsed.category, parsed.subcategory);
 
   if (!subcategory && parsed.suggestedNewSubcategory) {
     logTaxonomySuggestion({
@@ -127,7 +135,7 @@ export async function matchProductTitleAI(title, product = null) {
 
 // Fire-and-forget — a logging failure must never break the actual
 // classification result the caller is waiting on.
-async function logTaxonomySuggestion({ level, category, name, tags, title, product }) {
+export async function logTaxonomySuggestion({ level, category, name, tags, title, product }) {
   try {
     const { default: SubcategorySuggestion } = await import('../models/subcategorySuggestion.js');
     const normalized = String(name).trim();
