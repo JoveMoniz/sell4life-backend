@@ -225,27 +225,6 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// TEMP DEBUG — dry-run the AI listing generator against a real product
-// without saving (optionally with a corrupted image URL injected via
-// ?breakimages=1, to test the fetch-failure fallback). Remove after
-// verification.
-app.get('/api/_debug-listing/:id', async (req, res) => {
-  try {
-    const { default: Product } = await import('./models/product.js');
-    const { generateProductListingAI } = await import('./utils/aiListingGenerate.js');
-    const product = await Product.findById(req.params.id).select('name description images').lean();
-    if (!product) return res.status(404).json({ error: 'not found' });
-    if (req.query.breakimages === '1') {
-      product.images = ['https://oss-cf.cjdropshipping.com/does-not-exist-404.jpg'];
-    }
-    const start = Date.now();
-    const result = await generateProductListingAI(product);
-    res.json({ before: product, after: result, ms: Date.now() - start });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
