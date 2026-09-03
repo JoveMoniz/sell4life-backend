@@ -48,6 +48,7 @@ import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig }
 import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
 import { generateProductListingAI } from '../utils/aiListingGenerate.js';
+import { generateSlug } from './products.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
 
@@ -1241,6 +1242,20 @@ router.post('/products/bulk-generate-listing', authMiddleware, requireApprovedVe
           skipped++;
           send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
           continue;
+        }
+        // A fresh AI-written title makes the old CJ-derived slug (the
+        // product page's URL) stale — regenerate it the same way the
+        // manual-edit PATCH route already does, so the page's URL matches
+        // what's actually shown on it, not the raw supplier title.
+        if (generated.name !== product.name) {
+          const baseSlug = generateSlug(generated.name);
+          let uniqueSlug = baseSlug;
+          let counter = 1;
+          while (await Product.findOne({ slug: uniqueSlug, _id: { $ne: product._id } })) {
+            uniqueSlug = `${baseSlug}-${counter}`;
+            counter++;
+          }
+          generated.slug = uniqueSlug;
         }
         await Product.updateOne({ _id: product._id }, { $set: generated });
         updated++;
