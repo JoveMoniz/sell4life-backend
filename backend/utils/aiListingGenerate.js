@@ -53,12 +53,18 @@ If the photos and text together don't give you enough to say something truthful 
 Categories and their subcategories:
 ${taxonomyPromptBlock()}`;
 
+// Claude's vision API accepts exactly these 4 media types — anything else
+// (bmp, svg, x-icon, or a supplier CDN mislabeling a file) makes the WHOLE
+// request 400, not just that one image, so this must be an exact allowlist,
+// not merely "starts with image/".
+const ANTHROPIC_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
 async function fetchImageAsBase64(url) {
   try {
     const res = await fetch(url, { headers: { Referer: CJ_REFERER } });
     if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    if (!contentType.startsWith('image/')) return null;
+    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim();
+    if (!ANTHROPIC_IMAGE_TYPES.has(contentType)) return null;
     const buf = await res.arrayBuffer();
     if (!buf.byteLength || buf.byteLength > 5 * 1024 * 1024) return null;
     return { mediaType: contentType, data: Buffer.from(buf).toString('base64') };
