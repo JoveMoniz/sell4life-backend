@@ -343,7 +343,7 @@ router.get('/:id', async (req, res) => {
 ====================================================== */
 router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   try {
-    const { ids, price, stock, active, shippingCost, shipIncluded, markupPct } = req.body;
+    const { ids, price, stock, active, shippingCost, shipIncluded, markupPct, estDeliveryMinDays, estDeliveryMaxDays } = req.body;
 
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ error: 'ids array required' });
@@ -358,6 +358,22 @@ router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('profes
     if (shipIncluded !== undefined) update.shipIncluded = !!shipIncluded;
     if (markupPct    !== undefined && markupPct    !== null && Number.isFinite(Number(markupPct)) && Number(markupPct) >= 0) update.markupPct = Number(markupPct);
     if (active !== undefined) update.active = !!active;
+    if (estDeliveryMinDays !== undefined && estDeliveryMinDays !== null && Number.isFinite(Number(estDeliveryMinDays))) update.estDeliveryMinDays = Math.max(0, Math.round(Number(estDeliveryMinDays)));
+    if (estDeliveryMaxDays !== undefined && estDeliveryMaxDays !== null && Number.isFinite(Number(estDeliveryMaxDays))) update.estDeliveryMaxDays = Math.max(0, Math.round(Number(estDeliveryMaxDays)));
+
+    // No schema-level cross-field validation exists for these two (see
+    // product.js — each is just `min: 0` independently), and the only place
+    // that ever checks max >= min is a silent buyer-facing display guard in
+    // frontend/assets/js/product.js. A bulk write is exactly the kind of
+    // one-shot action worth actually rejecting here rather than silently
+    // producing a product page that just hides its delivery estimate.
+    if (
+      update.estDeliveryMinDays !== undefined &&
+      update.estDeliveryMaxDays !== undefined &&
+      update.estDeliveryMaxDays < update.estDeliveryMinDays
+    ) {
+      return res.status(400).json({ error: 'Max delivery days must be greater than or equal to min' });
+    }
 
     const hasPriceUpdate = price !== undefined && price !== null && Number.isFinite(Number(price));
 
