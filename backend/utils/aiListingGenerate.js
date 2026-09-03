@@ -31,6 +31,10 @@ const ListingSchema = z.object({
   // Plain newline-delimited bullet lines, no leading "-"/"•" — this is the
   // only format the storefront reads (product.js: bulletPoints.split(/\n/)).
   bulletPoints: z.string(),
+  // Real buyer search terms for THIS product, written every time regardless
+  // of category/subcategory match — separate from suggestedTags below,
+  // which is only ever used for a proposed brand-new subcategory.
+  tags: z.array(z.string()),
   category: z.enum(CATEGORY_KEYS),
   subcategory: z.string().nullable(),
   suggestedNewSubcategory: z.string().nullable(),
@@ -45,8 +49,9 @@ Write:
 - shortDescription: one or two punchy sentences, the kind shown right under the price.
 - description: a fuller paragraph (or a few short paragraphs) covering what it is, what it's for, and genuinely useful detail visible from the photos or text — no invented technical specs you can't actually see or infer.
 - bulletPoints: 4-7 short buyer-benefit lines, one per line, no bullet marker characters (the site adds its own) — key features/materials/what's included, each grounded in the photos or supplied text.
+- tags: 5-10 realistic lowercase search terms a UK shopper would actually type to find this specific product (material, type, use-case, style — not the brand name unless it's genuinely visible/known). Always fill this in, regardless of what category/subcategory you pick below.
 
-Then pick a category and, if genuinely confident, a subcategory, using the same rules as classification: always pick one of the 17 categories below (imperfect is fine, "other" is the catch-all); only fill subcategory when it's a clear match copied exactly from that category's list; never force a loose fit. If nothing fits, first check suggestedNewSubcategory isn't just a reword of an existing one, then propose ONE new one Title Case with 8-15 realistic lowercase UK buyer search terms in suggestedTags. suggestedNewCategory should almost never fire — only if this is a whole recognizable product family none of the 17 cover.
+Then pick a category and, if genuinely confident, a subcategory, using the same rules as classification: always pick one of the 17 categories below (imperfect is fine, "other" is the catch-all); only fill subcategory when it's a clear match copied exactly from that category's list; never force a loose fit. If nothing fits, first check suggestedNewSubcategory isn't just a reword of an existing one, then propose ONE new one Title Case with 8-15 realistic lowercase UK buyer search terms in suggestedTags (this is separate from the product's own tags above — suggestedTags describes the proposed subcategory in general, not this one product). suggestedNewCategory should almost never fire — only if this is a whole recognizable product family none of the 17 cover.
 
 If the photos and text together don't give you enough to say something truthful and specific, keep it simple and honest rather than inventing detail.
 
@@ -136,11 +141,16 @@ export async function generateProductListingAI(product) {
     });
   }
 
+  const tags = Array.isArray(parsed.tags)
+    ? [...new Set(parsed.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 15)
+    : [];
+
   return {
     name: parsed.name.trim(),
     shortDescription: parsed.shortDescription.trim(),
     description: parsed.description.trim(),
     bulletPoints: parsed.bulletPoints.trim(),
+    tags,
     category: parsed.category,
     subcategory,
   };
