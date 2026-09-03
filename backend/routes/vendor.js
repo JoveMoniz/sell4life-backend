@@ -1226,7 +1226,7 @@ router.post('/products/bulk-generate-listing', authMiddleware, requireApprovedVe
     const query = { vendor: vendor._id };
     if (requestedIds.length) query._id = { $in: requestedIds };
     const targets = await Product.find(query)
-      .select('_id name description images category subcategory active').lean().limit(100);
+      .select('_id name description images category subcategory active supplierTitle').lean().limit(100);
 
     send({ type: 'start', total: targets.length, activeCount: targets.filter(p => p.active).length });
 
@@ -1242,6 +1242,14 @@ router.post('/products/bulk-generate-listing', authMiddleware, requireApprovedVe
           skipped++;
           send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'skipped' });
           continue;
+        }
+        // Snapshot the pre-generation title once, so the vendor's edit page
+        // can still show "which supplier product is this" after `name`
+        // becomes a buyer-facing rewrite. Only set on the first generation —
+        // re-running generation on an already-rewritten product must not
+        // clobber the original with an already-rewritten title.
+        if (!product.supplierTitle) {
+          generated.supplierTitle = product.name;
         }
         // A fresh AI-written title makes the old CJ-derived slug (the
         // product page's URL) stale — regenerate it the same way the
