@@ -225,6 +225,23 @@ app.get('/api/version', (req, res) => {
   });
 });
 
+// TEMP DEBUG — dry-run the AI listing generator against a real product
+// without saving, to diagnose a real production failure. Remove after
+// verification.
+app.get('/api/_debug-listing/:id', async (req, res) => {
+  try {
+    const { default: Product } = await import('./models/product.js');
+    const { generateProductListingAI } = await import('./utils/aiListingGenerate.js');
+    const product = await Product.findById(req.params.id).select('name description images').lean();
+    if (!product) return res.status(404).json({ error: 'not found' });
+    const start = Date.now();
+    const result = await generateProductListingAI(product);
+    res.json({ before: product, after: result, ms: Date.now() - start });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
