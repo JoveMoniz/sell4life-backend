@@ -114,16 +114,6 @@ const vendorSchema = new mongoose.Schema(
       default: null,
     },
 
-    upgradeRequest: {
-      requestedAt: Date,
-      requestedTier: String,
-      message: String,
-      status: {
-        type: String,
-        enum: ['pending', 'approved', 'rejected'],
-      },
-    },
-
     // ── HMRC Digital Platform Reporting ──
     reportingStatus: {
       type: String,

@@ -1990,10 +1990,9 @@ router.patch('/settings', authMiddleware, requireVendor, async (req, res) => {
     if (storeDescription !== undefined) update.storeDescription = String(storeDescription).trim();
     if (storeLogo !== undefined)        update.storeLogo = String(storeLogo).trim();
     if (storeBanner !== undefined)      update.storeBanner = String(storeBanner).trim();
-    // NOTE: vendor tier ("type") is intentionally NOT settable here. It must only
-    // change via admin approval (PATCH /api/admin/vendors/:id/tier) or the
-    // request-upgrade flow — never directly by the vendor, since it gates
-    // tier-restricted features and determines the commission rate.
+    // NOTE: vendor tier ("type") is intentionally NOT settable here, and never
+    // changes in place at all — it gates tier-restricted features and the
+    // commission rate, and switching tier is a new seller account, not an edit.
     if (freeReturns !== undefined) update.freeReturns = !!freeReturns;
 
     if (country !== undefined) {
@@ -2846,100 +2845,6 @@ router.patch('/orders/:id/items/:itemId/tracking', authMiddleware, requireApprov
   } catch (err) {
     console.error('TRACKING ERROR:', err);
     res.status(500).json({ error: 'Failed to save tracking number' });
-  }
-});
-
-/* ======================================================
-   REQUEST TIER UPGRADE
-====================================================== */
-
-// Tiers a vendor may self-request from each current tier.
-// - Casual is never listed: it's non-trading personal selling, while every
-//   other tier is a registered business. Moving from casual into a business
-//   tier crosses a real tax boundary (a fresh "trading started" date matters
-//   for HMRC), so that's a new account, not an in-place upgrade.
-// - Enterprise is never listed either: it's a different kind of business
-//   relationship (manufacturers/wholesalers, custom terms), assigned by
-//   admins directly rather than something a vendor graduates into.
-const SELF_SERVICE_UPGRADE_OPTIONS = {
-  casual:       [],
-  refurbished:  ['professional'],
-  professional: [],
-  enterprise:   [],
-};
-
-router.post('/request-upgrade', authMiddleware, requireApprovedVendor, async (req, res) => {
-  try {
-    const vendor = req.vendor;
-    const { message, requestedTier: nextTier } = req.body;
-
-    if (!vendor || vendor.status !== 'approved') {
-      return res.status(403).json({ error: 'Only approved vendors can request upgrades' });
-    }
-
-    const currentTier = vendor.type || 'casual';
-    const allowedTiers = SELF_SERVICE_UPGRADE_OPTIONS[currentTier] || [];
-
-    if (!allowedTiers.length) {
-      return res.status(400).json({ error: 'No self-service upgrade available for your tier' });
-    }
-
-    if (!allowedTiers.includes(nextTier)) {
-      return res.status(400).json({ error: 'Invalid tier requested' });
-    }
-
-    // Store upgrade request in database
-    await Vendor.findByIdAndUpdate(vendor._id, {
-      $set: {
-        upgradeRequest: {
-          requestedAt: new Date(),
-          requestedTier: nextTier,
-          message: message || '',
-          status: 'pending',
-        },
-      },
-    });
-    console.log(`[request-upgrade] saved for vendor ${vendor._id} → ${nextTier}`);
-
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@sell4life.com';
-    const storeName = vendor.storeName || vendor.businessName || 'Unknown Store';
-    const user = await User.findById(vendor.userId).lean();
-    const vendorEmail = user?.email;
-
-    // Send email to admin (non-blocking)
-    (async () => {
-      try {
-        const nodemailer = (await import('nodemailer')).default;
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_PASSWORD,
-          },
-        });
-
-        await transporter.sendMail({
-          to: adminEmail,
-          subject: `[Upgrade Request] ${storeName} (${currentTier} → ${nextTier})`,
-          html: `
-            <p><strong>${storeName}</strong> has requested a tier upgrade:</p>
-            <p><strong>Current Tier:</strong> ${currentTier}</p>
-            <p><strong>Requested:</strong> ${nextTier}</p>
-            <p><strong>Vendor Email:</strong> ${vendorEmail}</p>
-            <p><strong>Message:</strong></p>
-            <p>${(message || '').replace(/\n/g, '<br>')}</p>
-            <p><a href="https://${process.env.FRONTEND_URL || 'sell4life.com'}/account/admin/vendors.html?id=${vendor._id}">View Vendor</a></p>
-          `,
-        });
-      } catch (e) {
-        console.error('Upgrade request email error:', e.message);
-      }
-    })();
-
-    res.json({ ok: true, message: `Your upgrade request to ${nextTier} has been sent to admins. We'll review and contact you soon.` });
-  } catch (err) {
-    console.error('UPGRADE REQUEST ERROR:', err);
-    res.status(500).json({ error: 'Failed to send upgrade request' });
   }
 });
 
