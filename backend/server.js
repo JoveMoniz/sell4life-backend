@@ -226,6 +226,46 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — price investigation, remove after use
+// ======================================================
+app.get('/api/_debug_order_price/:id', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260905') return res.status(404).end();
+  try {
+    const Order = (await import('./models/order.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) return res.json({ found: false, dbName: mongoose.connection.name });
+    const items = await Promise.all((order.items || []).map(async (it) => {
+      const product = it.productId ? await Product.findById(it.productId).lean() : null;
+      return {
+        title: it.title,
+        price: it.price,
+        shippingCost: it.shippingCost,
+        quantity: it.quantity,
+        productId: it.productId,
+        currentProductPrice: product?.price,
+        currentProductShipping: product?.shippingCost,
+      };
+    }));
+    res.json({
+      found: true,
+      dbName: mongoose.connection.name,
+      orderId: order._id,
+      shortId: order.shortId,
+      subtotal: order.subtotal,
+      shipping: order.shipping,
+      tax: order.tax,
+      discount: order.discount,
+      total: order.total,
+      createdAt: order.createdAt,
+      items,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
