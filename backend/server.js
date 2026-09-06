@@ -237,13 +237,14 @@ app.get('/api/_debug_reg_attr', async (req, res) => {
     // Same aggregation /admin/analytics/registrations runs — checked here
     // directly (no admin token available for this debug route) to confirm
     // the pipeline itself groups correctly against real data.
+    const attributed = { 'registrationAttribution.trafficSource': { $exists: true, $ne: '' } };
     const bySource = await User.aggregate([
-      { $match: { 'registrationAttribution.trafficSource': { $exists: true, $ne: '' } } },
+      { $match: attributed },
       { $group: { _id: '$registrationAttribution.trafficSource', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
     const topCampaigns = await User.aggregate([
-      { $match: { 'registrationAttribution.utmCampaign': { $ne: '' } } },
+      { $match: { ...attributed, 'registrationAttribution.utmCampaign': { $ne: '' } } },
       {
         $group: {
           _id: {
