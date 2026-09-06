@@ -226,6 +226,46 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — backfill investigation for pre-tracking registrations,
+// remove after use
+// ======================================================
+app.get('/api/_debug_reg_backfill', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260906d') return res.status(404).end();
+  try {
+    const AnalyticsSession = (await import('./models/analyticsSession.js')).default;
+    const unattributed = await User.find({ 'registrationAttribution.trafficSource': { $exists: false } })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('email name createdAt guestOrigin')
+      .lean();
+
+    const results = [];
+    for (const u of unattributed) {
+      // Best-effort candidate match: the nearest anonymous session
+      // (no userId yet, since it predates this user existing) that
+      // started shortly before this account was created — within a
+      // generous 3-hour window, since a guest-checkout account is often
+      // created well into a browsing session, and a direct signup less so.
+      const windowStart = new Date(u.createdAt.getTime() - 3 * 3600 * 1000);
+      const candidates = await AnalyticsSession.find({
+        startedAt: { $gte: windowStart, $lte: u.createdAt },
+        isBot: false,
+      })
+        .sort({ startedAt: -1 })
+        .limit(5)
+        .select('sessionId startedAt userId visitorId trafficSource referrerDomain utmSource utmMedium utmCampaign country isNewVisitor')
+        .lean();
+
+      results.push({ user: u, candidateSessions: candidates });
+    }
+
+    res.json({ count: unattributed.length, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
