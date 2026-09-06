@@ -3,6 +3,8 @@ import express from 'express';
 import AnalyticsSession from '../models/analyticsSession.js';
 import AnalyticsEvent from '../models/analyticsEvent.js';
 import Order from '../models/order.js';
+import User from '../models/user.js';
+import Vendor from '../models/vendor.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import adminMiddleware from '../middleware/adminMiddleware.js';
 import { processAnalyticsRollup } from '../jobs/analyticsRollupWorker.js';
@@ -388,6 +390,72 @@ router.get('/top-cities', async (req, res) => {
     })));
   } catch (err) {
     console.error('[admin-analytics] top-cities error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   GET /registrations — new accounts (User) and new vendor stores
+   (Vendor), each attributed to the traffic source active when that
+   document was created. Sourced straight from User/Vendor.createdAt,
+   not a client-fired tracking event — same "ground truth" reasoning as
+   /summary's orders/revenue above: a beacon can silently fail to fire,
+   a real database write can't.
+====================================================== */
+async function registrationStats(Model, dateMatch) {
+  const match = { ...dateMatch };
+  // Aggregation pipelines read the raw collection, bypassing Mongoose's
+  // document-hydration defaults — so a document from before this field
+  // existed has no registrationAttribution at all, not an empty one.
+  // $exists here (same reasoning as /top-cities above) keeps those
+  // pre-tracking documents out of the by-source/campaign breakdowns
+  // instead of silently mislabeling them "direct" — `total` below still
+  // counts them, since the true registration count doesn't depend on
+  // whether we know where it came from.
+  const attributed = { ...match, 'registrationAttribution.trafficSource': { $exists: true, $ne: '' } };
+  const [total, bySource, topCampaigns] = await Promise.all([
+    Model.countDocuments(match),
+    Model.aggregate([
+      { $match: attributed },
+      { $group: { _id: '$registrationAttribution.trafficSource', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+    Model.aggregate([
+      { $match: { ...attributed, 'registrationAttribution.utmCampaign': { $ne: '' } } },
+      {
+        $group: {
+          _id: {
+            source: '$registrationAttribution.utmSource',
+            medium: '$registrationAttribution.utmMedium',
+            campaign: '$registrationAttribution.utmCampaign',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 20 },
+    ]),
+  ]);
+
+  return {
+    total,
+    bySource: bySource.map((r) => ({ source: r._id, count: r.count })),
+    topCampaigns: topCampaigns.map((r) => ({
+      utmSource: r._id.source, utmMedium: r._id.medium, utmCampaign: r._id.campaign, count: r.count,
+    })),
+  };
+}
+
+router.get('/registrations', async (req, res) => {
+  try {
+    const period = req.query.period;
+    const [buyers, vendors] = await Promise.all([
+      registrationStats(User, dateFilterFor('createdAt', period)),
+      registrationStats(Vendor, dateFilterFor('createdAt', period)),
+    ]);
+    res.json({ buyers, vendors });
+  } catch (err) {
+    console.error('[admin-analytics] registrations error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -41,6 +41,18 @@ const vendorSchema = new mongoose.Schema(
       default: 'casual',
     },
 
+    // Traffic-source attribution for the session active when THIS STORE
+    // was created (POST /vendor/create) — separate from the user's own
+    // registrationAttribution on User, since a store is often created in
+    // a later, unrelated session rather than atomically with signup.
+    registrationAttribution: {
+      trafficSource: { type: String, default: '' },
+      referrerDomain: { type: String, default: '' },
+      utmSource: { type: String, default: '' },
+      utmMedium: { type: String, default: '' },
+      utmCampaign: { type: String, default: '' },
+    },
+
     // Tier 2 — Refurbished
     refurbishedBadge: {
       type: Boolean,

@@ -135,6 +135,19 @@ const userSchema = new mongoose.Schema(
       uppercase: true,
     },
 
+    // Traffic-source attribution for this registration, captured at
+    // signup time from the session's own UTM/referrer (same fields
+    // AnalyticsSession stores for visits) — never backfilled for
+    // accounts created before this existed, so blank means "predates
+    // attribution tracking," not "direct traffic."
+    registrationAttribution: {
+      trafficSource: { type: String, default: '' },
+      referrerDomain: { type: String, default: '' },
+      utmSource: { type: String, default: '' },
+      utmMedium: { type: String, default: '' },
+      utmCampaign: { type: String, default: '' },
+    },
+
     /* =================================
        ADDRESSES
     ================================= */
