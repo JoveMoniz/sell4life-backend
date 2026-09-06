@@ -231,6 +231,10 @@ app.get('/api/version', (req, res) => {
 app.get('/api/_debug_reg_attr', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260906c') return res.status(404).end();
   try {
+    if (req.query.deleteTestUser === '1') {
+      const result = await User.deleteMany({ email: /^test-regattr-/ });
+      return res.json({ deleted: result.deletedCount });
+    }
     const recent = await User.find({}).sort({ createdAt: -1 }).limit(3)
       .select('email createdAt registrationAttribution').lean();
 
