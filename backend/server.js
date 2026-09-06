@@ -233,7 +233,31 @@ app.get('/api/_debug_reg_attr', async (req, res) => {
   try {
     const recent = await User.find({}).sort({ createdAt: -1 }).limit(3)
       .select('email createdAt registrationAttribution').lean();
-    res.json({ recent });
+
+    // Same aggregation /admin/analytics/registrations runs — checked here
+    // directly (no admin token available for this debug route) to confirm
+    // the pipeline itself groups correctly against real data.
+    const bySource = await User.aggregate([
+      { $match: { 'registrationAttribution.trafficSource': { $exists: true, $ne: '' } } },
+      { $group: { _id: '$registrationAttribution.trafficSource', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+    const topCampaigns = await User.aggregate([
+      { $match: { 'registrationAttribution.utmCampaign': { $ne: '' } } },
+      {
+        $group: {
+          _id: {
+            source: '$registrationAttribution.utmSource',
+            medium: '$registrationAttribution.utmMedium',
+            campaign: '$registrationAttribution.utmCampaign',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    res.json({ recent, bySource, topCampaigns });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
