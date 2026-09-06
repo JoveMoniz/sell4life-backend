@@ -226,25 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — check what's linked to 2 leftover test accounts from
-// earlier guest-checkout verification on production, remove after use
-// ======================================================
-const TEST_ACCOUNT_IDS = ['6a981bffdde5bf77e8b1bdc6', '6a981a43dde5bf77e8b1bdb1'];
-
-app.get('/api/_debug_cleanup_test_accounts', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260907a') return res.status(404).end();
-  try {
-    const Order = (await import('./models/order.js')).default;
-    const orders = await Order.find({ user: { $in: TEST_ACCOUNT_IDS } })
-      .select('_id user total paymentStatus createdAt').lean();
-
-    res.json({ linkedOrders: orders });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
