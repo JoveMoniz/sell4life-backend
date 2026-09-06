@@ -226,49 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — registration attribution verification, remove after use
-// ======================================================
-app.get('/api/_debug_reg_attr', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260906c') return res.status(404).end();
-  try {
-    if (req.query.deleteTestUser === '1') {
-      const result = await User.deleteMany({ email: /^test-regattr-/ });
-      return res.json({ deleted: result.deletedCount });
-    }
-    const recent = await User.find({}).sort({ createdAt: -1 }).limit(3)
-      .select('email createdAt registrationAttribution').lean();
-
-    // Same aggregation /admin/analytics/registrations runs — checked here
-    // directly (no admin token available for this debug route) to confirm
-    // the pipeline itself groups correctly against real data.
-    const attributed = { 'registrationAttribution.trafficSource': { $exists: true, $ne: '' } };
-    const bySource = await User.aggregate([
-      { $match: attributed },
-      { $group: { _id: '$registrationAttribution.trafficSource', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
-    const topCampaigns = await User.aggregate([
-      { $match: { ...attributed, 'registrationAttribution.utmCampaign': { $ne: '' } } },
-      {
-        $group: {
-          _id: {
-            source: '$registrationAttribution.utmSource',
-            medium: '$registrationAttribution.utmMedium',
-            campaign: '$registrationAttribution.utmCampaign',
-          },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
-
-    res.json({ recent, bySource, topCampaigns });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
