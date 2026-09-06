@@ -226,6 +226,23 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — city/region analytics investigation, remove after use
+// ======================================================
+app.get('/api/_debug_city_analytics', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260906a') return res.status(404).end();
+  try {
+    const AnalyticsSession = (await import('./models/analyticsSession.js')).default;
+    const total = await AnalyticsSession.countDocuments({});
+    const withCity = await AnalyticsSession.countDocuments({ city: { $exists: true, $ne: '' } });
+    const recent = await AnalyticsSession.find({}).sort({ startedAt: -1 }).limit(10)
+      .select('startedAt city region country isBot isInternal').lean();
+    res.json({ total, withCity, recent });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // TEMP DEBUG — orphaned review investigation, remove after use
 // ======================================================
 app.get('/api/_debug_orphan_reviews', async (req, res) => {
@@ -256,6 +273,12 @@ app.get('/api/_debug_orphan_reviews', async (req, res) => {
         });
       }
     }
+    if (req.query.deleteOrphans === '1') {
+      const ids = results.map(r => r.reviewId);
+      await Review.deleteMany({ _id: { $in: ids } });
+      return res.json({ deleted: ids });
+    }
+
     res.json({ totalReviews: reviews.length, orphanCount: results.length, orphans: results });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });
