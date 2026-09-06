@@ -31,6 +31,7 @@ import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
 import { COOKIE_OPTS, createUniqueUsername, createToken } from '../utils/authTokens.js';
+import { buildRegistrationAttribution } from './auth.js';
 
 const router = express.Router();
 
@@ -289,6 +290,7 @@ router.post('/guest-checkout', async (req, res) => {
         emailVerified: false,
         passwordSet: false,
         guestOrigin: true,
+        registrationAttribution: buildRegistrationAttribution(req.body),
       });
     }
 
