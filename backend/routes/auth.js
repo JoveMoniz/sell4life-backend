@@ -8,9 +8,28 @@ import EmailLog from '../models/emailLog.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { mailEmailVerification, mailWelcome } from '../utils/email.js';
 import { lookupCountry } from '../utils/geoip.js';
+import { classifyTrafficSource, referrerDomainOf } from '../utils/trafficSource.js';
 import { COOKIE_OPTS, generateBaseUsername, createUniqueUsername, createToken } from '../utils/authTokens.js';
 
 const router = express.Router();
+
+// Shared by /register and vendor.js's /create — resolves the same
+// trafficSource/referrerDomain categorization used for visit tracking
+// (utils/trafficSource.js) from whatever UTM/referrer the frontend read
+// out of the current session's sessionStorage, defensively defaulting to
+// "direct" if the body is missing or malformed so a client-side glitch
+// never blocks the actual registration.
+export function buildRegistrationAttribution(body) {
+  const utm = body?.utm && typeof body.utm === 'object' ? body.utm : {};
+  const referrer = String(body?.referrer || '').slice(0, 500);
+  return {
+    trafficSource: classifyTrafficSource({ referrer, utmMedium: utm.medium }),
+    referrerDomain: referrerDomainOf(referrer),
+    utmSource: String(utm.source || '').slice(0, 200),
+    utmMedium: String(utm.medium || '').slice(0, 200),
+    utmCampaign: String(utm.campaign || '').slice(0, 200),
+  };
+}
 
 /* ======================================================
    REGISTER USER
@@ -81,6 +100,7 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       role: 'user',
       ...(detectedCountry && { country: detectedCountry }),
+      registrationAttribution: buildRegistrationAttribution(req.body),
     });
 
     /* ======================================================

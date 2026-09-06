@@ -51,6 +51,7 @@ import { generateProductListingAI } from '../utils/aiListingGenerate.js';
 import { generateSlug } from './products.js';
 import { STRIPE_CONNECT_COUNTRIES, isStripeConnectCountry } from '../utils/stripeConnectCountries.js';
 import PlatformConfig, { getPlatformConfig } from '../models/platformConfig.js';
+import { buildRegistrationAttribution } from './auth.js';
 
 const router = express.Router();
 
@@ -154,6 +155,7 @@ router.post('/create', authMiddleware, async (req, res) => {
       status: autoApprove ? 'approved' : 'pending',
       ...(autoApprove && { approvedAt: new Date() }),
       ...(foundingSellerData && { foundingSeller: foundingSellerData }),
+      registrationAttribution: buildRegistrationAttribution(req.body),
     });
 
     res.json({
