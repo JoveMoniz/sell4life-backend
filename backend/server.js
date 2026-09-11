@@ -226,59 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — read-only, key-gated. Finds the "Drive Impact Socket Set"
-// (or any name match) the vendor screenshotted from CJ's My Products
-// page showing $0, and — if we have it with a matched cjVid — fetches
-// CJ's live freightCalculate FULL option list (not just cheapest) for
-// a head-to-head comparison against that $0. Remove after use.
-// ======================================================
-app.get('/api/_debug_socket_set_check', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912g') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-
-    const q = req.query.q || 'Socket Set';
-    const products = await Product.find({ name: new RegExp(q, 'i'), archived: { $ne: true } })
-      .select('name variants shippingOriginCountry shippingCost vendor').lean();
-
-    const out = [];
-    for (const p of products) {
-      const cjVid = (p.variants || []).map(v => v.cjVid).find(Boolean);
-      out.push({
-        id: String(p._id), name: p.name, origin: p.shippingOriginCountry,
-        storedShippingCost: p.shippingCost, hasCjVid: !!cjVid, cjVid,
-      });
-    }
-
-    let liveQuote = null;
-    let realSync = null;
-    const firstMatched = out.find(p => p.hasCjVid);
-    if (firstMatched) {
-      const product = await Product.findById(firstMatched.id).lean();
-      const vendor = await Vendor.findById(product.vendor).lean();
-      const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-      const cj = await import('./utils/shippingProviders/cjdropshipping.js');
-      const quote = await cj.default.getShippingCost(
-        { supplierVariantRef: firstMatched.cjVid, destinationCountry: 'GB', quantity: 1, startCountryCode: 'GB' },
-        credential
-      );
-      liveQuote = { testedProduct: firstMatched.name, quote };
-
-      const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-      const syncResult = await syncProductFromCj(product, credential);
-      const after = await Product.findById(firstMatched.id).select('shippingCost').lean();
-      realSync = { before: firstMatched.storedShippingCost, after: after.shippingCost, syncResult };
-    }
-
-    res.json({ matches: out, liveQuote, realSync });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
