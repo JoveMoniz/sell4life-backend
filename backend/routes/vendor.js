@@ -1563,7 +1563,15 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'No recognizable shipping origin in this row' }));
             continue;
           }
-          await Product.updateOne({ _id: existing._id }, { $set: { shippingOriginCountry } });
+          const _uResult = await Product.updateOne({ _id: existing._id }, { $set: { shippingOriginCountry } });
+          if (_lastImportRowDebug.length <= 10) {
+            const dbgRow = _lastImportRowDebug.find(r => r.existingId === String(existing._id));
+            if (dbgRow) {
+              dbgRow.updateResult = { matchedCount: _uResult.matchedCount, modifiedCount: _uResult.modifiedCount, acknowledged: _uResult.acknowledged };
+              const _reread = await Product.findById(existing._id).select('shippingOriginCountry').lean();
+              dbgRow.rereadAfterWrite = _reread?.shippingOriginCountry ?? '(missing)';
+            }
+          }
           updated.push(existing._id);
           continue;
         }
