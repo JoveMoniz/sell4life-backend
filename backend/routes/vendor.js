@@ -1320,6 +1320,12 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
   try {
     const vendor = req.vendor;
     const raw = req.body;
+    // Backfill mode — only ever touches shippingOriginCountry on products
+    // that already exist (matched by name), never price/stock/shippingCost
+    // and never creates new products. For re-running an already-imported
+    // CSV just to pick up real warehouse data without resetting any price
+    // a vendor may have manually adjusted since the original import.
+    const originOnly = req.query.originOnly === '1';
 
     if (!raw || typeof raw !== 'string') {
       return res.status(400).json({ error: 'No CSV data received' });
@@ -1483,6 +1489,20 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         // Include deletedAt: null so trashed products are treated as "not found" and
         // re-imported as new, rather than silently updated while remaining in the trash.
         const existing = await Product.findOne({ vendor: vendor._id, name, deletedAt: null });
+
+        if (originOnly) {
+          if (!existing) {
+            entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Product not found — origin-only mode never creates new products' }));
+            continue;
+          }
+          if (!shippingOriginCountry) {
+            entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'No recognizable shipping origin in this row' }));
+            continue;
+          }
+          await Product.updateOne({ _id: existing._id }, { $set: { shippingOriginCountry } });
+          updated.push(existing._id);
+          continue;
+        }
 
         if (existing) {
           const updateFields = {
