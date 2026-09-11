@@ -226,30 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — read-only, key-gated. Vendor screenshotted the tools
-// hover panel showing "Shipping £3.50 (incl.)" for SKU CJJT27577600001
-// — confirming whether this exact product has a matched cjVid (in
-// which case the stale £3.50 is a real bug) or not (expected, in the
-// "needs URL" bucket). Remove after use.
-// ======================================================
-app.get('/api/_debug_sku_lookup', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912i') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const products = await Product.find({ 'variants.sku': req.query.sku })
-      .select('name variants supplierUrl shippingOriginCountry shippingCost shipIncluded active').lean();
-    res.json(products.map(p => ({
-      id: String(p._id), name: p.name, active: p.active,
-      shippingCost: p.shippingCost, shipIncluded: p.shipIncluded,
-      origin: p.shippingOriginCountry, supplierUrl: p.supplierUrl,
-      variants: (p.variants || []).map(v => ({ sku: v.sku, cjVid: v.cjVid })),
-    })));
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
