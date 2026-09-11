@@ -226,25 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — read-only, key-gated. GET /api/products/:id returned
-// "Product not found" for the socket set we just fixed — checking
-// whether that's because it's inactive/archived (would explain why
-// the vendor can't see the fix on the live buyer-facing page even
-// though the DB record is correct). Remove after use.
-// ======================================================
-app.get('/api/_debug_product_visibility', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912h') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const product = await Product.findById(req.query.id)
-      .select('name active archived deletedAt shippingCost shippingOriginCountry shipIncluded slug').lean();
-    res.json(product || { error: 'not found' });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
