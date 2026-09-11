@@ -4,7 +4,7 @@
 // ======================================================
 import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
-import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth, getShippingCostDiagnostic } from './shippingProviders/cjdropshipping.js';
+import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth, getShippingCostDiagnostic, candidateOrigins } from './shippingProviders/cjdropshipping.js';
 import { decryptCredential } from './shippingProviders/registry.js';
 import { matchCjCategory, matchProductTitle } from './categoryMatch.js';
 import { matchProductTitleAI } from './aiCategoryMatch.js';
@@ -251,6 +251,7 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   let variantsSynced = 0;
   let pricesSynced = 0;
   let firstCjVid = '';
+  let firstCjInventories = [];
   let minCostGbp = null;
   const hasMarkup = Number.isFinite(Number(product.markupPct));
   const variantMatchDebug = {
@@ -288,7 +289,10 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
       }
 
       if (!cjV) return { ourV, cjV: null, costGbp: null };
-      if (!firstCjVid && cjV.vid) firstCjVid = cjV.vid;
+      if (!firstCjVid && cjV.vid) {
+        firstCjVid = cjV.vid;
+        firstCjInventories = cjV.inventories || [];
+      }
       variantsSynced++;
 
       let costGbp = null;
@@ -305,15 +309,45 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   // otherwise the existing (weight-estimated) value stays. Fetched before
   // pass 2 below so this run's own fresh figure feeds this run's own price
   // calc, rather than the previous run's now-stale shippingCost.
+  //
+  // Tries candidateOrigins(firstCjInventories) in order (real stock in a
+  // non-China warehouse first, 'CN' always last) and stops at the first
+  // successful quote — so a product genuinely stocked in e.g. the UK gets
+  // priced/timed from there instead of always assuming a China->GB freight
+  // route, while a China-only product behaves exactly as before.
   let shippingGbp = null;
   if (firstCjVid) {
-    const quote = await cjProvider.getShippingCost(
-      { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1 },
-      credential
-    );
-    if (quote && Number.isFinite(Number(quote.cost))) {
-      shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
-      updateDoc.shippingCost = shippingGbp;
+    for (const startCountryCode of candidateOrigins(firstCjInventories)) {
+      const quote = await cjProvider.getShippingCost(
+        { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1, startCountryCode },
+        credential
+      );
+      if (quote && Number.isFinite(Number(quote.cost))) {
+        shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
+        updateDoc.shippingCost = shippingGbp;
+        updateDoc.shippingOriginCountry = startCountryCode;
+
+        // CJ's logisticAging shape isn't fully confirmed from docs alone —
+        // handle both a plain number and a "min-max" range string, and log
+        // the raw value once so real production data can be checked against
+        // this parsing on the first live sync after this ships.
+        const rawEta = quote.etaDays;
+        console.log('[cjProductSync] raw logisticAging for vid=%s origin=%s:', firstCjVid, startCountryCode, rawEta);
+        let etaMin = null, etaMax = null;
+        if (typeof rawEta === 'string' && /\d+\D+\d+/.test(rawEta)) {
+          const [a, b] = rawEta.match(/\d+/g).map(Number);
+          etaMin = Math.min(a, b);
+          etaMax = Math.max(a, b);
+        } else if (Number.isFinite(Number(rawEta))) {
+          etaMin = Number(rawEta);
+          etaMax = etaMin + 3; // small buffer — a point estimate isn't a guarantee
+        }
+        if (etaMin != null) {
+          updateDoc.estDeliveryMinDays = etaMin;
+          updateDoc.estDeliveryMaxDays = etaMax;
+        }
+        break;
+      }
     }
   }
 

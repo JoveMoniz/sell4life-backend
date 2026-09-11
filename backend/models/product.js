@@ -125,6 +125,15 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // ISO country code the current shippingCost/delivery estimate was
+    // actually quoted from — 'CN' unless CJ sync found real stock in a
+    // closer warehouse and quoted from there instead. Lets order creation
+    // book the real shipment from the same origin the buyer was priced on.
+    shippingOriginCountry: {
+      type: String,
+      default: 'CN',
+    },
+
     // Buyer must collect in person — distinct from shippingCost:0, which
     // means the seller ships it themselves at no charge. Both look like
     // "£0.00" on shippingCost alone, so this needs its own flag.

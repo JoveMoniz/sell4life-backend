@@ -45,6 +45,6 @@ export function setCached(key, result) {
   _cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-export function cacheKey(providerName, variantRef, destCountry) {
-  return `${providerName}:${variantRef}:${destCountry}`;
+export function cacheKey(providerName, variantRef, destCountry, ...extra) {
+  return [providerName, variantRef, destCountry, ...extra].join(':');
 }
