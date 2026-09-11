@@ -226,6 +226,55 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — READ-ONLY check of shippingCost/shippingOriginCountry
+// state after the vendor's re-import, to see if "every product has a
+// shipping cost" is a real regression or previously-hidden real data.
+// Remove after use.
+// ======================================================
+app.get('/api/_debug_shipping_state', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911d') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
+      const zeroShipping = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingCost: 0 });
+      const nonZeroShipping = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingCost: { $gt: 0 } });
+      const withOrigin = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true, $ne: 'CN' } });
+      const shipIncludedCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shipIncluded: true });
+      const recentlyUpdated = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
+        .sort({ updatedAt: -1 })
+        .limit(10)
+        .select('name shippingCost shippingOriginCountry shipIncluded updatedAt')
+        .lean();
+
+      results.push({
+        vendor: vendor.storeName,
+        total, zeroShipping, nonZeroShipping, withOrigin, shipIncludedCount,
+        recentlyUpdated: recentlyUpdated.map(p => ({
+          name: p.name,
+          shippingCost: p.shippingCost,
+          shippingOriginCountry: p.shippingOriginCountry,
+          shipIncluded: p.shipIncluded,
+          updatedAt: p.updatedAt,
+        })),
+      });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
