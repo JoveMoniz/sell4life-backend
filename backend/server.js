@@ -226,6 +226,53 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — read-only, key-gated. Final breakdown of GB-origin CJ
+// products into three buckets: real £0 quote, real non-zero quote
+// (still lower/more honest than the old China estimate, just not
+// free), and never-matched (still needs a Supplier URL). Vendor's
+// core question: why isn't shipping £0 for every UK product. Remove
+// after use.
+// ======================================================
+app.get('/api/_debug_final_breakdown', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912d') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
+        .select('name variants shippingOriginCountry shippingCost updatedAt').lean();
+      const cjProducts = products.filter(looksCjSourced);
+      const matched = cjProducts.filter(p => (p.variants || []).some(v => v.cjVid));
+      const unmatched = cjProducts.filter(p => !(p.variants || []).some(v => v.cjVid));
+      const gbMatched = matched.filter(p => p.shippingOriginCountry === 'GB');
+      const gbZero = gbMatched.filter(p => Number(p.shippingCost) === 0);
+      const gbNonZero = gbMatched.filter(p => Number(p.shippingCost) > 0);
+      results.push({
+        vendor: vendor.storeName,
+        cjSourced: cjProducts.length,
+        matched: matched.length,
+        unmatched: unmatched.length,
+        gbOriginAndMatched: gbMatched.length,
+        realZeroShipping: gbZero.length,
+        realNonZeroShipping: gbNonZero.length,
+        nonZeroSample: gbNonZero.slice(0, 8).map(p => ({ name: p.name, shippingCost: p.shippingCost })),
+      });
+    }
+    res.json({ results });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
