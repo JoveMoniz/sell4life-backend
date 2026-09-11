@@ -226,6 +226,40 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — READ-ONLY check of whether the origin-only import
+// actually ran/wrote anything server-side, independent of whether the
+// result banner rendered in the browser. Remove after use.
+// ======================================================
+app.get('/api/_debug_origin_check', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911g') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
+      const withOriginField = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true } });
+      const gbCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'GB' });
+      const cnCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'CN' });
+      const recentlyUpdated = await Product.find({ vendor: vendor._id, archived: { $ne: true }, updatedAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) } })
+        .select('name shippingOriginCountry updatedAt').limit(10).lean();
+
+      results.push({ vendor: vendor.storeName, total, withOriginField, gbCount, cnCount, recentlyUpdatedLast30Min: recentlyUpdated });
+    }
+
+    res.json({ serverTime: new Date().toISOString(), results });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
