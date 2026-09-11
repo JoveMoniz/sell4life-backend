@@ -226,6 +226,50 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — read-only, key-gated. Counts, per CJ-connected vendor, how
+// many CJ-sourced products already have a matched cjVid (sync can pull a
+// real live price) vs. don't (never matched CJ's catalog — need a
+// Supplier URL before sync can find them). Remove after use.
+// ======================================================
+app.get('/api/_debug_cjvid_coverage', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912a') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
+        .select('name variants supplierUrl supplier shippingOriginCountry shippingCost').lean();
+      const cjProducts = products.filter(looksCjSourced);
+      const matched = [];
+      const unmatched = [];
+      for (const p of cjProducts) {
+        const hasVid = (p.variants || []).some(v => v.cjVid);
+        (hasVid ? matched : unmatched).push({ id: String(p._id), name: p.name, origin: p.shippingOriginCountry, shippingCost: p.shippingCost });
+      }
+      results.push({
+        vendor: vendor.storeName,
+        totalProducts: products.length,
+        cjSourced: cjProducts.length,
+        matchedCount: matched.length,
+        unmatchedCount: unmatched.length,
+        unmatchedSample: unmatched.slice(0, 10),
+      });
+    }
+    res.json({ results });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
