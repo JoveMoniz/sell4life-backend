@@ -226,6 +226,50 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — read-only, key-gated. Compares CJ's own live freight
+// quote (full option list, not just cheapest) from CN vs. the product's
+// recorded shippingOriginCountry, for one specific product. Used to
+// check whether a real $0 shipping option exists that our "pick
+// cheapest" logic might be missing. Remove after use.
+// ======================================================
+app.get('/api/_debug_freight_compare', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911k') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { getShippingCostAllOptions } = await import('./utils/shippingProviders/cjdropshipping.js');
+
+    const product = await Product.findById(req.query.id).lean();
+    if (!product) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(product.vendor).lean();
+    if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor has no CJ credential' });
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const firstCjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+    if (!firstCjVid) return res.json({ error: 'no cjVid on this product', variants: product.variants });
+
+    const origins = Array.from(new Set([product.shippingOriginCountry || 'CN', 'CN']));
+    const results = {};
+    for (const startCountryCode of origins) {
+      results[startCountryCode] = await getShippingCostAllOptions(
+        { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1, startCountryCode },
+        credential
+      );
+    }
+    res.json({
+      name: product.name,
+      storedShippingCost: product.shippingCost,
+      storedOrigin: product.shippingOriginCountry,
+      firstCjVid,
+      results,
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
