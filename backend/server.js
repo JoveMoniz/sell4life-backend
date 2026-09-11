@@ -227,6 +227,101 @@ app.get('/api/version', (req, res) => {
 
 
 // ======================================================
+// TEMP ACTION — key-gated. (1) Soft-trashes the 10 confirmed stale
+// duplicate products (same vendor, same name, never-synced £0 copy
+// sitting alongside a properly-synced copy) — same safety check as
+// the real DELETE /vendor/products/:id route (skips if it has real
+// orders). (2) Kicks off a full re-sync of every CJ-matched product
+// across all CJ-connected vendors, in the background, so shippingCost
+// reflects CJ's current real rates instead of old/stale values.
+// Progress readable via /api/_debug_resync_status. Remove both after use.
+// ======================================================
+const STALE_DUPLICATE_IDS = [
+  '6a3714c3c88841b331848682', // 15.6-Inch Waterproof Laptop Sleeve Briefcase (£0 copy)
+  '6a3714c4c88841b331848694', // Adjustable Aluminium Laptop Stand with Dual Phone Holders (£0 copy)
+  '6a3714c4c88841b3318486a6', // Foldable Adjustable Laptop Stand for 11-17 Inch Devices (£0 copy)
+  '6a371774c88841b33184888b', // Women's Large Convertible Shoulder & Crossbody Bag (£0 copy)
+  '6a371774c88841b33184888e', // Women's Structured Crossbody Handbag (£0 copy)
+  '6a371774c88841b331848897', // Women's Large Shoulder & Crossbody Bag (£0 copy)
+  '6a371774c88841b33184889a', // Minimalist PU Leather Backpack (£0 copy)
+  '6a371774c88841b3318488a6', // Women's Printed Tote Bag with Flower Charm (£0 copy)
+  '6a371775c88841b3318488b8', // Women's Large Waterproof Tote Bag (£0 copy, draft)
+  '6a371775c88841b3318488bb', // Women's Small Convertible Shoulder Bag Backpack (£0 copy, draft)
+];
+
+let _resyncStatus = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, startedAt: null, finishedAt: null };
+
+app.get('/api/_action_cleanup_and_resync', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912k') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Order = (await import('./models/order.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    // (1) Trash confirmed stale duplicates
+    const trashed = [];
+    const skippedHasOrders = [];
+    for (const id of STALE_DUPLICATE_IDS) {
+      const product = await Product.findById(id);
+      if (!product || product.deletedAt) continue;
+      const hasOrders = await Order.exists({ 'items.productId': product._id });
+      if (hasOrders) { skippedHasOrders.push(id); continue; }
+      product.deletedAt = new Date();
+      await product.save();
+      trashed.push(id);
+    }
+
+    // (2) Kick off full re-sync in the background (not awaited)
+    if (!_resyncStatus.running) {
+      const vendors = await Vendor.find({
+        type: 'professional',
+        'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+      }).lean();
+
+      const jobs = [];
+      for (const vendor of vendors) {
+        let credential;
+        try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
+        const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
+        for (const product of products) {
+          if (looksCjSourced(product)) jobs.push({ product, credential });
+        }
+      }
+
+      _resyncStatus = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, startedAt: new Date().toISOString(), finishedAt: null };
+
+      (async () => {
+        for (const { product, credential } of jobs) {
+          try {
+            const r = await syncProductFromCj(product, credential);
+            _resyncStatus.done++;
+            if (r.status === 'updated') _resyncStatus.updated++;
+            else if (r.status === 'failed') _resyncStatus.failed++;
+            else _resyncStatus.skipped++;
+          } catch (err) {
+            _resyncStatus.done++;
+            _resyncStatus.failed++;
+          }
+        }
+        _resyncStatus.running = false;
+        _resyncStatus.finishedAt = new Date().toISOString();
+      })();
+    }
+
+    res.json({ trashed, skippedHasOrders, resyncStarted: _resyncStatus.total });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
+app.get('/api/_debug_resync_status', (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912k') return res.status(404).end();
+  res.json(_resyncStatus);
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
