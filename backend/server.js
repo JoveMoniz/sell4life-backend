@@ -271,6 +271,39 @@ app.get('/api/_debug_sync_progress', async (req, res) => {
   }
 });
 
+// TEMP DEBUG — key-gated. Runs the real syncProductFromCj on one product
+// right now and reports before/after, same as the earlier debug route
+// that proved this works — re-testing because the vendor's own bulk run
+// doesn't seem to have touched some already-matched products. Remove
+// after use.
+app.get('/api/_debug_run_sync2', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912b') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+
+    const before = await Product.findById(req.query.id).lean();
+    if (!before) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(before.vendor).lean();
+    if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor has no CJ credential' });
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const syncResult = await syncProductFromCj(before, credential);
+    const after = await Product.findById(req.query.id).lean();
+
+    res.json({
+      name: before.name,
+      syncResult,
+      before: { shippingCost: before.shippingCost, shippingOriginCountry: before.shippingOriginCountry, updatedAt: before.updatedAt },
+      after: { shippingCost: after.shippingCost, shippingOriginCountry: after.shippingOriginCountry, updatedAt: after.updatedAt },
+    });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
