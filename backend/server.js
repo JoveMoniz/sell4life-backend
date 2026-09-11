@@ -239,7 +239,7 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
     const Product = (await import('./models/product.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
     const cjModule = await import('./utils/shippingProviders/cjdropshipping.js');
-    const { getProductImages, candidateOrigins } = cjModule;
+    const { getProductImages, candidateOrigins, debugCjVariantData } = cjModule;
     const cjProvider = cjModule.default;
 
     const vendors = await Vendor.find({
@@ -251,6 +251,7 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
 
     const limit = Math.min(Number(req.query.limit) || 3, 10);
     const results = [];
+    let rawSample = null;
     for (const vendor of vendors) {
       const products = await Product.find({
         vendor: vendor._id,
@@ -269,6 +270,23 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
       } catch (err) {
         results.push({ vendor: vendor.storeName, error: 'Bad credential: ' + err.message });
         continue;
+      }
+
+      // One-off raw dump (read-only) of the untransformed CJ variant object,
+      // to see every real field name CJ actually returns — the earlier
+      // getProductImages() pass came back with an empty inventories[] for
+      // every tested product, which contradicts CJ's own documented schema,
+      // so this checks whether the field exists under a different name/shape
+      // rather than genuinely being absent.
+      if (!rawSample) {
+        const rawSku = (products[0]?.variants || []).map(v => v.sku).find(Boolean);
+        if (rawSku) {
+          try {
+            rawSample = await debugCjVariantData(rawSku, credential);
+          } catch (err) {
+            rawSample = { error: err.message };
+          }
+        }
       }
 
       for (const product of products) {
@@ -311,7 +329,7 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
       }
     }
 
-    res.json({ vendorsFound: vendors.length, results });
+    res.json({ vendorsFound: vendors.length, rawSample, results });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
