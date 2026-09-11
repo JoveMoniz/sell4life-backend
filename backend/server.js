@@ -225,43 +225,6 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// ======================================================
-// TEMP DEBUG — read-only, key-gated. Finds every SKU shared by more
-// than one non-deleted product, across all vendors — scoping how
-// widespread the duplicate-listing issue is beyond the one pair
-// spotted by chance (CJJT27577600001). Remove after use.
-// ======================================================
-app.get('/api/_debug_duplicate_skus', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912j') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const products = await Product.find({ deletedAt: null })
-      .select('name variants vendor active shippingCost').populate('vendor', 'storeName').lean();
-
-    const bySku = new Map();
-    for (const p of products) {
-      for (const v of (p.variants || [])) {
-        if (!v.sku) continue;
-        if (!bySku.has(v.sku)) bySku.set(v.sku, []);
-        bySku.get(v.sku).push({
-          id: String(p._id), name: p.name, active: p.active,
-          vendor: p.vendor?.storeName || String(p.vendor),
-          shippingCost: p.shippingCost,
-        });
-      }
-    }
-
-    const dupes = [];
-    for (const [sku, entries] of bySku) {
-      const uniqueProductIds = new Set(entries.map(e => e.id));
-      if (uniqueProductIds.size > 1) dupes.push({ sku, count: uniqueProductIds.size, entries });
-    }
-
-    res.json({ totalProducts: products.length, duplicateSkuCount: dupes.length, dupes });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
 
 // ======================================================
 // HEALTH CHECK
