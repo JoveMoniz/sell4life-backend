@@ -226,6 +226,52 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — read-only, key-gated. Same coverage snapshot as before,
+// re-checking whether mobile sync attempt moved the needle at all.
+// Remove after use.
+// ======================================================
+app.get('/api/_debug_sync_progress3', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912c') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const coverage = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
+        .select('name variants shippingOriginCountry shippingCost updatedAt').lean();
+      const cjProducts = products.filter(looksCjSourced);
+      const matched = cjProducts.filter(p => (p.variants || []).some(v => v.cjVid));
+      const gbCount = cjProducts.filter(p => p.shippingOriginCountry === 'GB').length;
+      const zeroShipCount = cjProducts.filter(p => Number(p.shippingCost) === 0).length;
+      const updated30m = cjProducts.filter(p => p.updatedAt && (Date.now() - new Date(p.updatedAt).getTime()) < 30 * 60 * 1000).length;
+      const mostRecent = cjProducts.reduce((max, p) => {
+        const t = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+        return t > max ? t : max;
+      }, 0);
+      coverage.push({
+        vendor: vendor.storeName,
+        cjSourced: cjProducts.length,
+        matchedCount: matched.length,
+        gbOriginCount: gbCount,
+        zeroShippingCount: zeroShipCount,
+        updatedInLast30m: updated30m,
+        mostRecentUpdate: mostRecent ? new Date(mostRecent).toISOString() : null,
+      });
+    }
+    res.json({ now: new Date().toISOString(), coverage });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
