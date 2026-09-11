@@ -1516,7 +1516,34 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         // (preserving slug, active status) rather than creating a duplicate.
         // Include deletedAt: null so trashed products are treated as "not found" and
         // re-imported as new, rather than silently updated while remaining in the trash.
-        const existing = await Product.findOne({ vendor: vendor._id, name, deletedAt: null });
+        // Exact name is tried first (unchanged default behavior); a
+        // re-exported CJ CSV can shift whitespace/capitalization on the
+        // title even when it's genuinely the same product, so a
+        // case-insensitive/trimmed name match is tried next, then finally
+        // a match on the CJ variant id itself (the one thing that
+        // shouldn't change between exports) — this is what actually lets
+        // originOnly backfills find products a plain exact-name match
+        // would otherwise skip as "not found".
+        let existing = await Product.findOne({ vendor: vendor._id, name, deletedAt: null });
+        if (!existing) {
+          const trimmedName = name.trim();
+          existing = await Product.findOne({
+            vendor: vendor._id,
+            deletedAt: null,
+            name: new RegExp(`^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+          });
+        }
+        if (!existing && supplierRef) {
+          existing = await Product.findOne({
+            vendor: vendor._id,
+            deletedAt: null,
+            $or: [
+              { supplierVariantRef: supplierRef },
+              { 'variants.supplierVariantRef': supplierRef },
+              { 'variants.cjVid': supplierRef },
+            ],
+          });
+        }
 
         if (originOnly) {
           if (!existing) {
