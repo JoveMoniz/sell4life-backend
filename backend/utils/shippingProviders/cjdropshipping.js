@@ -319,33 +319,6 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
   return { results, warnings };
 }
 
-// TEMP DEBUG — returns every freight option CJ offers for this route, not
-// just the cheapest, so a $0-looking figure shown elsewhere in CJ's own UI
-// can be checked against what the live freightCalculate API actually
-// quotes. Remove after use.
-export async function getShippingCostAllOptions(input, credential) {
-  const { supplierVariantRef, destinationCountry = 'GB', quantity = 1, startCountryCode = 'CN' } = input;
-  const accessToken = await resolveToken(credential);
-  if (!accessToken) return { error: 'Could not obtain CJ access token' };
-  const resp = await throttledFetch(accessToken, {
-    startCountryCode,
-    endCountryCode: destinationCountry,
-    products: [{ vid: supplierVariantRef, quantity }],
-  });
-  const body = await resp.json().catch(() => ({}));
-  return {
-    ok: resp.ok,
-    httpStatus: resp.status,
-    code: body?.code,
-    message: body?.message,
-    options: Array.isArray(body?.data) ? body.data.map(o => ({
-      logisticName: o.logisticName,
-      logisticPrice: o.logisticPrice,
-      logisticAging: o.logisticAging,
-    })) : [],
-  };
-}
-
 // ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
 //    raw code/message instead of collapsing every failure mode to null.
 //    Bypasses the cache deliberately — used to investigate why a product
