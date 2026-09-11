@@ -226,52 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — READ-ONLY check of real product data after the
-// origin-only backfill, to see actual shippingOriginCountry/image
-// coverage and spot-check a few products. Remove after use.
-// ======================================================
-app.get('/api/_debug_product_coverage', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260911c') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).select('_id storeName').lean();
-
-    const results = [];
-    for (const vendor of vendors) {
-      const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
-      const withOrigin = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true, $ne: 'CN' } });
-      const withImages = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, 'images.0': { $exists: true } });
-      const withSupplierUrl = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, supplierUrl: { $exists: true, $ne: '' } });
-      const sample = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
-        .select('name shippingOriginCountry images supplierUrl variants')
-        .limit(8).lean();
-
-      results.push({
-        vendor: vendor.storeName,
-        total, withOrigin, withImages, withSupplierUrl,
-        sample: sample.map(p => ({
-          name: p.name,
-          shippingOriginCountry: p.shippingOriginCountry,
-          imageCount: (p.images || []).length,
-          supplierUrl: p.supplierUrl || null,
-          variantCount: (p.variants || []).length,
-          firstVariantHasCjVid: !!p.variants?.[0]?.cjVid,
-        })),
-      });
-    }
-
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
