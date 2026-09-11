@@ -238,6 +238,22 @@ app.get('/api/_debug_last_import', async (req, res) => {
   res.json({ calls: _lastImportDebug });
 });
 
+app.get('/api/_debug_origin_final', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911j') return res.status(404).end();
+  const Vendor = (await import('./models/vendor.js')).default;
+  const Product = (await import('./models/product.js')).default;
+  const vendors = await Vendor.find({ type: 'professional', 'supplierCredentials.cjdropshipping': { $exists: true, $ne: null } }).select('_id storeName').lean();
+  const results = [];
+  for (const vendor of vendors) {
+    const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
+    const gbCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'GB' });
+    const cnCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'CN' });
+    const sample = await Product.find({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true } }).select('name shippingOriginCountry price shippingCost').limit(5).lean();
+    results.push({ vendor: vendor.storeName, total, gbCount, cnCount, sample });
+  }
+  res.json({ results });
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
