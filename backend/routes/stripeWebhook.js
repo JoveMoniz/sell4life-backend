@@ -321,7 +321,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               const rawCred = vendor.supplierCredentials?.cjdropshipping;
               if (!rawCred) continue;
 
-              const product = await Product.findById(item.productId).select('variants').lean();
+              const product = await Product.findById(item.productId).select('variants shippingOriginCountry').lean();
               const variants = product?.variants || [];
               const matched = variants.find(v => v.sku && item.variantSku && v.sku.trim() === item.variantSku.trim());
               // Only fall back to "any variant with a cjVid" when there's genuinely
@@ -352,6 +352,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 vid,
                 quantity: item.quantity,
                 destinationCountry: shippingAddress.country || 'GB',
+                // Book from the same warehouse the buyer was quoted at
+                // checkout (product.shippingOriginCountry, set by CJ sync),
+                // not always China.
+                startCountryCode: product?.shippingOriginCountry || 'CN',
                 address: shippingAddress,
               }, credential);
 

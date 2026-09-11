@@ -89,9 +89,12 @@ const cjProvider = {
   },
 
   // credential: decrypted string — either JSON { email, apiKey } or raw access token (legacy)
+  // startCountryCode defaults to 'CN' for full backward compatibility with
+  // every existing caller — pass it explicitly to quote from wherever the
+  // item is actually stocked (see candidateOrigins() below).
   // Returns: { cost, currency, etaDays, raw } | null
   async getShippingCost(input, credential) {
-    const { supplierVariantRef, destinationCountry = 'GB', quantity = 1 } = input;
+    const { supplierVariantRef, destinationCountry = 'GB', quantity = 1, startCountryCode = 'CN' } = input;
     if (!supplierVariantRef || !credential) {
       console.warn('[cjdropshipping] skipped — supplierVariantRef=%s hasCredential=%s', supplierVariantRef, !!credential);
       return null;
@@ -112,13 +115,16 @@ const cjProvider = {
       // Not JSON — use as raw access token (legacy single-token format)
     }
 
-    const key    = cacheKey('cjdropshipping', supplierVariantRef, destinationCountry);
+    // Origin is part of the cache key — the same vid quoted from CN vs. GB
+    // is a genuinely different freight lookup, not a cache hit/miss of the
+    // same thing.
+    const key    = cacheKey('cjdropshipping', supplierVariantRef, destinationCountry, startCountryCode);
     const cached = getCached(key);
     if (cached !== undefined) return cached; // null = already tried + failed
 
     try {
       const resp = await throttledFetch(accessToken, {
-        startCountryCode: 'CN',
+        startCountryCode,
         endCountryCode:   destinationCountry,
         products:         [{ vid: supplierVariantRef, quantity }],
       });
@@ -166,10 +172,13 @@ const cjProvider = {
   // Auto-creates the matching order on CJ's side when a buyer pays — unpaid
   // (payType "3"), so the vendor just has to go pay for it in the CJ
   // dashboard instead of re-entering it by hand.
-  // input: { orderNumber, vid, quantity, destinationCountry, address: { name, phone, address1, address2, city, county, postcode } }
+  // input: { orderNumber, vid, quantity, destinationCountry, startCountryCode, address: { name, phone, address1, address2, city, county, postcode } }
+  // startCountryCode should be the product's shippingOriginCountry (defaults
+  // to 'CN') so the shipment actually booked matches whatever origin the
+  // buyer was quoted at checkout, rather than always defaulting to China.
   // Returns: { orderId, orderNumber, status } | { error }
   async createOrder(input, credential) {
-    const { orderNumber, vid, quantity = 1, destinationCountry = 'GB', address } = input;
+    const { orderNumber, vid, quantity = 1, destinationCountry = 'GB', startCountryCode = 'CN', address } = input;
     if (!orderNumber || !vid || !address) return { error: 'Missing orderNumber, vid, or address' };
 
     const accessToken = await resolveToken(credential);
@@ -180,7 +189,7 @@ const cjProvider = {
     let logisticName;
     try {
       const freightResp = await throttledFetch(accessToken, {
-        startCountryCode: 'CN',
+        startCountryCode,
         endCountryCode:   destinationCountry,
         products:         [{ vid, quantity }],
       });
@@ -201,7 +210,7 @@ const cjProvider = {
       orderNumber,
       payType: '3', // create only — no payment initiated, paid manually in CJ dashboard
       platform: 'Api',
-      fromCountryCode: 'CN',
+      fromCountryCode: startCountryCode,
       logisticName,
       shippingCountryCode: destinationCountry,
       shippingCountry:     address.country || 'United Kingdom',
@@ -315,7 +324,7 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
 //    Bypasses the cache deliberately — used to investigate why a product
 //    is coming back with no freight options, not for production traffic.
 export async function getShippingCostDiagnostic(input, credential) {
-  const { supplierVariantRef, destinationCountry = 'GB', quantity = 1 } = input;
+  const { supplierVariantRef, destinationCountry = 'GB', quantity = 1, startCountryCode = 'CN' } = input;
   let accessToken = credential;
   try {
     const creds = JSON.parse(credential);
@@ -326,7 +335,7 @@ export async function getShippingCostDiagnostic(input, credential) {
   } catch (_) { /* raw legacy token */ }
 
   const resp = await throttledFetch(accessToken, {
-    startCountryCode: 'CN',
+    startCountryCode,
     endCountryCode:   destinationCountry,
     products:         [{ vid: supplierVariantRef, quantity }],
   });
@@ -338,6 +347,20 @@ export async function getShippingCostDiagnostic(input, credential) {
     message: body?.message,
     optionsCount: Array.isArray(body?.data) ? body.data.length : null,
   };
+}
+
+// ── Up to 2 non-China countries with real stock (de-duped), followed by
+//    'CN' as a guaranteed last resort — so a CN-only product's shipping
+//    behaves exactly as before this existed. Ordered non-CN-first because
+//    a local warehouse is normally both cheaper and faster than a
+//    China->GB freight quote. `inventories` comes from a variant returned
+//    by getProductImages() (result.cjVariants[i].inventories).
+export function candidateOrigins(inventories) {
+  const stocked = (inventories || [])
+    .filter(inv => inv.countryCode && inv.totalInventory > 0)
+    .map(inv => inv.countryCode);
+  const nonCn = [...new Set(stocked.filter(c => c !== 'CN'))];
+  return [...nonCn.slice(0, 2), 'CN'];
 }
 
 // ── Test whether a credential currently authenticates ─
@@ -514,6 +537,17 @@ export async function getProductImages(vid, productName, credential, pidOverride
       variantSku:  String(v.variantSku ?? v.vid ?? ''),
       image:       v.variantImage ?? v.image ?? '',
       sellPriceUsd: Number.isFinite(Number(v.variantSellPrice)) ? Number(v.variantSellPrice) : null,
+      // Per-country stock, e.g. [{countryCode:'US', totalInventory:40}, ...] —
+      // used to prefer quoting/booking shipping from a warehouse the item is
+      // actually stocked in over always assuming China. Not every CJ product
+      // has this array populated; treat a missing/empty one as "unknown,
+      // assume China" (candidateOrigins() below already does this).
+      inventories: Array.isArray(v.inventories)
+        ? v.inventories.map(inv => ({
+            countryCode:    String(inv.countryCode ?? '').toUpperCase(),
+            totalInventory: Number(inv.totalInventory) || 0,
+          }))
+        : [],
     })).filter(v => v.vid || v.variantSku);
   }
 
