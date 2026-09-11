@@ -226,6 +226,40 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — READ-ONLY check of whether the origin-only import wrote
+// anything this time, and if not, what a live re-run of the exact same
+// matching logic returns for a sample product (to see why it's still
+// not matching, without needing the browser's result banner at all).
+// Remove after use.
+// ======================================================
+app.get('/api/_debug_origin_check2', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911h') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
+      const withOriginField = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true } });
+      const recentlyUpdated = await Product.find({ vendor: vendor._id, archived: { $ne: true }, updatedAt: { $gte: new Date(Date.now() - 60 * 60 * 1000) } })
+        .select('name shippingOriginCountry price updatedAt').limit(15).lean();
+
+      results.push({ vendor: vendor.storeName, total, withOriginField, recentlyUpdatedLastHour: recentlyUpdated });
+    }
+
+    res.json({ serverTime: new Date().toISOString(), results });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
