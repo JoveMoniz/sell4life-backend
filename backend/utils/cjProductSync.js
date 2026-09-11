@@ -288,6 +288,23 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         }
       }
 
+      // Fallback: the other direction of the same problem — our stored SKU
+      // is CJ's own base/product-level SKU (captured at CSV-import time)
+      // with CJ's per-variant suffix missing (e.g. our "CJYD2458305" vs
+      // CJ's real variant SKU "CJYD245830501AZ"). If exactly one CJ variant
+      // SKU starts with ours, that's unambiguous.
+      if (!cjV && ourSku.length >= 6) {
+        const candidates = result.cjVariants.filter(cv => cv.variantSku.startsWith(ourSku));
+        if (candidates.length === 1) cjV = candidates[0];
+      }
+
+      // Fallback: a single-SKU product (no real variant options) with
+      // exactly one CJ variant on the other side can only mean one thing,
+      // regardless of whether the SKU strings happen to match at all.
+      if (!cjV && (product.variants || []).length === 1 && result.cjVariants.length === 1) {
+        cjV = result.cjVariants[0];
+      }
+
       if (!cjV) return { ourV, cjV: null, costGbp: null };
       if (!firstCjVid && cjV.vid) {
         firstCjVid = cjV.vid;
