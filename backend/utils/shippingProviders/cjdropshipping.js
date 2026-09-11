@@ -535,11 +535,6 @@ export async function getProductImages(vid, productName, credential, pidOverride
           // it onto our own categories.
           cjCategoryName: data.data.categoryName || null,
           videoApiDebug: lastVideoApiDebug,
-          // TEMP DEBUG — raw untransformed variant objects, to see every
-          // real field CJ returns (e.g. inventory/warehouse data) ahead of
-          // deciding how to capture it. Same variantList/variants fallback
-          // extractCjVariants() uses just above. Remove once that's settled.
-          _rawVariantListSample: (data.data.variantList ?? data.data.variants ?? []).slice(0, 2),
         };
       }
     }
