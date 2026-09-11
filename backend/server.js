@@ -305,6 +305,9 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
           // Read-only: fetches CJ's product detail (images/videos/variants
           // incl. inventories) but does not touch the database.
           const media = await getProductImages(cjVid, product.name, credential);
+          entry.mediaSucceeded = !!media;
+          entry.cjVariantsCount = media?.cjVariants?.length ?? null;
+          entry.cjVariantsSample = (media?.cjVariants || []).slice(0, 2);
           const matchedVariant = media?.cjVariants?.find(v => v.vid === cjVid) || media?.cjVariants?.[0];
           entry.rawInventories = matchedVariant?.inventories || [];
           const candidates = candidateOrigins(entry.rawInventories);
