@@ -1339,6 +1339,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
       'shippingfee($)':      'shippingcost',
       'productimage':        'image1',
       'specification':       'description',
+      'shippingfrom':        'shippingorigincountry',
     };
     for (let i = 0; i < headers.length; i++) {
       if (CJ_ALIASES[headers[i]]) headers[i] = CJ_ALIASES[headers[i]];
@@ -1367,6 +1368,21 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     function col(row, name) {
       const idx = headers.indexOf(name);
       return idx >= 0 ? (row[idx] || '').trim() : '';
+    }
+
+    // Accepts either an ISO code already (from vendor-tools.js's own CSV
+    // converter, which normalizes before writing) or common raw text CJ's
+    // export itself uses (from a vendor uploading a raw CJ CSV directly).
+    // Unrecognized text is left out rather than guessed — the product.js
+    // schema default ('CN') is the safe fallback either way.
+    function normalizeShippingOrigin(raw) {
+      const s = String(raw || '').trim().toUpperCase();
+      if (!s) return '';
+      if (['CN', 'CHINA'].includes(s)) return 'CN';
+      if (['US', 'USA', 'UNITED STATES', 'UNITED STATES OF AMERICA'].includes(s)) return 'US';
+      if (['GB', 'UK', 'UNITED KINGDOM', 'BRITAIN', 'GREAT BRITAIN'].includes(s)) return 'GB';
+      if (['DE', 'GERMANY'].includes(s)) return 'DE';
+      return /^[A-Z]{2}$/.test(s) ? s : '';
     }
 
     const created = [];
@@ -1460,6 +1476,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         const rawMarkupPct = parseFloat(col(firstRow, 'markuppct'));
         const markupPct    = Number.isFinite(rawMarkupPct) && rawMarkupPct >= 0 ? rawMarkupPct : undefined;
         const shipIncluded = col(firstRow, 'shipincluded') === 'true';
+        const shippingOriginCountry = normalizeShippingOrigin(col(firstRow, 'shippingorigincountry'));
 
         // If a product with this name already exists for this vendor, update it in place
         // (preserving slug, active status) rather than creating a duplicate.
@@ -1490,6 +1507,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             // variants exist, so this would otherwise just be a stale,
             // never-read top-level value once a product has real variants.
             ...(supplierRef && !variants.length ? { supplierVariantRef: supplierRef }   : {}),
+            ...(shippingOriginCountry           ? { shippingOriginCountry }              : {}),
           };
           await Product.updateOne({ _id: existing._id }, { $set: updateFields });
           updated.push(existing._id);
@@ -1510,6 +1528,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             costPrice:    Number.isFinite(costPrice) ? costPrice : undefined,
             markupPct,
             shipIncluded,
+            ...(shippingOriginCountry ? { shippingOriginCountry } : {}),
             stock:        totalStock,
             trackInventory: totalStock > 0,
             category:     col(firstRow, 'category').toLowerCase(),
@@ -1634,9 +1653,13 @@ router.post('/supplier/shipping-lookup', authMiddleware, requireApprovedVendor, 
 
     const results = [];
     for (const item of items) {
-      const { supplierVariantRef, rowIndex } = item;
+      // startCountryCode: the product's real stock warehouse when the
+      // vendor's CSV/tool mapped one (e.g. from CJ's "Shipping From"
+      // column) — defaults to 'CN' inside getShippingCost when omitted,
+      // same as every other caller.
+      const { supplierVariantRef, rowIndex, startCountryCode } = item;
       const result = await provider.getShippingCost(
-        { supplierVariantRef, destinationCountry, quantity: 1 },
+        { supplierVariantRef, destinationCountry, quantity: 1, ...(startCountryCode ? { startCountryCode } : {}) },
         token
       );
       results.push({ rowIndex, supplierVariantRef, result });
