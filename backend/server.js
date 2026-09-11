@@ -226,6 +226,46 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — read-only, key-gated. Full list of CJ-sourced products
+// with no matched cjVid, so the vendor has something concrete to work
+// through (add a Supplier URL to each, then re-sync). Remove after use.
+// ======================================================
+app.get('/api/_debug_unmatched_list', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912e') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
+        .select('name variants supplierUrl shippingOriginCountry shippingCost').lean();
+      const unmatched = products
+        .filter(looksCjSourced)
+        .filter(p => !(p.variants || []).some(v => v.cjVid))
+        .map(p => ({
+          id: String(p._id),
+          name: p.name,
+          sku: (p.variants || []).map(v => v.sku).filter(Boolean)[0] || '',
+          supplierUrl: p.supplierUrl || '',
+          origin: p.shippingOriginCountry,
+          shippingCost: p.shippingCost,
+        }));
+      results.push({ vendor: vendor.storeName, count: unmatched.length, products: unmatched });
+    }
+    res.json({ results });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
