@@ -226,6 +226,19 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — READ-ONLY view of the last few /products/import calls'
+// query params and parsed shipping-origin column, captured server-side
+// so the actual browser request can be inspected directly. See
+// _lastImportDebug in routes/vendor.js. Remove after use (both here
+// and there).
+// ======================================================
+app.get('/api/_debug_last_import', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911i') return res.status(404).end();
+  const { _lastImportDebug } = await import('./routes/vendor.js');
+  res.json({ calls: _lastImportDebug });
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {

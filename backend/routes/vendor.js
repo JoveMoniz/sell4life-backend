@@ -5,6 +5,13 @@
 import mongoose from 'mongoose';
 import express from 'express';
 
+// TEMP DEBUG — records the last few /products/import calls (query params,
+// row count, first row's parsed shippingorigincountry) so the actual
+// browser request can be inspected server-side without needing Render's
+// log viewer. Read via GET /api/_debug_last_import (see server.js).
+// Remove after use, alongside that debug route.
+export const _lastImportDebug = [];
+
 import { requireApprovedVendor, requireTier } from '../middleware/vendorMiddleware.js';
 
 import {
@@ -1326,6 +1333,25 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     // CSV just to pick up real warehouse data without resetting any price
     // a vendor may have manually adjusted since the original import.
     const originOnly = req.query.originOnly === '1';
+
+    // TEMP DEBUG capture — see _lastImportDebug above.
+    try {
+      const lines0 = String(raw || '').split('\n').map(l => l.trim()).filter(Boolean);
+      const headers0 = (lines0[0] || '').split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
+      const originIdx = headers0.indexOf('shippingfrom') !== -1 ? headers0.indexOf('shippingfrom') : headers0.indexOf('shippingorigincountry');
+      const firstDataRow = lines0[1] ? lines0[1].split(',') : [];
+      _lastImportDebug.unshift({
+        at: new Date().toISOString(),
+        vendorId: String(req.vendor?._id || ''),
+        rawQueryString: req.originalUrl.split('?')[1] || '',
+        originOnlyParsed: originOnly,
+        rowCount: lines0.length - 1,
+        headers: headers0,
+        hasShippingOriginColumn: originIdx !== -1,
+        firstRowShippingOriginRaw: originIdx !== -1 ? (firstDataRow[originIdx] || '') : '(no such column)',
+      });
+      if (_lastImportDebug.length > 5) _lastImportDebug.length = 5;
+    } catch (_) { /* diagnostic only, never block the real import */ }
 
     if (!raw || typeof raw !== 'string') {
       return res.status(400).json({ error: 'No CSV data received' });
