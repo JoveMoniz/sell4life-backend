@@ -5,14 +5,6 @@
 import mongoose from 'mongoose';
 import express from 'express';
 
-// TEMP DEBUG — records the last few /products/import calls (query params,
-// row count, first row's parsed shippingorigincountry) so the actual
-// browser request can be inspected server-side without needing Render's
-// log viewer. Read via GET /api/_debug_last_import (see server.js).
-// Remove after use, alongside that debug route.
-export const _lastImportDebug = [];
-export const _lastImportRowDebug = [];
-
 import { requireApprovedVendor, requireTier } from '../middleware/vendorMiddleware.js';
 
 import {
@@ -1335,26 +1327,6 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
     // a vendor may have manually adjusted since the original import.
     const originOnly = req.query.originOnly === '1';
 
-    // TEMP DEBUG capture — see _lastImportDebug above.
-    try {
-      const lines0 = String(raw || '').split('\n').map(l => l.trim()).filter(Boolean);
-      const headers0 = (lines0[0] || '').split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
-      const originIdx = headers0.indexOf('shippingfrom') !== -1 ? headers0.indexOf('shippingfrom') : headers0.indexOf('shippingorigincountry');
-      const firstDataRow = lines0[1] ? lines0[1].split(',') : [];
-      _lastImportDebug.unshift({
-        at: new Date().toISOString(),
-        vendorId: String(req.vendor?._id || ''),
-        rawQueryString: req.originalUrl.split('?')[1] || '',
-        originOnlyParsed: originOnly,
-        rowCount: lines0.length - 1,
-        headers: headers0,
-        hasShippingOriginColumn: originIdx !== -1,
-        firstRowShippingOriginRaw: originIdx !== -1 ? (firstDataRow[originIdx] || '') : '(no such column)',
-      });
-      if (_lastImportDebug.length > 5) _lastImportDebug.length = 5;
-      _lastImportRowDebug.length = 0;
-    } catch (_) { /* diagnostic only, never block the real import */ }
-
     if (!raw || typeof raw !== 'string') {
       return res.status(400).json({ error: 'No CSV data received' });
     }
@@ -1546,15 +1518,6 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         }
 
         if (originOnly) {
-          // TEMP DEBUG capture — first 10 rows only, see
-          // _lastImportRowDebug. Remove alongside _lastImportDebug.
-          if (_lastImportRowDebug.length < 10) {
-            _lastImportRowDebug.push({
-              name, supplierRef, shippingOriginCountry,
-              foundExisting: !!existing,
-              existingId: existing ? String(existing._id) : null,
-            });
-          }
           if (!existing) {
             entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Product not found — origin-only mode never creates new products' }));
             continue;
@@ -1563,15 +1526,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
             entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'No recognizable shipping origin in this row' }));
             continue;
           }
-          const _uResult = await Product.updateOne({ _id: existing._id }, { $set: { shippingOriginCountry } });
-          if (_lastImportRowDebug.length <= 10) {
-            const dbgRow = _lastImportRowDebug.find(r => r.existingId === String(existing._id));
-            if (dbgRow) {
-              dbgRow.updateResult = { matchedCount: _uResult.matchedCount, modifiedCount: _uResult.modifiedCount, acknowledged: _uResult.acknowledged };
-              const _reread = await Product.findById(existing._id).select('shippingOriginCountry').lean();
-              dbgRow.rereadAfterWrite = _reread?.shippingOriginCountry ?? '(missing)';
-            }
-          }
+          await Product.updateOne({ _id: existing._id }, { $set: { shippingOriginCountry } });
           updated.push(existing._id);
           continue;
         }

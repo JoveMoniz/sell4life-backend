@@ -226,35 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — READ-ONLY view of the last few /products/import calls'
-// query params and parsed shipping-origin column, captured server-side
-// so the actual browser request can be inspected directly. See
-// _lastImportDebug in routes/vendor.js. Remove after use (both here
-// and there).
-// ======================================================
-app.get('/api/_debug_last_import', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260911i') return res.status(404).end();
-  const { _lastImportDebug, _lastImportRowDebug } = await import('./routes/vendor.js');
-  res.json({ calls: _lastImportDebug, rows: _lastImportRowDebug });
-});
-
-app.get('/api/_debug_origin_final', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260911j') return res.status(404).end();
-  const Vendor = (await import('./models/vendor.js')).default;
-  const Product = (await import('./models/product.js')).default;
-  const vendors = await Vendor.find({ type: 'professional', 'supplierCredentials.cjdropshipping': { $exists: true, $ne: null } }).select('_id storeName').lean();
-  const results = [];
-  for (const vendor of vendors) {
-    const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
-    const gbCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'GB' });
-    const cnCount = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: 'CN' });
-    const sample = await Product.find({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true } }).select('name shippingOriginCountry price shippingCost').limit(5).lean();
-    results.push({ vendor: vendor.storeName, total, gbCount, cnCount, sample });
-  }
-  res.json({ results });
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
