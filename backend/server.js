@@ -253,6 +253,7 @@ app.get('/api/_debug_socket_set_check', async (req, res) => {
     }
 
     let liveQuote = null;
+    let realSync = null;
     const firstMatched = out.find(p => p.hasCjVid);
     if (firstMatched) {
       const product = await Product.findById(firstMatched.id).lean();
@@ -264,9 +265,14 @@ app.get('/api/_debug_socket_set_check', async (req, res) => {
         credential
       );
       liveQuote = { testedProduct: firstMatched.name, quote };
+
+      const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+      const syncResult = await syncProductFromCj(product, credential);
+      const after = await Product.findById(firstMatched.id).select('shippingCost').lean();
+      realSync = { before: firstMatched.storedShippingCost, after: after.shippingCost, syncResult };
     }
 
-    res.json({ matches: out, liveQuote });
+    res.json({ matches: out, liveQuote, realSync });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
   }
