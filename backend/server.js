@@ -226,50 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — READ-ONLY check of the exact raw supplier string and
-// shippingOriginCountry value on real products, to see why the "Ships
-// from" row isn't rendering at all (its condition is
-// p.supplier === 'CJdropshipping' && p.shippingOriginCountry — if
-// supplier's real stored value differs even slightly, or the field is
-// truly absent rather than defaulting to 'CN', that would explain it).
-// Remove after use.
-// ======================================================
-app.get('/api/_debug_raw_fields', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260911f') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).select('_id storeName').lean();
-
-    const results = [];
-    for (const vendor of vendors) {
-      const sample = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
-        .limit(5)
-        .select('name supplier shippingOriginCountry')
-        .lean();
-
-      results.push({
-        vendor: vendor.storeName,
-        sample: sample.map(p => ({
-          name: p.name,
-          supplierRaw: JSON.stringify(p.supplier),
-          hasShippingOriginField: Object.prototype.hasOwnProperty.call(p, 'shippingOriginCountry'),
-          shippingOriginCountryRaw: JSON.stringify(p.shippingOriginCountry),
-        })),
-      });
-    }
-
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
