@@ -226,49 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — READ-ONLY check of markupPct/price state to see whether
-// the origin-only backfill actually cleared markup (it shouldn't — that
-// path only ever $sets shippingOriginCountry). Remove after use.
-// ======================================================
-app.get('/api/_debug_markup_state', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260911e') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).select('_id storeName').lean();
-
-    const results = [];
-    for (const vendor of vendors) {
-      const total = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true } });
-      const withMarkup = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, markupPct: { $ne: null } });
-      const withOrigin = await Product.countDocuments({ vendor: vendor._id, archived: { $ne: true }, shippingOriginCountry: { $exists: true, $ne: 'CN' } });
-      const sample = await Product.find({ vendor: vendor._id, archived: { $ne: true } })
-        .sort({ updatedAt: -1 })
-        .limit(10)
-        .select('name price costPrice markupPct shippingCost shippingOriginCountry updatedAt')
-        .lean();
-
-      results.push({
-        vendor: vendor.storeName,
-        total, withMarkup, withOrigin,
-        sample: sample.map(p => ({
-          name: p.name, price: p.price, costPrice: p.costPrice, markupPct: p.markupPct,
-          shippingCost: p.shippingCost, shippingOriginCountry: p.shippingOriginCountry, updatedAt: p.updatedAt,
-        })),
-      });
-    }
-
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
-// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
