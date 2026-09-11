@@ -321,6 +321,37 @@ app.get('/api/_debug_resync_status', (req, res) => {
   res.json(_resyncStatus);
 });
 
+// TEMP DEBUG — spot-check real numbers after the full resync completed.
+// Remove alongside the two routes above.
+app.get('/api/_debug_resync_spotcheck', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912k') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null })
+        .select('name variants shippingOriginCountry shippingCost').lean();
+      const cjProducts = products.filter(looksCjSourced);
+      const matched = cjProducts.filter(p => (p.variants || []).some(v => v.cjVid));
+      const zero = matched.filter(p => Number(p.shippingCost) === 0).length;
+      const nonZero = matched.filter(p => Number(p.shippingCost) > 0).length;
+      const sample = matched.slice(0, 10).map(p => ({ name: p.name, origin: p.shippingOriginCountry, shippingCost: p.shippingCost }));
+      results.push({ vendor: vendor.storeName, totalProducts: products.length, matched: matched.length, zero, nonZero, sample });
+    }
+    res.json({ results });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
