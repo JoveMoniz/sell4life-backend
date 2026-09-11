@@ -270,6 +270,42 @@ app.get('/api/_debug_freight_compare', async (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — key-gated. Runs the real, existing "Sync from CJ" action
+// (utils/cjProductSync.js syncProductFromCj) on one specific product —
+// the exact same code path the vendor's own Sync button calls — and
+// reports the before/after shippingCost/shippingOriginCountry. Used to
+// confirm the fixed origin-preserving sync actually pulls CJ's real
+// live freight quote through into the stored price. Remove after use.
+// ======================================================
+app.get('/api/_debug_run_sync', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911k') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+
+    const before = await Product.findById(req.query.id).lean();
+    if (!before) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(before.vendor).lean();
+    if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor has no CJ credential' });
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const syncResult = await syncProductFromCj(before, credential);
+    const after = await Product.findById(req.query.id).lean();
+
+    res.json({
+      name: before.name,
+      syncResult,
+      before: { shippingCost: before.shippingCost, shippingOriginCountry: before.shippingOriginCountry },
+      after: { shippingCost: after.shippingCost, shippingOriginCountry: after.shippingOriginCountry },
+    });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
