@@ -315,9 +315,21 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   // successful quote — so a product genuinely stocked in e.g. the UK gets
   // priced/timed from there instead of always assuming a China->GB freight
   // route, while a China-only product behaves exactly as before.
+  //
+  // CJ's live API doesn't expose per-variant warehouse data (confirmed —
+  // it always comes back null), so candidateOrigins() here would normally
+  // only ever produce ['CN']. If a real, non-CN origin was already
+  // recorded some other way (the CSV import's "Shipping From" column —
+  // the only source that actually has this data), try that FIRST rather
+  // than silently reverting a correct GB/US/DE origin back to China just
+  // because this particular sync run has no better information.
+  const knownOrigin = product.shippingOriginCountry;
+  const originCandidates = knownOrigin && knownOrigin !== 'CN'
+    ? [knownOrigin, ...candidateOrigins(firstCjInventories).filter(c => c !== knownOrigin)]
+    : candidateOrigins(firstCjInventories);
   let shippingGbp = null;
   if (firstCjVid) {
-    for (const startCountryCode of candidateOrigins(firstCjInventories)) {
+    for (const startCountryCode of originCandidates) {
       const quote = await cjProvider.getShippingCost(
         { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1, startCountryCode },
         credential
