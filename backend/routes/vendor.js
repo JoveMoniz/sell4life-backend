@@ -11,6 +11,7 @@ import express from 'express';
 // log viewer. Read via GET /api/_debug_last_import (see server.js).
 // Remove after use, alongside that debug route.
 export const _lastImportDebug = [];
+export const _lastImportRowDebug = [];
 
 import { requireApprovedVendor, requireTier } from '../middleware/vendorMiddleware.js';
 
@@ -1351,6 +1352,7 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         firstRowShippingOriginRaw: originIdx !== -1 ? (firstDataRow[originIdx] || '') : '(no such column)',
       });
       if (_lastImportDebug.length > 5) _lastImportDebug.length = 5;
+      _lastImportRowDebug.length = 0;
     } catch (_) { /* diagnostic only, never block the real import */ }
 
     if (!raw || typeof raw !== 'string') {
@@ -1544,6 +1546,15 @@ router.post('/products/import', authMiddleware, requireApprovedVendor, requireTi
         }
 
         if (originOnly) {
+          // TEMP DEBUG capture — first 10 rows only, see
+          // _lastImportRowDebug. Remove alongside _lastImportDebug.
+          if (_lastImportRowDebug.length < 10) {
+            _lastImportRowDebug.push({
+              name, supplierRef, shippingOriginCountry,
+              foundExisting: !!existing,
+              existingId: existing ? String(existing._id) : null,
+            });
+          }
           if (!existing) {
             entries.forEach(e => skipped.push({ row: e.lineNum, reason: 'Product not found — origin-only mode never creates new products' }));
             continue;

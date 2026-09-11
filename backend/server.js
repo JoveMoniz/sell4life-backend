@@ -234,8 +234,8 @@ app.get('/api/version', (req, res) => {
 // ======================================================
 app.get('/api/_debug_last_import', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260911i') return res.status(404).end();
-  const { _lastImportDebug } = await import('./routes/vendor.js');
-  res.json({ calls: _lastImportDebug });
+  const { _lastImportDebug, _lastImportRowDebug } = await import('./routes/vendor.js');
+  res.json({ calls: _lastImportDebug, rows: _lastImportRowDebug });
 });
 
 app.get('/api/_debug_origin_final', async (req, res) => {
