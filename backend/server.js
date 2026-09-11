@@ -238,7 +238,7 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
     const Product = (await import('./models/product.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
     const cjModule = await import('./utils/shippingProviders/cjdropshipping.js');
-    const { getProductImages, debugCjVariantData } = cjModule;
+    const { getProductImages } = cjModule;
     const cjProvider = cjModule.default;
 
     // candidateOrigins isn't on this branch yet (the fix hasn't been
@@ -282,17 +282,6 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
         continue;
       }
 
-      if (!rawSample) {
-        const rawSku = (products[0]?.variants || []).map(v => v.sku).find(Boolean);
-        if (rawSku) {
-          try {
-            rawSample = await debugCjVariantData(rawSku, credential);
-          } catch (err) {
-            rawSample = { error: err.message };
-          }
-        }
-      }
-
       for (const product of products) {
         const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
         const entry = {
@@ -308,6 +297,9 @@ app.get('/api/_debug_cj_origin_test', async (req, res) => {
           const media = await getProductImages(cjVid, product.name, credential);
           entry.mediaSucceeded = !!media;
           entry.cjVariantsCount = media?.cjVariants?.length ?? null;
+          if (!rawSample && media?._rawVariantListSample?.length) {
+            rawSample = media._rawVariantListSample;
+          }
           const matchedVariant = media?.cjVariants?.find(v => v.vid === cjVid) || media?.cjVariants?.[0];
           entry.rawInventories = matchedVariant?.inventories || [];
           const candidates = candidateOrigins(entry.rawInventories);
