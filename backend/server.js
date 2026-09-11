@@ -226,6 +226,98 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
+// TEMP DEBUG — READ-ONLY check of the CJ shipping-origin fix against
+// real data. Fetches CJ's raw variant/inventory data and, if any
+// non-CN stock is found, a live freight quote from that origin —
+// never calls syncProductFromCj, never writes to the database.
+// Remove after use.
+// ======================================================
+app.get('/api/_debug_cj_origin_test', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260911a') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const cjModule = await import('./utils/shippingProviders/cjdropshipping.js');
+    const { getProductImages, candidateOrigins } = cjModule;
+    const cjProvider = cjModule.default;
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName supplierCredentials').lean();
+
+    if (!vendors.length) return res.json({ vendorsFound: 0 });
+
+    const limit = Math.min(Number(req.query.limit) || 3, 10);
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({
+        vendor: vendor._id,
+        'variants.cjVid': { $exists: true, $ne: '' },
+        archived: { $ne: true },
+      }).select('name variants shippingCost shippingOriginCountry estDeliveryMinDays estDeliveryMaxDays').limit(limit).lean();
+
+      if (!products.length) {
+        results.push({ vendor: vendor.storeName, productsWithCjVid: 0 });
+        continue;
+      }
+
+      let credential;
+      try {
+        credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+      } catch (err) {
+        results.push({ vendor: vendor.storeName, error: 'Bad credential: ' + err.message });
+        continue;
+      }
+
+      for (const product of products) {
+        const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+        const entry = {
+          vendor: vendor.storeName,
+          productId: String(product._id),
+          name: product.name,
+          currentShippingCost: product.shippingCost,
+          currentShippingOriginCountry: product.shippingOriginCountry,
+          currentEstDelivery: [product.estDeliveryMinDays, product.estDeliveryMaxDays],
+        };
+        if (!cjVid) { entry.note = 'no cjVid'; results.push(entry); continue; }
+
+        try {
+          // Read-only: fetches CJ's product detail (images/videos/variants
+          // incl. inventories) but does not touch the database.
+          const media = await getProductImages(cjVid, product.name, credential);
+          const matchedVariant = media?.cjVariants?.find(v => v.vid === cjVid) || media?.cjVariants?.[0];
+          entry.rawInventories = matchedVariant?.inventories || [];
+          const candidates = candidateOrigins(entry.rawInventories);
+          entry.candidateOrigins = candidates;
+
+          if (candidates[0] !== 'CN') {
+            // Only fetch a live quote when a real non-CN candidate exists —
+            // GET-only external API call, no write, but still worth gating
+            // to avoid burning CJ rate-limit budget on CN-only products
+            // where the answer is already known.
+            const quote = await cjProvider.getShippingCost(
+              { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1, startCountryCode: candidates[0] },
+              credential
+            );
+            entry.sampleQuoteFromBestOrigin = quote;
+          }
+          results.push(entry);
+        } catch (err) {
+          entry.error = err.message;
+          results.push(entry);
+        }
+      }
+    }
+
+    res.json({ vendorsFound: vendors.length, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
