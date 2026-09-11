@@ -226,39 +226,32 @@ app.get('/api/version', (req, res) => {
 });
 
 // ======================================================
-// TEMP DEBUG — key-gated. Fetches CJ's raw variant list for a pinned
-// product (pidOverride from supplierUrl) and compares it directly
-// against our stored variant SKUs, to see exactly why variant matching
-// fails even when the right CJ product is found. Remove after use.
+// TEMP DEBUG — key-gated. Runs the real syncProductFromCj on one product
+// to confirm the variant-matching fix (base-SKU vs. CJ's real variant
+// SKU) actually produces a matched cjVid now. Remove after use.
 // ======================================================
-app.get('/api/_debug_variant_match', async (req, res) => {
+app.get('/api/_debug_run_sync4', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912f') return res.status(404).end();
   try {
     const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { getProductImages } = await import('./utils/shippingProviders/cjdropshipping.js');
-    const { cjPidFromUrl } = await import('./utils/cjProductSync.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
 
-    const product = await Product.findById(req.query.id).lean();
-    if (!product) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(product.vendor).lean();
+    const before = await Product.findById(req.query.id).lean();
+    if (!before) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(before.vendor).lean();
     if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor has no CJ credential' });
     const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
 
-    const pidOverride = cjPidFromUrl(product.supplierUrl);
-    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean) || product.supplierVariantRef || product.sku;
-    const result = await getProductImages(vid, product.name, credential, pidOverride);
+    const syncResult = await syncProductFromCj(before, credential);
+    const after = await Product.findById(req.query.id).lean();
 
     res.json({
-      name: product.name,
-      supplierUrl: product.supplierUrl,
-      pidOverride,
-      ourVariants: (product.variants || []).map(v => ({ sku: v.sku, attributes: v.attributes, cjVid: v.cjVid, supplierVariantRef: v.supplierVariantRef })),
-      cjResult: result?.error ? { error: result.error, debug: result.debug } : {
-        cjVariants: result.cjVariants,
-        cjCategoryName: result.cjCategoryName,
-      },
+      name: before.name,
+      syncResult,
+      before: { shippingCost: before.shippingCost, cjVid: (before.variants || []).map(v => v.cjVid) },
+      after: { shippingCost: after.shippingCost, cjVid: (after.variants || []).map(v => v.cjVid) },
     });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
