@@ -226,35 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — resync3 finished with 0 newlyMatched across 76 products
-// even WITH pacing built in, disproving the rate-limit theory. Full
-// trace on one real product to see exactly what the search chain
-// actually did this time. Remove after use.
-app.get('/api/_debug_full_trace', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912n') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-
-    const product = await Product.findById(req.query.id).lean();
-    if (!product) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(product.vendor).lean();
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-
-    const syncResult = await syncProductFromCj(product, credential);
-    res.json({
-      name: product.name,
-      storedSku: (product.variants || []).map(v => v.sku),
-      truncatedCandidate: (product.variants || []).map(v => v.sku).filter(Boolean).map(s => s.length >= 8 ? s.slice(0, -4) : null),
-      syncResult,
-    });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
