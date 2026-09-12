@@ -454,11 +454,22 @@ export async function getProductImages(vid, productName, credential, pidOverride
 
   const delay = ms => new Promise(r => setTimeout(r, ms));
 
-  // Fetch with retry on 429 / 5xx (exponential back-off)
+  // Fetch with retry on 429 / 5xx (exponential back-off). Shares the same
+  // process-wide _lastCall gate as the freight endpoint (RATE_LIMIT_MS
+  // apart) — CJ's real rate limit applies across ALL its endpoints, not
+  // just freightCalculate, and a single product's own search+detail+
+  // video chain firing 3-5 requests within milliseconds of each other
+  // was tripping it even when different *products* were paced apart.
+  // That's why isolated single-product calls always succeeded (the gate
+  // had fully drained) while the same calls inside any bulk run — even
+  // one with inter-product pacing — failed almost universally.
   async function cjFetch(url, opts = {}, maxRetries = 2) {
     const headers = { 'CJ-Access-Token': token, ...opts.headers };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) await delay(1200 * attempt); // 1.2 s, 2.4 s
+      const gap = _lastCall + RATE_LIMIT_MS - Date.now();
+      if (gap > 0) await delay(gap);
+      _lastCall = Date.now();
       try {
         const resp = await fetch(url, { ...opts, headers });
         if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) continue;
