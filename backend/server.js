@@ -296,31 +296,30 @@ app.get('/api/_debug_resync2_status', (req, res) => {
   res.json(_resync2Status);
 });
 
-// TEMP DEBUG — resync2 finished with 0 newlyMatched across 167 products,
-// which is suspicious given the manual test proved the fallback works.
-// Checks current real state of specific known-previously-unmatched
-// products to determine if the fix actually fired (counter bug) or
-// genuinely didn't match at scale. Remove after use.
-app.get('/api/_debug_spotcheck_after_resync2', async (req, res) => {
+// TEMP DEBUG — trace exactly why a specific product's base-SKU fallback
+// didn't fire, via a fresh sync run with full cjSearchDebug returned.
+// Remove after use.
+app.get('/api/_debug_trace_sync', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
   try {
     const Product = (await import('./models/product.js')).default;
-    const ids = [
-      '6aa2c9f8eae8170a209150a4',
-      '6aa2c9f8eae8170a209150a8',
-      '6aa2c9f8eae8170a209150ac',
-      '6aa2c9f8eae8170a209150b0',
-      '6aa2c9f8eae8170a209150b4',
-    ];
-    const products = await Product.find({ _id: { $in: ids } })
-      .select('name variants shippingOriginCountry shippingCost updatedAt').lean();
-    res.json(products.map(p => ({
-      id: String(p._id), name: p.name, origin: p.shippingOriginCountry,
-      shippingCost: p.shippingCost, updatedAt: p.updatedAt,
-      variants: (p.variants || []).map(v => ({ sku: v.sku, cjVid: v.cjVid })),
-    })));
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+
+    const product = await Product.findById(req.query.id).lean();
+    if (!product) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(product.vendor).lean();
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const syncResult = await syncProductFromCj(product, credential);
+    res.json({
+      name: product.name,
+      storedSku: (product.variants || []).map(v => v.sku),
+      syncResult,
+    });
   } catch (err) {
-    res.json({ error: err.message });
+    res.json({ error: err.message, stack: err.stack });
   }
 });
 
