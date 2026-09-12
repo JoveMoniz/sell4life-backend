@@ -226,34 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP ACTION — key-gated. Refreshes one specific product's shipping
-// cost from CJ's real live rate (same as clicking the vendor's own
-// Sync from CJ button). Remove after use.
-app.get('/api/_action_resync_one', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912q') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-
-    const product = req.query.cost != null
-      ? await Product.findOne({ name: new RegExp(req.query.name, 'i'), shippingCost: Number(req.query.cost) }).lean()
-      : await Product.findOne({ name: new RegExp(req.query.name, 'i') }).lean();
-    if (!product) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(product.vendor).lean();
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-
-    const before = product.shippingCost;
-    const syncResult = await syncProductFromCj(product, credential);
-    const after = await Product.findById(product._id).select('shippingCost').lean();
-
-    res.json({ name: product.name, before, after: after.shippingCost, syncResult });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
