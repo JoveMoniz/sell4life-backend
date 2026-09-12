@@ -264,6 +264,64 @@ app.get('/api/_debug_sequential_test', async (req, res) => {
   }
 });
 
+// TEMP DEBUG — the real, conclusive test: runs sync on EVERY remaining
+// unmatched CJ product, sequentially, fully awaited within one live
+// streamed request/response (same execution pattern the real vendor
+// bulk-sync button already uses) — never detached into a background
+// task. Streams NDJSON progress so the connection stays active the
+// whole time. This is expected to actually work, unlike every prior
+// detached-background attempt today. Remove after use.
+app.get('/api/_debug_full_resync_streamed', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  const send = obj => res.write(JSON.stringify(obj) + '\n');
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).lean();
+
+    const jobs = [];
+    for (const vendor of vendors) {
+      let credential;
+      try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
+      for (const product of products) {
+        if (looksCjSourced(product) && !(product.variants || []).some(v => v.cjVid)) {
+          jobs.push({ product, credential });
+        }
+      }
+    }
+
+    send({ type: 'start', total: jobs.length });
+    let newlyMatched = 0, failed = 0;
+    for (let i = 0; i < jobs.length; i++) {
+      const { product, credential } = jobs[i];
+      try {
+        const r = await syncProductFromCj(product, credential);
+        const fresh = await Product.findById(product._id).select('variants').lean();
+        const matched = (fresh.variants || []).some(v => v.cjVid);
+        if (matched) newlyMatched++;
+        send({ type: 'progress', n: i + 1, total: jobs.length, name: product.name, matched, note: r.note });
+      } catch (err) {
+        failed++;
+        send({ type: 'progress', n: i + 1, total: jobs.length, name: product.name, error: err.message });
+      }
+    }
+    send({ type: 'done', total: jobs.length, newlyMatched, failed });
+    res.end();
+  } catch (err) {
+    send({ type: 'error', error: err.message });
+    res.end();
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
