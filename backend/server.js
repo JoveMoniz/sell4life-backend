@@ -226,33 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — final coverage check before cleanup. Remove after use.
-app.get('/api/_debug_final_coverage', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-    const { looksCjSourced } = await import('./utils/cjProductSync.js');
-
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).select('_id storeName').lean();
-
-    const results = [];
-    for (const vendor of vendors) {
-      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null })
-        .select('name variants').lean();
-      const cjProducts = products.filter(looksCjSourced);
-      const matched = cjProducts.filter(p => (p.variants || []).some(v => v.cjVid));
-      results.push({ vendor: vendor.storeName, cjSourced: cjProducts.length, matched: matched.length, unmatched: cjProducts.length - matched.length });
-    }
-    res.json({ results });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
