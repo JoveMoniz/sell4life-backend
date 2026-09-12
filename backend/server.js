@@ -226,75 +226,33 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// ======================================================
-// TEMP ACTION — key-gated. Third pass: re-runs the full sync WITH the
-// new 300ms inter-product pacing (same fix just added to the real
-// bulk-sync route and periodic worker) to confirm it resolves the
-// transient rate-limit failures seen in the unpaced run. Runs in the
-// background; progress readable via /api/_debug_resync3_status.
-// Remove both after use.
-// ======================================================
-let _resync3Status = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: null, finishedAt: null };
-
-app.get('/api/_action_resync3', async (req, res) => {
+// TEMP DEBUG — resync3 finished with 0 newlyMatched across 76 products
+// even WITH pacing built in, disproving the rate-limit theory. Full
+// trace on one real product to see exactly what the search chain
+// actually did this time. Remove after use.
+app.get('/api/_debug_full_trace', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912n') return res.status(404).end();
   try {
     const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
 
-    if (_resync3Status.running) return res.json({ error: 'already running', status: _resync3Status });
+    const product = await Product.findById(req.query.id).lean();
+    if (!product) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(product.vendor).lean();
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
 
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).lean();
-
-    const jobs = [];
-    for (const vendor of vendors) {
-      let credential;
-      try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
-      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
-      for (const product of products) {
-        if (looksCjSourced(product) && !(product.variants || []).some(v => v.cjVid)) {
-          jobs.push({ product, credential });
-        }
-      }
-    }
-
-    _resync3Status = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: new Date().toISOString(), finishedAt: null };
-
-    (async () => {
-      for (const { product, credential } of jobs) {
-        try {
-          await new Promise(r => setTimeout(r, 300));
-          const r = await syncProductFromCj(product, credential);
-          _resync3Status.done++;
-          if (r.status === 'updated') _resync3Status.updated++;
-          else if (r.status === 'failed') _resync3Status.failed++;
-          else _resync3Status.skipped++;
-
-          const fresh = await Product.findById(product._id).select('variants').lean();
-          if ((fresh.variants || []).some(v => v.cjVid)) _resync3Status.newlyMatched++;
-        } catch (err) {
-          _resync3Status.done++;
-          _resync3Status.failed++;
-        }
-      }
-      _resync3Status.running = false;
-      _resync3Status.finishedAt = new Date().toISOString();
-    })();
-
-    res.json({ resyncStarted: jobs.length });
+    const syncResult = await syncProductFromCj(product, credential);
+    res.json({
+      name: product.name,
+      storedSku: (product.variants || []).map(v => v.sku),
+      truncatedCandidate: (product.variants || []).map(v => v.sku).filter(Boolean).map(s => s.length >= 8 ? s.slice(0, -4) : null),
+      syncResult,
+    });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
   }
-});
-
-app.get('/api/_debug_resync3_status', (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912n') return res.status(404).end();
-  res.json(_resync3Status);
 });
 
 // ======================================================
