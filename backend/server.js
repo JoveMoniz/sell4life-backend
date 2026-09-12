@@ -226,41 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — read-only, key-gated. Checks whether ALL GB-origin CJ
-// products currently show £0 shipping, or only some. Remove after use.
-app.get('/api/_debug_gb_shipping_check', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912p') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-    const { looksCjSourced } = await import('./utils/cjProductSync.js');
-
-    const vendors = await Vendor.find({
-      type: 'professional',
-      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).select('_id storeName').lean();
-
-    const results = [];
-    for (const vendor of vendors) {
-      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null })
-        .select('name variants shippingOriginCountry shippingCost active').lean();
-      const gbProducts = products.filter(p => looksCjSourced(p) && p.shippingOriginCountry === 'GB' && (p.variants || []).some(v => v.cjVid));
-      const zero = gbProducts.filter(p => Number(p.shippingCost) === 0);
-      const nonZero = gbProducts.filter(p => Number(p.shippingCost) > 0);
-      results.push({
-        vendor: vendor.storeName,
-        gbTotal: gbProducts.length,
-        zeroCount: zero.length,
-        nonZeroCount: nonZero.length,
-        nonZeroSample: nonZero.slice(0, 10).map(p => ({ name: p.name, shippingCost: p.shippingCost, active: p.active })),
-      });
-    }
-    res.json({ results });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
