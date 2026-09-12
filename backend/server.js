@@ -226,6 +226,27 @@ app.get('/api/version', (req, res) => {
 });
 
 
+// TEMP DEBUG — key-gated, read-only (does NOT save the result). Confirms
+// whether the AI Generate Listing feature (generateProductListingAI,
+// claude-sonnet-5 with real vision on the product's own photos) actually
+// works on production right now, before the vendor uses it themselves.
+// Remove after use.
+app.get('/api/_debug_ai_listing_check', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912u') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const { generateProductListingAI } = await import('./utils/aiListingGenerate.js');
+
+    const product = await Product.findById(req.query.id).select('name description images category subcategory').lean();
+    if (!product) return res.json({ error: 'product not found' });
+
+    const generated = await generateProductListingAI(product);
+    res.json({ originalName: product.name, imageCount: (product.images || []).length, generated });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
