@@ -287,34 +287,44 @@ app.get('/api/_debug_full_resync_streamed', async (req, res) => {
       'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
     }).lean();
 
-    const jobs = [];
+    const idJobs = [];
     for (const vendor of vendors) {
       let credential;
       try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
-      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
-      for (const product of products) {
-        if (looksCjSourced(product) && !(product.variants || []).some(v => v.cjVid)) {
-          jobs.push({ product, credential });
-        }
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null }).select('_id').lean();
+      for (const p of products) {
+        idJobs.push({ id: p._id, credential });
       }
     }
 
-    send({ type: 'start', total: jobs.length });
-    let newlyMatched = 0, failed = 0;
-    for (let i = 0; i < jobs.length; i++) {
-      const { product, credential } = jobs[i];
+    const limit = Number(req.query.limit) || idJobs.length;
+    const sliced = idJobs.slice(0, limit);
+
+    send({ type: 'start', total: sliced.length });
+    let newlyMatched = 0, failed = 0, skippedMatched = 0;
+    for (let i = 0; i < sliced.length; i++) {
+      const { id, credential } = sliced[i];
       try {
+        // Re-fetch fresh each iteration (not pre-built), matching the
+        // pattern that reliably succeeded in the smaller ad-hoc test —
+        // isolating whether a large upfront-built jobs array is itself
+        // a factor.
+        const product = await Product.findById(id).lean();
+        if (!product || !looksCjSourced(product) || (product.variants || []).some(v => v.cjVid)) {
+          skippedMatched++;
+          continue;
+        }
         const r = await syncProductFromCj(product, credential);
-        const fresh = await Product.findById(product._id).select('variants').lean();
+        const fresh = await Product.findById(id).select('variants').lean();
         const matched = (fresh.variants || []).some(v => v.cjVid);
         if (matched) newlyMatched++;
-        send({ type: 'progress', n: i + 1, total: jobs.length, name: product.name, matched, note: r.note });
+        send({ type: 'progress', n: i + 1, total: sliced.length, name: product.name, matched, note: r.note, cjSearchError: r.cjSearchError });
       } catch (err) {
         failed++;
-        send({ type: 'progress', n: i + 1, total: jobs.length, name: product.name, error: err.message });
+        send({ type: 'progress', n: i + 1, total: sliced.length, error: err.message });
       }
     }
-    send({ type: 'done', total: jobs.length, newlyMatched, failed });
+    send({ type: 'done', total: sliced.length, newlyMatched, failed, skippedMatched });
     res.end();
   } catch (err) {
     send({ type: 'error', error: err.message });
