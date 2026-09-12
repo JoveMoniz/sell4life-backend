@@ -414,9 +414,34 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         priceUpdate = { price: newPrice };
         pricesSynced++;
       }
-      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...priceUpdate };
+      // Stock — unlike price, this has no "no basis to compute it" case tied
+      // to markup config: CJ's real inventory count is ground truth, so it
+      // refreshes on every sync for every matched variant. Previously this
+      // sync never touched stock at all — set once at CSV import, then
+      // frozen forever, even though the data needed to keep it honest
+      // (cjV.inventories) was already being fetched here for origin
+      // detection. A real sellout could silently stay "in stock" forever,
+      // or a real restock could stay blocked — the same staleness risk
+      // shipping cost had, just for orders.js's trackInventory check.
+      //
+      // CJ's own API frequently returns no inventory data at all for a
+      // variant (inventories: null, confirmed directly against production
+      // data) — that's "CJ didn't tell us this time", not "confirmed zero
+      // stock". Treating a missing/empty array as 0 would wrongly zero out
+      // — and silently block orders on — every such product on its very
+      // next sync. Only overwrite stock when CJ actually returned at least
+      // one real inventory entry; otherwise keep whatever was already
+      // stored rather than guessing.
+      const stockUpdate = Array.isArray(cjV.inventories) && cjV.inventories.length > 0
+        ? { stock: cjV.inventories.reduce((sum, inv) => sum + (Number(inv.totalInventory) || 0), 0) }
+        : {};
+      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...stockUpdate, ...priceUpdate };
     });
     if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+
+    const totalStock = syncedVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+    updateDoc.stock = totalStock;
+    updateDoc.trackInventory = totalStock > 0;
 
     // Keep the base "from £X" price honest — always the cheapest variant,
     // never a stale independently-set number.
