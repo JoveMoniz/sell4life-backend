@@ -352,6 +352,49 @@ app.get('/api/_debug_resync_spotcheck', async (req, res) => {
   }
 });
 
+// TEMP DEBUG — same as above but split by active/draft, since the vendor
+// clarified only the draft batch (the ones the CSV origin-only import
+// touched) should ever be GB — the rest of the catalog is genuinely
+// China-sourced and always was. Checks whether the earlier "regression"
+// concern was real or just an unfiltered sample mixing both groups.
+app.get('/api/_debug_resync_by_status', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912k') return res.status(404).end();
+  try {
+    const Vendor = (await import('./models/vendor.js')).default;
+    const Product = (await import('./models/product.js')).default;
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).select('_id storeName').lean();
+
+    const results = [];
+    for (const vendor of vendors) {
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null })
+        .select('name active variants shippingOriginCountry shippingCost').lean();
+      const cjProducts = products.filter(looksCjSourced).filter(p => (p.variants || []).some(v => v.cjVid));
+
+      for (const activeFlag of [false, true]) {
+        const group = cjProducts.filter(p => p.active === activeFlag);
+        const gb = group.filter(p => p.shippingOriginCountry === 'GB').length;
+        const cn = group.filter(p => p.shippingOriginCountry === 'CN' || !p.shippingOriginCountry).length;
+        results.push({
+          vendor: vendor.storeName,
+          status: activeFlag ? 'active' : 'draft',
+          matchedCount: group.length,
+          gbCount: gb,
+          cnCount: cn,
+          sample: group.slice(0, 6).map(p => ({ name: p.name, origin: p.shippingOriginCountry, shippingCost: p.shippingCost })),
+        });
+      }
+    }
+    res.json({ results });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
