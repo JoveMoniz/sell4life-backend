@@ -227,6 +227,74 @@ app.get('/api/version', (req, res) => {
 
 
 // ======================================================
+// TEMP ACTION — key-gated. Fourth (and hopefully final) pass, now that
+// CJ calls share one real rate-limit gate across search/detail/video/
+// freight. Targets only products still missing a cjVid. Progress via
+// /api/_debug_resync4_status. Remove both after use.
+// ======================================================
+let _resync4Status = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: null, finishedAt: null };
+
+app.get('/api/_action_resync4', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    if (_resync4Status.running) return res.json({ error: 'already running', status: _resync4Status });
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).lean();
+
+    const jobs = [];
+    for (const vendor of vendors) {
+      let credential;
+      try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
+      for (const product of products) {
+        if (looksCjSourced(product) && !(product.variants || []).some(v => v.cjVid)) {
+          jobs.push({ product, credential });
+        }
+      }
+    }
+
+    _resync4Status = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: new Date().toISOString(), finishedAt: null };
+
+    (async () => {
+      for (const { product, credential } of jobs) {
+        try {
+          const r = await syncProductFromCj(product, credential);
+          _resync4Status.done++;
+          if (r.status === 'updated') _resync4Status.updated++;
+          else if (r.status === 'failed') _resync4Status.failed++;
+          else _resync4Status.skipped++;
+
+          const fresh = await Product.findById(product._id).select('variants').lean();
+          if ((fresh.variants || []).some(v => v.cjVid)) _resync4Status.newlyMatched++;
+        } catch (err) {
+          _resync4Status.done++;
+          _resync4Status.failed++;
+        }
+      }
+      _resync4Status.running = false;
+      _resync4Status.finishedAt = new Date().toISOString();
+    })();
+
+    res.json({ resyncStarted: jobs.length });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
+app.get('/api/_debug_resync4_status', (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
+  res.json(_resync4Status);
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
