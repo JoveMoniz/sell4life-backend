@@ -237,7 +237,9 @@ app.get('/api/_action_resync_one', async (req, res) => {
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
     const { syncProductFromCj } = await import('./utils/cjProductSync.js');
 
-    const product = await Product.findOne({ name: new RegExp(req.query.name, 'i') }).lean();
+    const product = req.query.cost != null
+      ? await Product.findOne({ name: new RegExp(req.query.name, 'i'), shippingCost: Number(req.query.cost) }).lean()
+      : await Product.findOne({ name: new RegExp(req.query.name, 'i') }).lean();
     if (!product) return res.json({ error: 'product not found' });
     const vendor = await Vendor.findById(product.vendor).lean();
     const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
