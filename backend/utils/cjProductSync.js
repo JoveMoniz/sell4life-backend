@@ -306,10 +306,6 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
       }
 
       if (!cjV) return { ourV, cjV: null, costGbp: null };
-      if (!firstCjVid && cjV.vid) {
-        firstCjVid = cjV.vid;
-        firstCjInventories = cjV.inventories || [];
-      }
       variantsSynced++;
 
       let costGbp = null;
@@ -319,6 +315,21 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
       }
       return { ourV, cjV, costGbp };
     });
+
+    // Pick which matched variant to request the shipping quote from.
+    // Was previously just "the first one matched" — but a variant with
+    // zero stock (e.g. a discontinued colour) genuinely has no freight
+    // route on CJ's side (0 options returned), silently leaving the
+    // whole product's shippingCost stuck on a stale value forever even
+    // though sibling variants with real stock quote fine. Prefer a
+    // variant with actual stock; only fall back to a zero-stock one if
+    // every matched variant is out of stock.
+    const withCjV = matched.filter(m => m.cjV?.vid);
+    const stockedFirst = withCjV.find(m => Number(m.ourV?.stock) > 0) || withCjV[0];
+    if (stockedFirst) {
+      firstCjVid = stockedFirst.cjV.vid;
+      firstCjInventories = stockedFirst.cjV.inventories || [];
+    }
   }
 
   // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
