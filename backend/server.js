@@ -226,6 +226,38 @@ app.get('/api/version', (req, res) => {
 });
 
 
+// TEMP DEBUG — verifies the stock-refresh fix on a real product: does a
+// matched variant's stock get updated from CJ's real inventory data, and
+// does a variant with no inventory data returned keep its existing stock
+// rather than getting zeroed out? Remove after use.
+app.get('/api/_debug_verify_stock_refresh', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912s') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+
+    const product = await Product.findById(req.query.id).lean();
+    if (!product) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(product.vendor).lean();
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const before = { stock: product.stock, trackInventory: product.trackInventory, variants: (product.variants || []).map(v => ({ sku: v.sku, stock: v.stock })) };
+    const syncResult = await syncProductFromCj(product, credential);
+    const after = await Product.findById(product._id).select('stock trackInventory variants').lean();
+
+    res.json({
+      name: product.name,
+      before,
+      after: { stock: after.stock, trackInventory: after.trackInventory, variants: (after.variants || []).map(v => ({ sku: v.sku, stock: v.stock })) },
+      syncResult,
+    });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
