@@ -226,40 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — runs a real syncProductFromCj to confirm the new
-// truncated-base-SKU fallback (just added to cjdropshipping.js) actually
-// produces a matched cjVid end-to-end, not just a raw search hit. Remove
-// after use.
-app.get('/api/_debug_verify_sku_fallback', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912l') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-
-    const before = await Product.findById(req.query.id).lean();
-    if (!before) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(before.vendor).lean();
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-
-    const syncResult = await syncProductFromCj(before, credential);
-    const after = await Product.findById(req.query.id).lean();
-
-    res.json({
-      name: before.name,
-      storedSku: (before.variants || []).map(v => v.sku),
-      syncResult,
-      cjVidBefore: (before.variants || []).map(v => v.cjVid),
-      cjVidAfter: (after.variants || []).map(v => v.cjVid),
-      shippingCostBefore: before.shippingCost,
-      shippingCostAfter: after.shippingCost,
-    });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
