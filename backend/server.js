@@ -226,36 +226,35 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — tests several truncations of a known-correct SKU against
-// CJ's raw product/list search, to see if CJ indexes products under a
-// shorter "base SPU" sku (full sku minus the trailing 2-digit-index +
-// 2-letter-code CJ appends per variant/color) rather than the full
-// variant-level string. Remove after use.
-app.get('/api/_debug_sku_truncation_test', async (req, res) => {
+// TEMP DEBUG — runs a real syncProductFromCj to confirm the new
+// truncated-base-SKU fallback (just added to cjdropshipping.js) actually
+// produces a matched cjVid end-to-end, not just a raw search hit. Remove
+// after use.
+app.get('/api/_debug_verify_sku_fallback', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912l') return res.status(404).end();
   try {
+    const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { debugRawSkuSearch } = await import('./utils/shippingProviders/cjdropshipping.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
 
-    const vendor = await Vendor.findOne({ storeName: req.query.vendor || 'Forge & Found' }).lean();
-    if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor not found or no CJ credential' });
+    const before = await Product.findById(req.query.id).lean();
+    if (!before) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(before.vendor).lean();
     const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
 
-    const sku = req.query.sku;
-    const candidates = [
-      sku,
-      sku.slice(0, -4),
-      sku.slice(0, -3),
-      sku.slice(0, -2),
-    ];
+    const syncResult = await syncProductFromCj(before, credential);
+    const after = await Product.findById(req.query.id).lean();
 
-    const results = [];
-    for (const c of candidates) {
-      const r = await debugRawSkuSearch(c, credential);
-      results.push(r);
-    }
-    res.json({ results });
+    res.json({
+      name: before.name,
+      storedSku: (before.variants || []).map(v => v.sku),
+      syncResult,
+      cjVidBefore: (before.variants || []).map(v => v.cjVid),
+      cjVidAfter: (after.variants || []).map(v => v.cjVid),
+      shippingCostBefore: before.shippingCost,
+      shippingCostAfter: after.shippingCost,
+    });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
   }

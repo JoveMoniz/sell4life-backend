@@ -319,31 +319,6 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
   return { results, warnings };
 }
 
-// TEMP DEBUG — raw product/list search by an arbitrary productSku string,
-// for testing which SKU truncation (if any) CJ's own search actually
-// recognizes. Remove after use.
-export async function debugRawSkuSearch(sku, credential) {
-  const token = await resolveToken(credential);
-  if (!token) return { error: 'no token' };
-  const resp = await fetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, productSku: sku })}`, {
-    headers: { 'CJ-Access-Token': token },
-  });
-  const data = await resp.json().catch(() => ({}));
-  return {
-    sku,
-    httpOk: resp.ok,
-    httpStatus: resp.status,
-    code: data?.code,
-    message: data?.message,
-    total: data?.data?.total,
-    first: data?.data?.list?.[0] ? {
-      pid: data.data.list[0].pid,
-      productNameEn: data.data.list[0].productNameEn,
-      variantCount: (data.data.list[0].variantList || []).length,
-    } : null,
-  };
-}
-
 // ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
 //    raw code/message instead of collapsing every failure mode to null.
 //    Bypasses the cache deliberately — used to investigate why a product
@@ -693,6 +668,22 @@ export async function getProductImages(vid, productName, credential, pidOverride
       await delay(200);
       const media2 = await searchAndExtract({ productSku: basePid });
       if (media2?.images?.length) return media2;
+    }
+
+    // Tertiary: CJ's own SKU convention is <base SPU sku><2-digit variant
+    // index><2-letter colour code> (e.g. "CJLY264262201AZ" = base
+    // "CJLY2642622" + "01" + "AZ") — confirmed via direct search testing:
+    // the full variant-level SKU returns zero results from CJ's own
+    // product/list search, but the 11-char base does. Only try this for
+    // SKUs that plausibly have that suffix (11+ chars, no hyphen already
+    // handled above) — cheap enough to always attempt otherwise, but
+    // guard the length so we don't truncate an already-short/base SKU
+    // into garbage.
+    if (!basePid && vid.length >= 8) {
+      const truncatedBase = vid.slice(0, -4);
+      await delay(200);
+      const media2b = await searchAndExtract({ productSku: truncatedBase });
+      if (media2b?.images?.length) return media2b;
     }
 
     // Last resort: name search, accepted only if result name substantially overlaps ours
