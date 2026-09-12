@@ -227,23 +227,24 @@ app.get('/api/version', (req, res) => {
 
 
 // ======================================================
-// TEMP ACTION — key-gated. User approved re-running a full sync now
-// that the base-SKU fallback fix is live, so previously-unmatched CJ
-// products get a real chance at matching. Runs in the background;
-// progress readable via /api/_debug_resync2_status. Remove both after
-// use.
+// TEMP ACTION — key-gated. Third pass: re-runs the full sync WITH the
+// new 300ms inter-product pacing (same fix just added to the real
+// bulk-sync route and periodic worker) to confirm it resolves the
+// transient rate-limit failures seen in the unpaced run. Runs in the
+// background; progress readable via /api/_debug_resync3_status.
+// Remove both after use.
 // ======================================================
-let _resync2Status = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: null, finishedAt: null };
+let _resync3Status = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: null, finishedAt: null };
 
-app.get('/api/_action_resync2', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
+app.get('/api/_action_resync3', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912n') return res.status(404).end();
   try {
     const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
     const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
 
-    if (_resync2Status.running) return res.json({ error: 'already running', status: _resync2Status });
+    if (_resync3Status.running) return res.json({ error: 'already running', status: _resync3Status });
 
     const vendors = await Vendor.find({
       type: 'professional',
@@ -256,33 +257,33 @@ app.get('/api/_action_resync2', async (req, res) => {
       try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
       const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
       for (const product of products) {
-        if (looksCjSourced(product)) jobs.push({ product, credential });
+        if (looksCjSourced(product) && !(product.variants || []).some(v => v.cjVid)) {
+          jobs.push({ product, credential });
+        }
       }
     }
 
-    _resync2Status = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: new Date().toISOString(), finishedAt: null };
+    _resync3Status = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: new Date().toISOString(), finishedAt: null };
 
     (async () => {
       for (const { product, credential } of jobs) {
-        const hadCjVidBefore = (product.variants || []).some(v => v.cjVid);
         try {
+          await new Promise(r => setTimeout(r, 300));
           const r = await syncProductFromCj(product, credential);
-          _resync2Status.done++;
-          if (r.status === 'updated') _resync2Status.updated++;
-          else if (r.status === 'failed') _resync2Status.failed++;
-          else _resync2Status.skipped++;
+          _resync3Status.done++;
+          if (r.status === 'updated') _resync3Status.updated++;
+          else if (r.status === 'failed') _resync3Status.failed++;
+          else _resync3Status.skipped++;
 
-          if (!hadCjVidBefore) {
-            const fresh = await Product.findById(product._id).select('variants').lean();
-            if ((fresh.variants || []).some(v => v.cjVid)) _resync2Status.newlyMatched++;
-          }
+          const fresh = await Product.findById(product._id).select('variants').lean();
+          if ((fresh.variants || []).some(v => v.cjVid)) _resync3Status.newlyMatched++;
         } catch (err) {
-          _resync2Status.done++;
-          _resync2Status.failed++;
+          _resync3Status.done++;
+          _resync3Status.failed++;
         }
       }
-      _resync2Status.running = false;
-      _resync2Status.finishedAt = new Date().toISOString();
+      _resync3Status.running = false;
+      _resync3Status.finishedAt = new Date().toISOString();
     })();
 
     res.json({ resyncStarted: jobs.length });
@@ -291,36 +292,9 @@ app.get('/api/_action_resync2', async (req, res) => {
   }
 });
 
-app.get('/api/_debug_resync2_status', (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
-  res.json(_resync2Status);
-});
-
-// TEMP DEBUG — trace exactly why a specific product's base-SKU fallback
-// didn't fire, via a fresh sync run with full cjSearchDebug returned.
-// Remove after use.
-app.get('/api/_debug_trace_sync', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-
-    const product = await Product.findById(req.query.id).lean();
-    if (!product) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(product.vendor).lean();
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-
-    const syncResult = await syncProductFromCj(product, credential);
-    res.json({
-      name: product.name,
-      storedSku: (product.variants || []).map(v => v.sku),
-      syncResult,
-    });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
+app.get('/api/_debug_resync3_status', (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912n') return res.status(404).end();
+  res.json(_resync3Status);
 });
 
 // ======================================================

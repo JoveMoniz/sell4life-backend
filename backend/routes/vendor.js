@@ -1063,6 +1063,16 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
       const product = targets[i];
       send({ type: 'progress', n: i + 1, total: targets.length, name: product.name, status: 'fetching' });
 
+      // A product with no supplierUrl/cjVid does 2-3 sequential CJ API
+      // calls of its own (list search, detail, freight quote) — back to
+      // back across a large batch this exceeds CJ's ~1 req/s limit often
+      // enough that some searches get silently rate-limited and read as
+      // "not found" rather than retried, so genuinely matchable products
+      // fall through to name-search or fail outright. A small fixed gap
+      // between products (not needed within syncProductFromCj's own
+      // retry-aware calls) keeps the whole run under that limit.
+      if (i > 0) await new Promise(r => setTimeout(r, 300));
+
       const r = await syncProductFromCj(product, credential, { forceCategory });
       if (r.status === 'updated') {
         updated++;

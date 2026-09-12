@@ -42,6 +42,12 @@ export async function processCjProductSync() {
         const needsSync = (product.variants || []).some(v => (v.supplierVariantRef || v.sku) && !v.cjVid);
         if (!needsSync) { summary.skipped++; continue; }
 
+        // Same pacing fix as the vendor's bulk-sync route — back-to-back
+        // CJ calls across many products in one sweep can exceed CJ's
+        // ~1 req/s limit and cause a search that would otherwise succeed
+        // to come back empty. A harmless extra 300ms on the first call.
+        await new Promise(r => setTimeout(r, 300));
+
         const r = await syncProductFromCj(product, credential);
         if (r.status === 'updated' && r.variantsSynced > 0) {
           summary.synced++;
