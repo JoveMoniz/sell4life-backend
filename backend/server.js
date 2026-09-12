@@ -226,38 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — checks the RAW inventories CJ returned for a specific
-// matched variant, to know for certain whether the stock-refresh fix's
-// "confirmed data" path or its "preserve on missing data" path fired for
-// a given product, rather than inferring it from an unchanged number.
-// Remove after use.
-app.get('/api/_debug_raw_inventories', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912s') return res.status(404).end();
-  try {
-    const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { getProductImages } = await import('./utils/shippingProviders/cjdropshipping.js');
-    const { cjPidFromUrl } = await import('./utils/cjProductSync.js');
-
-    const product = await Product.findById(req.query.id).lean();
-    if (!product) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(product.vendor).lean();
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-
-    const pidOverride = cjPidFromUrl(product.supplierUrl);
-    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean);
-    const result = await getProductImages(vid, product.name, credential, pidOverride);
-
-    res.json({
-      name: product.name,
-      cjVariants: result?.cjVariants?.map(v => ({ vid: v.vid, variantSku: v.variantSku, inventories: v.inventories })) || result?.error,
-    });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
