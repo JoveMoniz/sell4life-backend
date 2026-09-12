@@ -226,109 +226,30 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — resync4 finished 73/73 with 0 newlyMatched, same as the
-// unpaced runs, DESPITE the shared rate-limit gate being confirmed
-// working under true concurrent load moments earlier. This tests a
-// different variable: does a SEQUENTIAL loop, fully awaited within one
-// request/response cycle (never detached into a background IIFE),
-// succeed on multiple previously-unmatched products? If yes, the real
-// cause is something about the detached-background execution pattern
-// specifically, not CJ's rate limit at all. Remove after use.
-app.get('/api/_debug_sequential_test', async (req, res) => {
+// TEMP DEBUG — final coverage check before cleanup. Remove after use.
+app.get('/api/_debug_final_coverage', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
   try {
-    const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-
-    const ids = (req.query.ids || '').split(',').filter(Boolean);
-    const results = [];
-    for (const id of ids) {
-      const product = await Product.findById(id).lean();
-      if (!product) { results.push({ id, error: 'not found' }); continue; }
-      const vendor = await Vendor.findById(product.vendor).lean();
-      const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-      const r = await syncProductFromCj(product, credential);
-      results.push({
-        id, name: product.name,
-        variantsSynced: r.variantsSynced,
-        note: r.note,
-        cjSearchError: r.cjSearchError,
-        cjSearchDebug: r.cjSearchDebug,
-      });
-    }
-    res.json({ results });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
-
-// TEMP DEBUG — the real, conclusive test: runs sync on EVERY remaining
-// unmatched CJ product, sequentially, fully awaited within one live
-// streamed request/response (same execution pattern the real vendor
-// bulk-sync button already uses) — never detached into a background
-// task. Streams NDJSON progress so the connection stays active the
-// whole time. This is expected to actually work, unlike every prior
-// detached-background attempt today. Remove after use.
-app.get('/api/_debug_full_resync_streamed', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912o') return res.status(404).end();
-  res.setHeader('Content-Type', 'application/x-ndjson');
-  res.setHeader('Transfer-Encoding', 'chunked');
-  const send = obj => res.write(JSON.stringify(obj) + '\n');
-  try {
     const Product = (await import('./models/product.js')).default;
-    const Vendor = (await import('./models/vendor.js')).default;
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+    const { looksCjSourced } = await import('./utils/cjProductSync.js');
 
     const vendors = await Vendor.find({
       type: 'professional',
       'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
-    }).lean();
+    }).select('_id storeName').lean();
 
-    const idJobs = [];
+    const results = [];
     for (const vendor of vendors) {
-      let credential;
-      try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
-      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null }).select('_id').lean();
-      for (const p of products) {
-        idJobs.push({ id: p._id, credential });
-      }
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null })
+        .select('name variants').lean();
+      const cjProducts = products.filter(looksCjSourced);
+      const matched = cjProducts.filter(p => (p.variants || []).some(v => v.cjVid));
+      results.push({ vendor: vendor.storeName, cjSourced: cjProducts.length, matched: matched.length, unmatched: cjProducts.length - matched.length });
     }
-
-    const limit = Number(req.query.limit) || idJobs.length;
-    const sliced = idJobs.slice(0, limit);
-
-    send({ type: 'start', total: sliced.length });
-    let newlyMatched = 0, failed = 0, skippedMatched = 0;
-    for (let i = 0; i < sliced.length; i++) {
-      const { id, credential } = sliced[i];
-      try {
-        // Re-fetch fresh each iteration (not pre-built), matching the
-        // pattern that reliably succeeded in the smaller ad-hoc test —
-        // isolating whether a large upfront-built jobs array is itself
-        // a factor.
-        const product = await Product.findById(id).lean();
-        if (!product || !looksCjSourced(product) || (product.variants || []).some(v => v.cjVid)) {
-          skippedMatched++;
-          continue;
-        }
-        const r = await syncProductFromCj(product, credential);
-        const fresh = await Product.findById(id).select('variants').lean();
-        const matched = (fresh.variants || []).some(v => v.cjVid);
-        if (matched) newlyMatched++;
-        send({ type: 'progress', n: i + 1, total: sliced.length, name: product.name, matched, note: r.note, cjSearchError: r.cjSearchError });
-      } catch (err) {
-        failed++;
-        send({ type: 'progress', n: i + 1, total: sliced.length, error: err.message });
-      }
-    }
-    send({ type: 'done', total: sliced.length, newlyMatched, failed, skippedMatched });
-    res.end();
+    res.json({ results });
   } catch (err) {
-    send({ type: 'error', error: err.message });
-    res.end();
+    res.json({ error: err.message });
   }
 });
 
