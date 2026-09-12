@@ -226,26 +226,6 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — key-gated. Confirms whether the real AI category call
-// (matchProductTitleAI, aiCategoryMatch.js) actually succeeds on
-// production right now, vs silently falling back to the old keyword
-// matcher (which rematchProductCategoryFromTitle's classify() wrapper
-// does automatically on ANY AI failure, with no visible error to the
-// vendor). Tests the AI function directly, unwrapped, so a real
-// failure surfaces here instead of being swallowed. Remove after use.
-app.get('/api/_debug_ai_category_check', async (req, res) => {
-  if (req.query.k !== 's4l-debug-20260912t') return res.status(404).end();
-  try {
-    const hasKey = !!process.env.ANTHROPIC_API_KEY;
-    const { matchProductTitleAI } = await import('./utils/aiCategoryMatch.js');
-    const testTitle = req.query.title || 'Rubber Duck Bath Toy for Kids';
-    const result = await matchProductTitleAI(testTitle, {});
-    res.json({ hasApiKeyEnvVar: hasKey, testTitle, result });
-  } catch (err) {
-    res.json({ hasApiKeyEnvVar: !!process.env.ANTHROPIC_API_KEY, error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // HEALTH CHECK
 // ======================================================
