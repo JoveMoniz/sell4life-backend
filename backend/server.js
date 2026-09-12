@@ -226,34 +226,25 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — key-gated. Traces the exact CJ freight error for a
-// multi-variant product whose shipping quote came back null twice in
-// a row, testing each variant individually (theory: one variant may
-// have zero stock and no valid freight route, while a stocked sibling
-// variant does). Remove after use.
-app.get('/api/_debug_freight_trace', async (req, res) => {
+// TEMP DEBUG — verifies the stock-aware variant-selection fix on the
+// exact product that exposed the bug. Remove after use.
+app.get('/api/_debug_verify_stock_fix', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912r') return res.status(404).end();
   try {
     const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { getShippingCostDiagnostic } = await import('./utils/shippingProviders/cjdropshipping.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
 
     const product = await Product.findOne({ name: new RegExp(req.query.name, 'i'), shippingCost: Number(req.query.cost) }).lean();
     if (!product) return res.json({ error: 'product not found' });
     const vendor = await Vendor.findById(product.vendor).lean();
     const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
 
-    const results = [];
-    for (const v of (product.variants || [])) {
-      if (!v.cjVid) { results.push({ sku: v.sku, cjVid: v.cjVid, stock: v.stock, skip: 'no cjVid' }); continue; }
-      const diag = await getShippingCostDiagnostic(
-        { supplierVariantRef: v.cjVid, destinationCountry: 'GB', quantity: 1, startCountryCode: 'GB' },
-        credential
-      );
-      results.push({ sku: v.sku, cjVid: v.cjVid, stock: v.stock, diag });
-    }
-    res.json({ name: product.name, shippingOriginCountry: product.shippingOriginCountry, results });
+    const before = product.shippingCost;
+    const syncResult = await syncProductFromCj(product, credential);
+    const after = await Product.findById(product._id).select('shippingCost').lean();
+    res.json({ name: product.name, before, after: after.shippingCost, syncResult });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
   }
