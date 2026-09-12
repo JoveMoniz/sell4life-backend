@@ -296,6 +296,34 @@ app.get('/api/_debug_resync2_status', (req, res) => {
   res.json(_resync2Status);
 });
 
+// TEMP DEBUG — resync2 finished with 0 newlyMatched across 167 products,
+// which is suspicious given the manual test proved the fallback works.
+// Checks current real state of specific known-previously-unmatched
+// products to determine if the fix actually fired (counter bug) or
+// genuinely didn't match at scale. Remove after use.
+app.get('/api/_debug_spotcheck_after_resync2', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const ids = [
+      '6aa2c9f8eae8170a209150a4',
+      '6aa2c9f8eae8170a209150a8',
+      '6aa2c9f8eae8170a209150ac',
+      '6aa2c9f8eae8170a209150b0',
+      '6aa2c9f8eae8170a209150b4',
+    ];
+    const products = await Product.find({ _id: { $in: ids } })
+      .select('name variants shippingOriginCountry shippingCost updatedAt').lean();
+    res.json(products.map(p => ({
+      id: String(p._id), name: p.name, origin: p.shippingOriginCountry,
+      shippingCost: p.shippingCost, updatedAt: p.updatedAt,
+      variants: (p.variants || []).map(v => ({ sku: v.sku, cjVid: v.cjVid })),
+    })));
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
