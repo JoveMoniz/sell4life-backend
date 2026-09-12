@@ -227,6 +227,76 @@ app.get('/api/version', (req, res) => {
 
 
 // ======================================================
+// TEMP ACTION — key-gated. User approved re-running a full sync now
+// that the base-SKU fallback fix is live, so previously-unmatched CJ
+// products get a real chance at matching. Runs in the background;
+// progress readable via /api/_debug_resync2_status. Remove both after
+// use.
+// ======================================================
+let _resync2Status = { running: false, total: 0, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: null, finishedAt: null };
+
+app.get('/api/_action_resync2', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj, looksCjSourced } = await import('./utils/cjProductSync.js');
+
+    if (_resync2Status.running) return res.json({ error: 'already running', status: _resync2Status });
+
+    const vendors = await Vendor.find({
+      type: 'professional',
+      'supplierCredentials.cjdropshipping': { $exists: true, $ne: null },
+    }).lean();
+
+    const jobs = [];
+    for (const vendor of vendors) {
+      let credential;
+      try { credential = decryptCredential(vendor.supplierCredentials.cjdropshipping); } catch (_) { continue; }
+      const products = await Product.find({ vendor: vendor._id, archived: { $ne: true }, deletedAt: null });
+      for (const product of products) {
+        if (looksCjSourced(product)) jobs.push({ product, credential });
+      }
+    }
+
+    _resync2Status = { running: true, total: jobs.length, done: 0, updated: 0, failed: 0, skipped: 0, newlyMatched: 0, startedAt: new Date().toISOString(), finishedAt: null };
+
+    (async () => {
+      for (const { product, credential } of jobs) {
+        const hadCjVidBefore = (product.variants || []).some(v => v.cjVid);
+        try {
+          const r = await syncProductFromCj(product, credential);
+          _resync2Status.done++;
+          if (r.status === 'updated') _resync2Status.updated++;
+          else if (r.status === 'failed') _resync2Status.failed++;
+          else _resync2Status.skipped++;
+
+          if (!hadCjVidBefore) {
+            const fresh = await Product.findById(product._id).select('variants').lean();
+            if ((fresh.variants || []).some(v => v.cjVid)) _resync2Status.newlyMatched++;
+          }
+        } catch (err) {
+          _resync2Status.done++;
+          _resync2Status.failed++;
+        }
+      }
+      _resync2Status.running = false;
+      _resync2Status.finishedAt = new Date().toISOString();
+    })();
+
+    res.json({ resyncStarted: jobs.length });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
+app.get('/api/_debug_resync2_status', (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912m') return res.status(404).end();
+  res.json(_resync2Status);
+});
+
+// ======================================================
 // HEALTH CHECK
 // ======================================================
 app.get('/api/health', (req, res) => {
