@@ -226,40 +226,36 @@ app.get('/api/version', (req, res) => {
 });
 
 
-// TEMP DEBUG — key-gated. Vendor's own fresh CJ CSV export has NO product
-// ID/link column at all — only Product Title, SKU, Shipping From, etc.
-// But some unmatched products' stored SKU already exactly matches this
-// CSV's SKU column (e.g. "391pcs First Aid Kit", CJLY264262201AZ) — this
-// tests whether CJ's own productSku search actually finds a match when
-// the SKU is already correct, without any Supplier URL at all. If yes,
-// re-importing this CSV (refreshing sku on every variant) could auto-fix
-// most unmatched products with zero manual work. If no, CJ's search
-// endpoint has its own separate limitation and manual URLs are still
-// needed. Remove after use.
-app.get('/api/_debug_sku_only_match_test', async (req, res) => {
+// TEMP DEBUG — tests several truncations of a known-correct SKU against
+// CJ's raw product/list search, to see if CJ indexes products under a
+// shorter "base SPU" sku (full sku minus the trailing 2-digit-index +
+// 2-letter-code CJ appends per variant/color) rather than the full
+// variant-level string. Remove after use.
+app.get('/api/_debug_sku_truncation_test', async (req, res) => {
   if (req.query.k !== 's4l-debug-20260912l') return res.status(404).end();
   try {
-    const Product = (await import('./models/product.js')).default;
     const Vendor = (await import('./models/vendor.js')).default;
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+    const { debugRawSkuSearch } = await import('./utils/shippingProviders/cjdropshipping.js');
 
-    const before = await Product.findById(req.query.id).lean();
-    if (!before) return res.json({ error: 'product not found' });
-    const vendor = await Vendor.findById(before.vendor).lean();
+    const vendor = await Vendor.findOne({ storeName: req.query.vendor || 'Forge & Found' }).lean();
+    if (!vendor?.supplierCredentials?.cjdropshipping) return res.json({ error: 'vendor not found or no CJ credential' });
     const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
 
-    const syncResult = await syncProductFromCj(before, credential);
-    const after = await Product.findById(req.query.id).lean();
+    const sku = req.query.sku;
+    const candidates = [
+      sku,
+      sku.slice(0, -4),
+      sku.slice(0, -3),
+      sku.slice(0, -2),
+    ];
 
-    res.json({
-      name: before.name,
-      storedSku: (before.variants || []).map(v => v.sku),
-      supplierUrl: before.supplierUrl,
-      syncResult,
-      cjVidBefore: (before.variants || []).map(v => v.cjVid),
-      cjVidAfter: (after.variants || []).map(v => v.cjVid),
-    });
+    const results = [];
+    for (const c of candidates) {
+      const r = await debugRawSkuSearch(c, credential);
+      results.push(r);
+    }
+    res.json({ results });
   } catch (err) {
     res.json({ error: err.message, stack: err.stack });
   }

@@ -319,6 +319,31 @@ export async function getOrderStatusBatch(cjOrderIds, credential) {
   return { results, warnings };
 }
 
+// TEMP DEBUG — raw product/list search by an arbitrary productSku string,
+// for testing which SKU truncation (if any) CJ's own search actually
+// recognizes. Remove after use.
+export async function debugRawSkuSearch(sku, credential) {
+  const token = await resolveToken(credential);
+  if (!token) return { error: 'no token' };
+  const resp = await fetch(`${CJ_BASE}/product/list?${new URLSearchParams({ pageNum: 1, pageSize: 5, productSku: sku })}`, {
+    headers: { 'CJ-Access-Token': token },
+  });
+  const data = await resp.json().catch(() => ({}));
+  return {
+    sku,
+    httpOk: resp.ok,
+    httpStatus: resp.status,
+    code: data?.code,
+    message: data?.message,
+    total: data?.data?.total,
+    first: data?.data?.list?.[0] ? {
+      pid: data.data.list[0].pid,
+      productNameEn: data.data.list[0].productNameEn,
+      variantCount: (data.data.list[0].variantList || []).length,
+    } : null,
+  };
+}
+
 // ── Diagnostic: same freight call as getShippingCost, but surfaces CJ's
 //    raw code/message instead of collapsing every failure mode to null.
 //    Bypasses the cache deliberately — used to investigate why a product
