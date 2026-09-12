@@ -226,6 +226,45 @@ app.get('/api/version', (req, res) => {
 });
 
 
+// TEMP DEBUG — key-gated. Vendor's own fresh CJ CSV export has NO product
+// ID/link column at all — only Product Title, SKU, Shipping From, etc.
+// But some unmatched products' stored SKU already exactly matches this
+// CSV's SKU column (e.g. "391pcs First Aid Kit", CJLY264262201AZ) — this
+// tests whether CJ's own productSku search actually finds a match when
+// the SKU is already correct, without any Supplier URL at all. If yes,
+// re-importing this CSV (refreshing sku on every variant) could auto-fix
+// most unmatched products with zero manual work. If no, CJ's search
+// endpoint has its own separate limitation and manual URLs are still
+// needed. Remove after use.
+app.get('/api/_debug_sku_only_match_test', async (req, res) => {
+  if (req.query.k !== 's4l-debug-20260912l') return res.status(404).end();
+  try {
+    const Product = (await import('./models/product.js')).default;
+    const Vendor = (await import('./models/vendor.js')).default;
+    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
+    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
+
+    const before = await Product.findById(req.query.id).lean();
+    if (!before) return res.json({ error: 'product not found' });
+    const vendor = await Vendor.findById(before.vendor).lean();
+    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+
+    const syncResult = await syncProductFromCj(before, credential);
+    const after = await Product.findById(req.query.id).lean();
+
+    res.json({
+      name: before.name,
+      storedSku: (before.variants || []).map(v => v.sku),
+      supplierUrl: before.supplierUrl,
+      syncResult,
+      cjVidBefore: (before.variants || []).map(v => v.cjVid),
+      cjVidAfter: (after.variants || []).map(v => v.cjVid),
+    });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
 // ======================================================
 // HEALTH CHECK
 // ======================================================
