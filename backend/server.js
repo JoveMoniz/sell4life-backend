@@ -260,16 +260,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/_debug_ip_check', (req, res) => {
-  if (req.query.k !== 'ip-check-prod-7a2') return res.status(404).end();
-  res.json({
-    resolvedIp: req.ip,
-    ips: req.ips,
-    xForwardedFor: req.headers['x-forwarded-for'] || null,
-    userAgent: req.headers['user-agent'] || null,
-  });
-});
-
 // ======================================================
 // ENVIRONMENT VALIDATION
 // ======================================================
