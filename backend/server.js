@@ -266,7 +266,8 @@ app.get('/api/_debug_cj_raw_variants', async (req, res) => {
   try {
     const Vendor = (await import('./models/vendor.js')).default;
     const Product = (await import('./models/product.js')).default;
-    const { getProductImages, cjPidFromUrl } = await import('./utils/shippingProviders/cjdropshipping.js');
+    const { getProductImages } = await import('./utils/shippingProviders/cjdropshipping.js');
+    const { cjPidFromUrl } = await import('./utils/cjProductSync.js');
     const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
 
     const name = req.query.name || 'T87 Wireless Gaming Keyboard';
