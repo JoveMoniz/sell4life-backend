@@ -119,18 +119,35 @@ app.options('*', cors(corsOptions));
 // JSON-shaped message instead.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 1500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests — please try again shortly.' },
-  // Tracking and the admin analytics dashboard get their own, more
-  // generous limiters below — a single active visitor already fires
+  // Tracking, the admin analytics dashboard, and vendor tools get their own,
+  // more generous limiters below — a single active visitor already fires
   // several beacons per pageview (shared-IP scenarios like offices or
   // mobile carrier NAT would otherwise exhaust this limit almost
   // immediately), and the dashboard's 20s realtime poll plus its
   // multi-endpoint page load adds up fast under normal, legitimate use
-  // by an already-authenticated admin.
-  skip: (req) => req.path.startsWith('/interactions') || req.path.startsWith('/admin/analytics'),
+  // by an already-authenticated admin. The base ceiling itself is raised
+  // from the original 500 for the same shared-IP reason: a household or
+  // small office doing normal shopping alongside a vendor's own admin work
+  // shares one public IP and one 15-minute bucket, and 500 proved too easy
+  // to exhaust with entirely legitimate combined traffic.
+  skip: (req) => req.path.startsWith('/interactions') || req.path.startsWith('/admin/analytics') || req.path.startsWith('/vendor'),
+});
+
+// Authenticated vendors only — bulk catalog tools (CJ sync, AI re-match,
+// AI listing generation) legitimately fire one request per product in a
+// tight loop, easily tens or low hundreds of requests in a single run, on
+// top of normal store-management browsing. Abuse risk here is much lower
+// than on public endpoints since every request requires a logged-in vendor.
+const vendorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests — please try again shortly.' },
 });
 
 const authLimiter = rateLimit({
@@ -163,6 +180,7 @@ const adminAnalyticsLimiter = rateLimit({
 app.use('/api', apiLimiter);
 app.use('/api/interactions', trackLimiter);
 app.use('/api/admin/analytics', adminAnalyticsLimiter);
+app.use('/api/vendor', vendorLimiter);
 app.post('/api/auth/login', authLimiter);
 app.post('/api/auth/register', authLimiter);
 app.post('/api/auth/forgot-password', authLimiter);
