@@ -437,11 +437,35 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         : {};
       return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...stockUpdate, ...priceUpdate };
     });
-    if (variantsSynced > 0) updateDoc.variants = syncedVariants;
-
     const totalStock = syncedVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
-    updateDoc.stock = totalStock;
-    updateDoc.trackInventory = totalStock > 0;
+    const previousStock = Number(product.stock) || 0;
+
+    // Debounce a fresh "CJ says zero" against a previously-in-stock product.
+    // CJ's own inventory feed genuinely glitches sometimes (confirmed
+    // directly against production data), and this product's auto-sync-on-
+    // save hook means a routine, unrelated edit silently re-triggers a live
+    // CJ check — so a single flaky "0" reading is common, not rare. Only
+    // commit to 0 once a second check, some time after the first, confirms
+    // it; otherwise keep the last known-good numbers untouched this run.
+    const ZERO_CONFIRM_MS = 3 * 60 * 60 * 1000; // 3 hours
+    if (totalStock === 0 && previousStock > 0) {
+      if (!product.stockZeroPendingSince) {
+        updateDoc.stockZeroPendingSince = new Date();
+        // Deliberately skip updateDoc.variants/stock/trackInventory this
+        // run — preserve the existing, known-good values.
+      } else if (Date.now() - new Date(product.stockZeroPendingSince).getTime() >= ZERO_CONFIRM_MS) {
+        if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+        updateDoc.stock = totalStock;
+        updateDoc.trackInventory = false;
+        updateDoc.stockZeroPendingSince = null;
+      }
+      // else: still within the confirmation window — wait for a later sync.
+    } else {
+      if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+      updateDoc.stock = totalStock;
+      updateDoc.trackInventory = totalStock > 0;
+      if (product.stockZeroPendingSince) updateDoc.stockZeroPendingSince = null;
+    }
 
     // Keep the base "from £X" price honest — always the cheapest variant,
     // never a stale independently-set number.
