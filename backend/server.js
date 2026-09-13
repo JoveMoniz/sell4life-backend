@@ -260,42 +260,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// TEMPORARY — raw CJ variant list for one product, remove after use.
-app.get('/api/_debug_cj_raw_variants', async (req, res) => {
-  if (req.query.k !== 'cj-raw-4f92') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-    const { getProductImages } = await import('./utils/shippingProviders/cjdropshipping.js');
-    const { cjPidFromUrl } = await import('./utils/cjProductSync.js');
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-
-    const name = req.query.name || 'T87 Wireless Gaming Keyboard';
-    const vendor = await Vendor.findOne({ storeName: { $regex: /forge\s*&\s*found/i } });
-    if (!vendor) return res.json({ error: 'vendor not found' });
-    const rawCred = vendor.supplierCredentials?.cjdropshipping;
-    if (!rawCred) return res.json({ error: 'no CJ credential' });
-    const credential = decryptCredential(rawCred);
-
-    const product = await Product.findOne({ vendor: vendor._id, name: { $regex: name, $options: 'i' } }).lean();
-    if (!product) return res.json({ error: 'product not found' });
-
-    const vid = (product.variants || []).map(v => v.supplierVariantRef || v.sku).find(Boolean)
-      || product.supplierVariantRef || product.sku;
-    const pidOverride = cjPidFromUrl(product.supplierUrl);
-
-    const result = await getProductImages(vid, product.name, credential, pidOverride);
-
-    res.json({
-      productName: product.name,
-      ourVariants: (product.variants || []).map(v => ({ sku: v.sku, colour: v.attributes?.Colour, stock: v.stock, price: v.price })),
-      cjResult: { error: result?.error, cjCategoryName: result?.cjCategoryName, cjVariants: result?.cjVariants || [] },
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // ENVIRONMENT VALIDATION
 // ======================================================
