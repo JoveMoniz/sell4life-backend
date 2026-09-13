@@ -234,6 +234,20 @@ const productSchema = new mongoose.Schema(
       default: true,
     },
 
+    // Set by cjProductSync.js the first time a live CJ sync reports 0 stock
+    // for a product that previously had real stock — the sync then holds
+    // off actually zeroing it out until this has stayed true across a
+    // second check some time later. CJ's own inventory feed genuinely
+    // glitches sometimes (confirmed against production data), and this
+    // product's auto-sync-on-save hook means a routine, unrelated edit can
+    // silently re-trigger a live CJ check — a single flaky "0" reading
+    // should not be enough to falsely mark a real, in-stock product as
+    // sold out. Cleared the moment a sync sees real stock again.
+    stockZeroPendingSince: {
+      type: Date,
+      default: null,
+    },
+
     allowBackorder: {
       type: Boolean,
       default: false,

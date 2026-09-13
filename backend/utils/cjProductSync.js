@@ -288,11 +288,24 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         }
       }
 
-      if (!cjV) return { ourV, cjV: null, costGbp: null };
-      if (!firstCjVid && cjV.vid) {
-        firstCjVid = cjV.vid;
-        firstCjInventories = cjV.inventories || [];
+      // Fallback: the other direction of the same problem — our stored SKU
+      // is CJ's own base/product-level SKU (captured at CSV-import time)
+      // with CJ's per-variant suffix missing (e.g. our "CJYD2458305" vs
+      // CJ's real variant SKU "CJYD245830501AZ"). If exactly one CJ variant
+      // SKU starts with ours, that's unambiguous.
+      if (!cjV && ourSku.length >= 6) {
+        const candidates = result.cjVariants.filter(cv => cv.variantSku.startsWith(ourSku));
+        if (candidates.length === 1) cjV = candidates[0];
       }
+
+      // Fallback: a single-SKU product (no real variant options) with
+      // exactly one CJ variant on the other side can only mean one thing,
+      // regardless of whether the SKU strings happen to match at all.
+      if (!cjV && (product.variants || []).length === 1 && result.cjVariants.length === 1) {
+        cjV = result.cjVariants[0];
+      }
+
+      if (!cjV) return { ourV, cjV: null, costGbp: null };
       variantsSynced++;
 
       let costGbp = null;
@@ -302,6 +315,21 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
       }
       return { ourV, cjV, costGbp };
     });
+
+    // Pick which matched variant to request the shipping quote from.
+    // Was previously just "the first one matched" — but a variant with
+    // zero stock (e.g. a discontinued colour) genuinely has no freight
+    // route on CJ's side (0 options returned), silently leaving the
+    // whole product's shippingCost stuck on a stale value forever even
+    // though sibling variants with real stock quote fine. Prefer a
+    // variant with actual stock; only fall back to a zero-stock one if
+    // every matched variant is out of stock.
+    const withCjV = matched.filter(m => m.cjV?.vid);
+    const stockedFirst = withCjV.find(m => Number(m.ourV?.stock) > 0) || withCjV[0];
+    if (stockedFirst) {
+      firstCjVid = stockedFirst.cjV.vid;
+      firstCjInventories = stockedFirst.cjV.inventories || [];
+    }
   }
 
   // Live UK shipping quote using CJ's real variant id (SKUs get rejected with
@@ -386,9 +414,58 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
         priceUpdate = { price: newPrice };
         pricesSynced++;
       }
-      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...priceUpdate };
+      // Stock — unlike price, this has no "no basis to compute it" case tied
+      // to markup config: CJ's real inventory count is ground truth, so it
+      // refreshes on every sync for every matched variant. Previously this
+      // sync never touched stock at all — set once at CSV import, then
+      // frozen forever, even though the data needed to keep it honest
+      // (cjV.inventories) was already being fetched here for origin
+      // detection. A real sellout could silently stay "in stock" forever,
+      // or a real restock could stay blocked — the same staleness risk
+      // shipping cost had, just for orders.js's trackInventory check.
+      //
+      // CJ's own API frequently returns no inventory data at all for a
+      // variant (inventories: null, confirmed directly against production
+      // data) — that's "CJ didn't tell us this time", not "confirmed zero
+      // stock". Treating a missing/empty array as 0 would wrongly zero out
+      // — and silently block orders on — every such product on its very
+      // next sync. Only overwrite stock when CJ actually returned at least
+      // one real inventory entry; otherwise keep whatever was already
+      // stored rather than guessing.
+      const stockUpdate = Array.isArray(cjV.inventories) && cjV.inventories.length > 0
+        ? { stock: cjV.inventories.reduce((sum, inv) => sum + (Number(inv.totalInventory) || 0), 0) }
+        : {};
+      return { ...ourV, ...(cjV.image ? { image: cjV.image } : {}), cjVid: cjV.vid, ...stockUpdate, ...priceUpdate };
     });
-    if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+    const totalStock = syncedVariants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+    const previousStock = Number(product.stock) || 0;
+
+    // Debounce a fresh "CJ says zero" against a previously-in-stock product.
+    // CJ's own inventory feed genuinely glitches sometimes (confirmed
+    // directly against production data), and this product's auto-sync-on-
+    // save hook means a routine, unrelated edit silently re-triggers a live
+    // CJ check — so a single flaky "0" reading is common, not rare. Only
+    // commit to 0 once a second check, some time after the first, confirms
+    // it; otherwise keep the last known-good numbers untouched this run.
+    const ZERO_CONFIRM_MS = 3 * 60 * 60 * 1000; // 3 hours
+    if (totalStock === 0 && previousStock > 0) {
+      if (!product.stockZeroPendingSince) {
+        updateDoc.stockZeroPendingSince = new Date();
+        // Deliberately skip updateDoc.variants/stock/trackInventory this
+        // run — preserve the existing, known-good values.
+      } else if (Date.now() - new Date(product.stockZeroPendingSince).getTime() >= ZERO_CONFIRM_MS) {
+        if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+        updateDoc.stock = totalStock;
+        updateDoc.trackInventory = false;
+        updateDoc.stockZeroPendingSince = null;
+      }
+      // else: still within the confirmation window — wait for a later sync.
+    } else {
+      if (variantsSynced > 0) updateDoc.variants = syncedVariants;
+      updateDoc.stock = totalStock;
+      updateDoc.trackInventory = totalStock > 0;
+      if (product.stockZeroPendingSince) updateDoc.stockZeroPendingSince = null;
+    }
 
     // Keep the base "from £X" price honest — always the cheapest variant,
     // never a stale independently-set number.
@@ -418,101 +495,8 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
 // Only checks the first variant with a cjVid per product, matching
 // syncProductFromCj's existing "shipping is roughly product-level" treatment.
 // ======================================================
-function blankShippingSummary() {
-  return { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, apiDisabled: 0, details: [] };
-}
-
-// Checks UK freight availability for one vendor's CJ-connected products and
-// merges the results into `summary`. Shared by the all-vendors admin sweep
-// and the single-vendor on-demand check a vendor can trigger themselves.
-async function checkUkShippingForVendor(vendor, summary) {
-  summary.vendorsChecked++;
-  let credential;
-  try {
-    credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-  } catch (err) {
-    summary.errors++;
-    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
-    return;
-  }
-
-  // Test auth once per vendor before looping products — a *token* can be
-  // obtained even when the account's API access is separately disabled
-  // on CJ's side, so this alone isn't enough (see the code:200 check
-  // below), but it still catches genuinely wrong credentials up front.
-  const authCheck = await testCredentialAuth(credential);
-  if (!authCheck.ok) {
-    summary.authFailed++;
-    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
-    return;
-  }
-
-  const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
-
-  let vendorApiDisabled = false;
-
-  for (const product of products) {
-    if (vendorApiDisabled) { summary.skipped++; continue; }
-
-    summary.productsChecked++;
-    try {
-      const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
-      if (!cjVid) { summary.skipped++; continue; }
-
-      // Use the diagnostic call, not getShippingCost() — that function
-      // collapses "CJ account-level API access disabled" (code !== 200,
-      // e.g. 1600014) and "genuinely no freight route" (code === 200,
-      // empty options) into the same null, which would otherwise
-      // misreport every product for an account with disabled API access
-      // as having lost UK shipping — this is what actually happened on
-      // the first run of this check, before this distinction existed.
-      const diag = await getShippingCostDiagnostic(
-        { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
-        credential
-      );
-
-      if (diag.code !== 200) {
-        // Account-level problem, not per-product — stop hammering CJ with
-        // the same failure for the rest of this vendor's catalog, and
-        // clear any shippingUnavailableUK flags this vendor's products
-        // already carry from an earlier run — those were written before
-        // this code-!==200 distinction existed and don't reflect real
-        // per-product data, just this same account-level failure repeated.
-        vendorApiDisabled = true;
-        summary.apiDisabled++;
-        await Product.updateMany(
-          { vendor: vendor._id, shippingCheckedAt: { $ne: null } },
-          { shippingUnavailableUK: null, shippingCheckedAt: null }
-        );
-        summary.details.push({
-          vendorId: String(vendor._id), storeName: vendor.storeName,
-          error: `CJ API error (code ${diag.code}): ${diag.message || 'unknown'} — rest of this vendor's products skipped, stale flags cleared, not reported as unavailable`,
-        });
-        continue;
-      }
-
-      const unavailable = diag.optionsCount === 0;
-
-      await Product.findByIdAndUpdate(product._id, {
-        shippingUnavailableUK: unavailable,
-        shippingCheckedAt: new Date(),
-      });
-
-      if (unavailable) {
-        summary.unavailable++;
-        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
-      } else {
-        summary.available++;
-      }
-    } catch (err) {
-      summary.errors++;
-      summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
-    }
-  }
-}
-
 export async function checkUkShippingForAllProducts() {
-  const summary = blankShippingSummary();
+  const summary = { vendorsChecked: 0, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, apiDisabled: 0, details: [] };
 
   const vendors = await Vendor.find({
     type: 'professional',
@@ -520,21 +504,90 @@ export async function checkUkShippingForAllProducts() {
   });
 
   for (const vendor of vendors) {
-    await checkUkShippingForVendor(vendor, summary);
+    summary.vendorsChecked++;
+    let credential;
+    try {
+      credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+    } catch (err) {
+      summary.errors++;
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
+      continue;
+    }
+
+    // Test auth once per vendor before looping products — a *token* can be
+    // obtained even when the account's API access is separately disabled
+    // on CJ's side, so this alone isn't enough (see the code:200 check
+    // below), but it still catches genuinely wrong credentials up front.
+    const authCheck = await testCredentialAuth(credential);
+    if (!authCheck.ok) {
+      summary.authFailed++;
+      summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
+      continue;
+    }
+
+    const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
+
+    let vendorApiDisabled = false;
+
+    for (const product of products) {
+      if (vendorApiDisabled) { summary.skipped++; continue; }
+
+      summary.productsChecked++;
+      try {
+        const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+        if (!cjVid) { summary.skipped++; continue; }
+
+        // Use the diagnostic call, not getShippingCost() — that function
+        // collapses "CJ account-level API access disabled" (code !== 200,
+        // e.g. 1600014) and "genuinely no freight route" (code === 200,
+        // empty options) into the same null, which would otherwise
+        // misreport every product for an account with disabled API access
+        // as having lost UK shipping — this is what actually happened on
+        // the first run of this check, before this distinction existed.
+        const diag = await getShippingCostDiagnostic(
+          { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
+          credential
+        );
+
+        if (diag.code !== 200) {
+          // Account-level problem, not per-product — stop hammering CJ with
+          // the same failure for the rest of this vendor's catalog, and
+          // clear any shippingUnavailableUK flags this vendor's products
+          // already carry from an earlier run — those were written before
+          // this code-!==200 distinction existed and don't reflect real
+          // per-product data, just this same account-level failure repeated.
+          vendorApiDisabled = true;
+          summary.apiDisabled++;
+          await Product.updateMany(
+            { vendor: vendor._id, shippingCheckedAt: { $ne: null } },
+            { shippingUnavailableUK: null, shippingCheckedAt: null }
+          );
+          summary.details.push({
+            vendorId: String(vendor._id), storeName: vendor.storeName,
+            error: `CJ API error (code ${diag.code}): ${diag.message || 'unknown'} — rest of this vendor's products skipped, stale flags cleared, not reported as unavailable`,
+          });
+          continue;
+        }
+
+        const unavailable = diag.optionsCount === 0;
+
+        await Product.findByIdAndUpdate(product._id, {
+          shippingUnavailableUK: unavailable,
+          shippingCheckedAt: new Date(),
+        });
+
+        if (unavailable) {
+          summary.unavailable++;
+          summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
+        } else {
+          summary.available++;
+        }
+      } catch (err) {
+        summary.errors++;
+        summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
+      }
+    }
   }
 
-  return summary;
-}
-
-// On-demand check for a single vendor (e.g. a "Check UK shipping now"
-// button on the vendor's own My Products page) — same logic, scoped to
-// just their own catalog rather than sweeping every vendor.
-export async function checkUkShippingForOneVendor(vendor) {
-  const summary = blankShippingSummary();
-  if (!vendor?.supplierCredentials?.cjdropshipping) {
-    summary.details.push({ error: 'No CJ Dropshipping account connected' });
-    return summary;
-  }
-  await checkUkShippingForVendor(vendor, summary);
   return summary;
 }

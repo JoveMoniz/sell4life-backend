@@ -1035,7 +1035,7 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
     const query = { vendor: vendor._id };
     if (requestedIds.length) query._id = { $in: requestedIds };
     const allProducts = await Product.find(query)
-      .select('_id name category subcategory variants images supplierUrl supplierVariantRef sku videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5').lean();
+      .select('_id name category subcategory variants images supplierUrl supplierVariantRef sku videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5 stock stockZeroPendingSince').lean();
 
     // Target every product CJ-syncable via any of the paths
     // syncProductFromCj actually checks: a variant ref/SKU, OR (for a
