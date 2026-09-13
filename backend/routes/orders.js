@@ -30,7 +30,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
-import { COOKIE_OPTS, createUniqueUsername, createToken } from '../utils/authTokens.js';
+import { COOKIE_OPTS, createUniqueUsername, createToken, verifyToken } from '../utils/authTokens.js';
 import { buildRegistrationAttribution } from './auth.js';
 
 const router = express.Router();
@@ -257,15 +257,13 @@ router.post('/guest-checkout', async (req, res) => {
     }
 
     let user = await User.findOne({ email });
-
-    if (user && user.passwordSet !== false) {
-      // A real, already-claimed account owns this email — never silently
-      // fold a guest order into someone else's account.
-      return res.status(409).json({
-        error: 'An account already exists with this email. Please sign in to continue.',
-        code: 'ACCOUNT_EXISTS',
-      });
-    }
+    // A real, already-claimed account owns this email — the order still
+    // goes through (attached to that account so it shows up once they sign
+    // in), but this request never proved it's actually that person, so it
+    // must NOT come back with a login session for their account. See
+    // '/shipping-address' below, which accepts proof of possessing this
+    // specific PaymentIntent's clientSecret instead of a token in that case.
+    const isExistingClaimedAccount = !!(user && user.passwordSet !== false);
 
     if (!user) {
       const namePart = email.split('@')[0].replace(/[^a-zA-Z]/g, '') || 'Guest';
@@ -295,6 +293,16 @@ router.post('/guest-checkout', async (req, res) => {
     }
 
     const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor: null });
+
+    if (isExistingClaimedAccount) {
+      // No token/cookie here — this request never proved it's the real
+      // account holder. The order is placed and attached to their account
+      // either way; they sign in (or the thank-you page prompts them to)
+      // to see it, same message shown for a new guest who hasn't set a
+      // password yet.
+      return res.json({ ...result, accountExists: true });
+    }
+
     const token = createToken(user);
 
     res.cookie('s4l_token', token, COOKIE_OPTS).json({
@@ -322,9 +330,9 @@ router.post('/guest-checkout', async (req, res) => {
    webhook has a real delivery address to snapshot onto the order.
 ====================================================== */
 
-router.post('/shipping-address', authMiddleware, async (req, res) => {
+router.post('/shipping-address', async (req, res) => {
   try {
-    const { paymentIntentId, name, phone, address1, address2, city, county, postcode, country, saveAsDefault } = req.body;
+    const { paymentIntentId, clientSecret, name, phone, address1, address2, city, county, postcode, country, saveAsDefault } = req.body;
 
     if (!paymentIntentId) {
       return res.status(400).json({ error: 'Missing paymentIntentId' });
@@ -334,7 +342,34 @@ router.post('/shipping-address', authMiddleware, async (req, res) => {
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    if (!paymentIntent || paymentIntent.metadata?.userId !== String(req.user._id)) {
+
+    // Two ways to prove this request is allowed to set the address on this
+    // specific order: a normal logged-in session matching the buyer, or —
+    // for the "email already had an account, but we never logged this
+    // request in as them" guest-checkout path — knowledge of this exact
+    // PaymentIntent's clientSecret, which Stripe only ever reveals to the
+    // browser that just created it.
+    let authorizedBuyerId = null;
+    let authedUser = null;
+
+    const authHeader = req.headers.authorization;
+    const bearerToken = req.cookies?.s4l_token || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+    if (bearerToken) {
+      try {
+        const decoded = verifyToken(bearerToken);
+        authedUser = await User.findById(decoded.id).select('_id');
+        if (authedUser) authorizedBuyerId = String(authedUser._id);
+      } catch { /* falls through to the clientSecret check below */ }
+    }
+
+    if (!authorizedBuyerId) {
+      if (!clientSecret || !paymentIntent || paymentIntent.client_secret !== clientSecret) {
+        return res.status(403).json({ error: 'Not allowed' });
+      }
+      authorizedBuyerId = paymentIntent.metadata?.userId || null;
+    }
+
+    if (!paymentIntent || !authorizedBuyerId || paymentIntent.metadata?.userId !== authorizedBuyerId) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
@@ -385,9 +420,11 @@ router.post('/shipping-address', authMiddleware, async (req, res) => {
       metadata: { shippingAddress: JSON.stringify(address) },
     });
 
-    if (saveAsDefault) {
-      const User = (await import('../models/user.js')).default;
-      await User.findByIdAndUpdate(req.user._id, { defaultShippingAddress: address });
+    // Only for a real verified session — the clientSecret-possession path
+    // above proves the right to complete THIS order, not a full account
+    // session to write preferences onto.
+    if (saveAsDefault && authedUser) {
+      await User.findByIdAndUpdate(authedUser._id, { defaultShippingAddress: address });
     }
 
     res.json({ success: true });
