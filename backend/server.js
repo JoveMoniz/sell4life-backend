@@ -236,16 +236,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/_debug_ip_check', (req, res) => {
-  if (req.query.k !== 'ip-check-9f31') return res.status(404).end();
-  res.json({
-    resolvedIp: req.ip,
-    ips: req.ips,
-    xForwardedFor: req.headers['x-forwarded-for'] || null,
-    trustProxySetting: app.get('trust proxy'),
-  });
-});
-
 // ======================================================
 // ENVIRONMENT VALIDATION
 // ======================================================
