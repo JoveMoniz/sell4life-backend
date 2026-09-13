@@ -260,47 +260,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// TEMPORARY — trace a real resync on one product, before/after, remove after use.
-app.get('/api/_debug_resync_trace', async (req, res) => {
-  if (req.query.k !== 'resync-trace-4d81') return res.status(404).end();
-  try {
-    const Vendor = (await import('./models/vendor.js')).default;
-    const Product = (await import('./models/product.js')).default;
-    const { syncProductFromCj } = await import('./utils/cjProductSync.js');
-    const { decryptCredential } = await import('./utils/shippingProviders/registry.js');
-
-    const name = req.query.name || 'T87 Wireless Gaming Keyboard';
-    const vendor = await Vendor.findOne({ storeName: { $regex: /forge\s*&\s*found/i } });
-    if (!vendor) return res.json({ error: 'vendor not found' });
-
-    const rawCred = vendor.supplierCredentials?.cjdropshipping;
-    if (!rawCred) return res.json({ error: 'no CJ credential on vendor' });
-    const credential = decryptCredential(rawCred);
-
-    const before = await Product.findOne({ vendor: vendor._id, name: { $regex: name, $options: 'i' } }).lean();
-    if (!before) return res.json({ error: 'product not found', name });
-
-    const beforeSnapshot = {
-      stock: before.stock,
-      trackInventory: before.trackInventory,
-      variants: (before.variants || []).map(v => ({ sku: v.sku, stock: v.stock, attributes: v.attributes })),
-    };
-
-    const syncResult = await syncProductFromCj(before, credential);
-
-    const after = await Product.findById(before._id).lean();
-    const afterSnapshot = {
-      stock: after.stock,
-      trackInventory: after.trackInventory,
-      variants: (after.variants || []).map(v => ({ sku: v.sku, stock: v.stock, attributes: v.attributes })),
-    };
-
-    res.json({ productId: before._id, name: before.name, before: beforeSnapshot, syncResult, after: afterSnapshot });
-  } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
-  }
-});
-
 // ======================================================
 // ENVIRONMENT VALIDATION
 // ======================================================
