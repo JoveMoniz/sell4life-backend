@@ -109,30 +109,6 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // ======================================================
-// TEMPORARY TRAFFIC BREAKDOWN (diagnostic — remove after use)
-// Placed before the rate limiters so it counts every request, including
-// ones that get 429'd, grouped by path + client IP so we can see exactly
-// what's driving volume instead of guessing.
-// ======================================================
-const _trafficStart = Date.now();
-const _trafficCounts = {};
-app.use((req, res, next) => {
-  const key = `${req.ip} ${req.method} ${req.path}`;
-  _trafficCounts[key] = (_trafficCounts[key] || 0) + 1;
-  next();
-});
-app.get('/api/_debug_traffic', (req, res) => {
-  if (req.query.k !== 'traffic-9f2c') return res.status(404).end();
-  const rows = Object.entries(_trafficCounts).sort((a, b) => b[1] - a[1]).slice(0, 40);
-  const total = Object.values(_trafficCounts).reduce((a, b) => a + b, 0);
-  res.json({
-    sinceMinutesAgo: ((Date.now() - _trafficStart) / 60000).toFixed(1),
-    totalRequests: total,
-    top: rows,
-  });
-});
-
-// ======================================================
 // RATE LIMITERS
 // General API limiter + stricter auth limiter
 // ======================================================
