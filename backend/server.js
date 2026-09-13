@@ -150,9 +150,14 @@ const vendorLimiter = rateLimit({
   message: { error: 'Too many requests — please try again shortly.' },
 });
 
+// Raised from the original 20 for the same shared-IP reason as apiLimiter
+// above: a household or office IP where several people sign in, plus normal
+// mistyped-password retries, exhausted 20/15min on entirely legitimate
+// traffic. 60 still caps sustained password-guessing far below what's
+// needed against a properly-hashed password.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts — please wait a few minutes and try again.' },
