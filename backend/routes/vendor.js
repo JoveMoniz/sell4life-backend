@@ -2520,6 +2520,58 @@ router.patch(
 );
 
 /* ======================================================
+   RETRY A CJ ORDER CANCEL
+   On-demand version of attemptCjOrderCancel() for items that were
+   cancelled before this feature existed (or whose first live attempt
+   failed) — same best-effort call, just triggerable manually instead of
+   only at the moment of cancellation.
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/retry-cj-cancel',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item = findOrderItem(order, itemId);
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({ error: 'Not your item' });
+      }
+
+      if (!item.cjOrderId) return res.status(400).json({ error: 'No CJ order on this item' });
+      if (item.cjOrderStatus === 'cancelled') return res.status(400).json({ error: 'Already cancelled on CJ' });
+      if (item.cjOrderStatus !== 'CREATED') {
+        return res.status(400).json({ error: `CJ order is ${item.cjOrderStatus || 'past CREATED'} — likely already paid for, can't auto-cancel` });
+      }
+
+      const before = item.cjOrderStatus;
+      await attemptCjOrderCancel(item);
+      await order.save();
+
+      if (item.cjOrderStatus === before) {
+        return res.status(400).json({ error: 'CJ declined the cancellation — check server logs for the exact reason' });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Retry CJ cancel error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/* ======================================================
    RETRY A FAILED AUTO-REFUND
    Re-runs triggerItemRefund for whatever quantity is still
    unrefunded — safe to call repeatedly, since it's the same
