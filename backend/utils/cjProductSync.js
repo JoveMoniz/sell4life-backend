@@ -671,3 +671,39 @@ export async function checkUkShippingForOneVendor(vendor) {
 
   return summary;
 }
+
+// ======================================================
+// BEST-EFFORT: CANCEL THE MATCHING CJ ORDER
+// Called whenever an item that already has an auto-created CJ order gets
+// cancelled on our side. Only actually attempts a live CJ call while the
+// CJ order is still 'CREATED' (unpaid) — CJ's deleteOrder endpoint itself
+// refuses anything past that, which is the correct, safe outcome once the
+// vendor has already paid for it in their CJ dashboard. Never throws and
+// never blocks the caller's own cancellation — on any failure/skip, the
+// item's existing cjOrderId/cjOrderStatus is left untouched, so the
+// "still active on CJ" warning banner (product.js/vendor-order-details.js)
+// keeps showing and tells the vendor to handle it manually instead.
+// Mutates item.cjOrderStatus in place on success — caller still needs to
+// save() the order afterwards.
+// ======================================================
+export async function attemptCjOrderCancel(item) {
+  if (!item?.cjOrderId || item.cjOrderStatus !== 'CREATED') return;
+
+  try {
+    const vendor = await Vendor.findById(item.vendorId).select('supplierCredentials');
+    const rawCred = vendor?.supplierCredentials?.cjdropshipping;
+    if (!rawCred) return;
+
+    const credential = decryptCredential(rawCred);
+    const result = await cjProvider.cancelOrder(item.cjOrderId, credential);
+
+    if (result?.success) {
+      item.cjOrderStatus = 'cancelled';
+      console.log(`[cj-auto-cancel] cancelled CJ order ${item.cjOrderId} for item ${item._id}`);
+    } else {
+      console.warn(`[cj-auto-cancel] could not cancel CJ order ${item.cjOrderId} for item ${item._id}:`, result?.error);
+    }
+  } catch (err) {
+    console.warn(`[cj-auto-cancel] error cancelling CJ order for item ${item._id}:`, err.message);
+  }
+}

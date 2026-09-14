@@ -9,6 +9,7 @@ import {
   isFinalOrder,
 } from '../utils/orderLogic.js';
 import { canRefund } from '../utils/refundGuard.js';
+import { attemptCjOrderCancel } from '../utils/cjProductSync.js';
 
 import {
   findOrderItem,
@@ -763,6 +764,8 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
     item.status = 'Cancelled';
     item.cancelledAt = new Date();
 
+    await attemptCjOrderCancel(item);
+
     const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
     const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
 
@@ -830,13 +833,14 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
         vo.cancelledAt = now;
       });
 
-      order.items.forEach((item) => {
+      for (const item of order.items) {
         if (['Pending', 'Processing', 'Cancel Requested'].includes(item.status)) {
           item.statusBeforeCancel = item.status;
           item.status = 'Cancelled';
           item.cancelledAt = now;
+          await attemptCjOrderCancel(item);
         }
-      });
+      }
     }
 
     // =====================================================

@@ -45,7 +45,7 @@ import { getProvider, listProviders, encryptCredential, decryptCredential } from
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
-import { syncProductFromCj, checkUkShippingForOneVendor } from '../utils/cjProductSync.js';
+import { syncProductFromCj, checkUkShippingForOneVendor, attemptCjOrderCancel } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
 import { generateProductListingAI } from '../utils/aiListingGenerate.js';
 import { generateSlug } from './products.js';
@@ -2512,6 +2512,8 @@ router.patch(
 
       item.status = 'Cancelled';
       item.cancelledAt = new Date();
+
+      await attemptCjOrderCancel(item);
 
       const isPaid = ['paid', 'partially_refunded'].includes(
         (order.paymentStatus || '').toLowerCase()

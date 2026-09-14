@@ -248,6 +248,38 @@ const cjProvider = {
       return { error: err.message };
     }
   },
+
+  // Deletes an order we auto-created via createOrder() (payType '3',
+  // unpaid) — CJ only allows this while the order is still CREATED or
+  // IN_CART; once the vendor pays for it in their CJ dashboard, this will
+  // correctly fail, matching reality (nothing to auto-cancel any more).
+  // Returns: { success: true } | { error }
+  async cancelOrder(cjOrderId, credential) {
+    if (!cjOrderId) return { error: 'Missing cjOrderId' };
+    const accessToken = await resolveToken(credential);
+    if (!accessToken) return { error: 'Could not obtain CJ access token' };
+
+    const gap = _lastCall + RATE_LIMIT_MS - Date.now();
+    if (gap > 0) await new Promise(r => setTimeout(r, gap));
+    _lastCall = Date.now();
+
+    try {
+      const resp = await fetch(
+        `${CJ_BASE}/shopping/order/deleteOrder?orderId=${encodeURIComponent(cjOrderId)}`,
+        { method: 'DELETE', headers: { 'CJ-Access-Token': accessToken } }
+      );
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || data?.code !== 200) {
+        if (resp.status === 401) invalidateToken(credential);
+        return { error: data?.message || `CJ delete failed (HTTP ${resp.status}, code ${data?.code})` };
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('[cjdropshipping] cancelOrder failed:', err.message);
+      return { error: err.message };
+    }
+  },
 };
 
 registerProvider(cjProvider);
