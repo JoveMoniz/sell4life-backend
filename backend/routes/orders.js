@@ -29,6 +29,8 @@ import stripe from '../config/stripe.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { resolveAcceptedOffer } from '../utils/offerLogic.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
+import { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
+import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
 import { COOKIE_OPTS, createUniqueUsername, createToken, verifyToken } from '../utils/authTokens.js';
 import { buildRegistrationAttribution } from './auth.js';
@@ -402,12 +404,55 @@ router.post('/shipping-address', async (req, res) => {
     try {
       const items = JSON.parse(paymentIntent.metadata?.items || '[]');
       const productIds = [...new Set(items.map(i => i.productId))];
-      const products = await Product.find({ _id: { $in: productIds } }).select('name shippingScope shippingCountries');
+      const products = await Product.find({ _id: { $in: productIds } })
+        .select('name shippingScope shippingCountries variants vendor shippingOriginCountry');
       const blocked = products.find(p => !isCountryAllowedByScope(p, address.country));
       if (blocked) {
         return res.status(400).json({
           error: `"${blocked.name}" isn't available for delivery to the selected country. Please remove it from your cart or choose a different delivery address.`,
         });
+      }
+
+      // Live CJ freight-route check — the seller's own scope above is a
+      // manual, self-declared setting; this checks what CJ can *actually*
+      // fulfil, for CJ-linked items only. Reuses the same getShippingCost
+      // 24h cache (registry.js) that sync and the vendor's on-demand UK
+      // check already rely on, so only a genuinely new (product, country)
+      // pair pays the live-lookup cost — repeat checkouts to a popular
+      // destination are instant afterwards. Fails OPEN on any CJ-side
+      // problem (auth, account-disabled, network) — a transient CJ hiccup
+      // must never block a legitimate sale, matching the same caution
+      // already used in checkUkShippingForAllProducts.
+      const cjItems = products
+        .map(p => ({ p, cjVid: (p.variants || []).map(v => v.cjVid).find(Boolean) }))
+        .filter(x => x.cjVid);
+
+      if (cjItems.length) {
+        const vendorIds = [...new Set(cjItems.map(x => String(x.p.vendor)))];
+        const vendors = await Vendor.find({ _id: { $in: vendorIds } }).select('supplierCredentials');
+        const vendorById = new Map(vendors.map(v => [String(v._id), v]));
+
+        for (const { p, cjVid } of cjItems) {
+          const vendor = vendorById.get(String(p.vendor));
+          const rawCred = vendor?.supplierCredentials?.cjdropshipping;
+          if (!rawCred) continue; // not actually CJ-connected — nothing to check
+
+          let credential;
+          try { credential = decryptCredential(rawCred); } catch { continue; }
+
+          const diag = await getShippingCostDiagnostic(
+            { supplierVariantRef: cjVid, destinationCountry: address.country, startCountryCode: p.shippingOriginCountry || 'CN' },
+            credential
+          );
+
+          if (diag.code === 200 && diag.optionsCount === 0) {
+            return res.status(400).json({
+              error: `"${p.name}" can't currently be shipped to the selected country by our supplier. Please remove it from your cart or choose a different delivery address.`,
+            });
+          }
+          // Any other outcome (auth failure, account-disabled code, network
+          // error) is "unknown" — never block a sale over it.
+        }
       }
     } catch (err) {
       // A malformed/missing items list shouldn't block a legitimate
