@@ -591,3 +591,83 @@ export async function checkUkShippingForAllProducts() {
 
   return summary;
 }
+
+// ======================================================
+// CHECK UK SHIPPING AVAILABILITY — ONE VENDOR, ON DEMAND
+// Same per-product logic as checkUkShippingForAllProducts above, scoped to
+// a single already-fetched vendor so routes/vendor.js's on-demand endpoint
+// doesn't have to wait for the automatic sweep's next cycle. Returns the
+// same summary shape (minus the outer vendor loop) so callers can treat
+// both responses identically.
+// ======================================================
+export async function checkUkShippingForOneVendor(vendor) {
+  const summary = { vendorsChecked: 1, productsChecked: 0, unavailable: 0, available: 0, skipped: 0, errors: 0, authFailed: 0, apiDisabled: 0, details: [] };
+
+  let credential;
+  try {
+    credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
+  } catch (err) {
+    summary.errors++;
+    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'Bad CJ credential: ' + err.message });
+    return summary;
+  }
+
+  const authCheck = await testCredentialAuth(credential);
+  if (!authCheck.ok) {
+    summary.authFailed++;
+    summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, error: 'CJ credential did not authenticate — results skipped, not reported as unavailable' });
+    return summary;
+  }
+
+  const products = await Product.find({ vendor: vendor._id, archived: { $ne: true } });
+
+  let vendorApiDisabled = false;
+
+  for (const product of products) {
+    if (vendorApiDisabled) { summary.skipped++; continue; }
+
+    summary.productsChecked++;
+    try {
+      const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
+      if (!cjVid) { summary.skipped++; continue; }
+
+      const diag = await getShippingCostDiagnostic(
+        { supplierVariantRef: cjVid, destinationCountry: 'GB', quantity: 1 },
+        credential
+      );
+
+      if (diag.code !== 200) {
+        vendorApiDisabled = true;
+        summary.apiDisabled++;
+        await Product.updateMany(
+          { vendor: vendor._id, shippingCheckedAt: { $ne: null } },
+          { shippingUnavailableUK: null, shippingCheckedAt: null }
+        );
+        summary.details.push({
+          vendorId: String(vendor._id), storeName: vendor.storeName,
+          error: `CJ API error (code ${diag.code}): ${diag.message || 'unknown'} — rest of this vendor's products skipped, stale flags cleared, not reported as unavailable`,
+        });
+        continue;
+      }
+
+      const unavailable = diag.optionsCount === 0;
+
+      await Product.findByIdAndUpdate(product._id, {
+        shippingUnavailableUK: unavailable,
+        shippingCheckedAt: new Date(),
+      });
+
+      if (unavailable) {
+        summary.unavailable++;
+        summary.details.push({ vendorId: String(vendor._id), storeName: vendor.storeName, productId: String(product._id), name: product.name });
+      } else {
+        summary.available++;
+      }
+    } catch (err) {
+      summary.errors++;
+      summary.details.push({ vendorId: String(vendor._id), productId: String(product._id), error: err.message });
+    }
+  }
+
+  return summary;
+}
