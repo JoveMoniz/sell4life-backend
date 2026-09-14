@@ -343,7 +343,7 @@ router.get('/:id', async (req, res) => {
 ====================================================== */
 router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('professional'), async (req, res) => {
   try {
-    const { ids, price, stock, active, shippingCost, shipIncluded, markupPct, estDeliveryMinDays, estDeliveryMaxDays } = req.body;
+    const { ids, price, stock, active, shippingCost, shipIncluded, markupPct, estDeliveryMinDays, estDeliveryMaxDays, shippingScope, shippingCountries } = req.body;
 
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ error: 'ids array required' });
@@ -351,6 +351,8 @@ router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('profes
     if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
       return res.status(400).json({ error: 'Invalid product ID in ids' });
     }
+
+    const VALID_SHIPPING_SCOPES = ['worldwide', 'uk', 'uk_eu', 'custom'];
 
     const update = {};
     if (stock        !== undefined && stock        !== null && Number.isFinite(Number(stock)))        update.stock        = Math.max(0, Math.round(Number(stock)));
@@ -360,6 +362,12 @@ router.patch('/bulk', authMiddleware, requireApprovedVendor, requireTier('profes
     if (active !== undefined) update.active = !!active;
     if (estDeliveryMinDays !== undefined && estDeliveryMinDays !== null && Number.isFinite(Number(estDeliveryMinDays))) update.estDeliveryMinDays = Math.max(0, Math.round(Number(estDeliveryMinDays)));
     if (estDeliveryMaxDays !== undefined && estDeliveryMaxDays !== null && Number.isFinite(Number(estDeliveryMaxDays))) update.estDeliveryMaxDays = Math.max(0, Math.round(Number(estDeliveryMaxDays)));
+    if (shippingScope !== undefined && VALID_SHIPPING_SCOPES.includes(shippingScope)) {
+      update.shippingScope = shippingScope;
+      update.shippingCountries = shippingScope === 'custom' && Array.isArray(shippingCountries)
+        ? shippingCountries.map(c => String(c).toUpperCase()).filter(c => /^[A-Z]{2}$/.test(c))
+        : [];
+    }
 
     // No schema-level cross-field validation exists for these two (see
     // product.js — each is just `min: 0` independently), and the only place
