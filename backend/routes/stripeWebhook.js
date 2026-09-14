@@ -6,6 +6,7 @@ import { mailOrderConfirmation, mailNewOrderVendor, mailRefundConfirmed } from '
 import express from 'express';
 import stripe from '../config/stripe.js';
 import Order from '../models/order.js';
+import User from '../models/user.js';
 import Product from '../models/product.js';
 import Vendor from '../models/vendor.js';
 import cjProvider from '../utils/shippingProviders/cjdropshipping.js';
@@ -229,10 +230,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         shippingAddress = undefined;
       }
 
+      // Order.email was defined on the schema but never actually populated
+      // here — every order in the system had it blank. Needed so pages that
+      // can't rely on a login session (e.g. the thank-you page after a
+      // guest checkout that matched an existing account) can still show
+      // whose order this is / pre-fill a sign-in email.
+      const buyerForEmail = await User.findById(userId).select('email').lean();
+
       let order;
       try {
         order = await Order.create({
           user: userId,
+          email: buyerForEmail?.email,
           items,
           vendorOrders,
           subtotal: orderSubtotal,
