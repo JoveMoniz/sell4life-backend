@@ -290,11 +290,13 @@ export function mailRefundConfirmed({ to, orderRef, amount }) {
   });
 }
 
-export function mailOrderCancelled({ to, orderRef, itemName, refundAmount, refundImmediate = false }) {
+export function mailOrderCancelled({ to, orderRef, itemName, refundAmount, refundImmediate = false, refundPending = false }) {
   const what = itemName ? `<strong>${itemName}</strong> on order <strong>${orderRef}</strong>` : `order <strong>${orderRef}</strong>`;
   const refundLine = refundAmount != null
     ? `<p style="margin:0 0 10px;color:#374151">A refund of <strong>£${Number(refundAmount).toFixed(2)}</strong> ${refundImmediate ? 'has been processed and is on its way' : 'has been scheduled and will be on its way'} back to your original payment method${refundImmediate ? '' : ' shortly'}.</p>`
-    : '';
+    : refundPending
+      ? `<p style="margin:0 0 10px;color:#374151">We're processing your refund and will confirm by email once it's been issued.</p>`
+      : '';
 
   return sendMail({
     to,

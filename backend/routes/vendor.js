@@ -2539,6 +2539,7 @@ router.patch(
           itemName: item.name,
           refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
           refundImmediate: true,
+          refundPending: !!refundResult && !refundResult.success,
         }).catch(() => {});
       }
 

@@ -791,6 +791,7 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
         itemName: item.name,
         refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
         refundImmediate: true,
+        refundPending: !!refundResult && !refundResult.success,
       }).catch(() => {});
     }
 
