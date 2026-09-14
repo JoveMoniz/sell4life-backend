@@ -526,7 +526,14 @@ router.get('/purchased/:productId', authMiddleware, async (req, res) => {
    GET ORDER BY PAYMENT INTENT
 ====================================================== */
 
-router.get('/by-payment/:paymentIntentId', authMiddleware, async (req, res) => {
+// No authMiddleware here — the thank-you page needs to show order details
+// even for a guest checkout that used an existing account's email (no
+// session token issued, by design — see the guest-checkout security fix in
+// project memory). Same dual-auth pattern as /shipping-address: a normal
+// Bearer token if present, otherwise the PaymentIntent's own clientSecret
+// as proof this browser legitimately owns this specific checkout — Stripe
+// only ever reveals that secret to the browser that created it.
+router.get('/by-payment/:paymentIntentId', async (req, res) => {
   try {
     const order = await Order.findOne({
       paymentIntentId: req.params.paymentIntentId,
@@ -536,7 +543,23 @@ router.get('/by-payment/:paymentIntentId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (String(order.user) !== String(req.user.id)) {
+    let authorized = false;
+
+    const authHeader = req.headers.authorization;
+    const bearerToken = req.cookies?.s4l_token || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+    if (bearerToken) {
+      try {
+        const decoded = verifyToken(bearerToken);
+        if (String(order.user) === String(decoded.id)) authorized = true;
+      } catch { /* falls through to the clientSecret check below */ }
+    }
+
+    if (!authorized && req.query.clientSecret) {
+      const paymentIntent = await stripe.paymentIntents.retrieve(req.params.paymentIntentId);
+      if (paymentIntent?.client_secret === req.query.clientSecret) authorized = true;
+    }
+
+    if (!authorized) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
