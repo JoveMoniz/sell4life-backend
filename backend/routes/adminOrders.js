@@ -755,6 +755,10 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
       return res.status(400).json({ error: 'Item is already cancelled' });
     }
 
+    if (item.status === 'Delivered') {
+      return res.status(400).json({ error: 'This item has already been delivered — use Goodwill Refund instead of Cancel' });
+    }
+
     item.statusBeforeCancel = item.status;
     item.status = 'Cancelled';
     item.cancelledAt = new Date();
