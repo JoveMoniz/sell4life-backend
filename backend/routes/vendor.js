@@ -37,7 +37,7 @@ import Payout from '../models/payout.js';
 import Conversation from '../models/conversation.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
-import { mailOrderShipped } from '../utils/email.js';
+import { mailOrderShipped, mailOrderCancelled } from '../utils/email.js';
 import stripe from '../config/stripe.js';
 
 // Shipping cost providers (registers CJ at import time)
@@ -2518,8 +2518,9 @@ router.patch(
       const isPaid = ['paid', 'partially_refunded'].includes(
         (order.paymentStatus || '').toLowerCase()
       );
+      let refundResult = null;
       if (isPaid && order.paymentIntentId) {
-        await triggerItemRefund(order, item, item.quantity, vendor._id);
+        refundResult = await triggerItemRefund(order, item, item.quantity, vendor._id);
       }
 
       pushUniqueHistory(
@@ -2529,6 +2530,18 @@ router.patch(
       );
 
       await order.save();
+
+      const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+      if (buyer?.email) {
+        mailOrderCancelled({
+          to: buyer.email,
+          orderRef: order.shortId || order._id,
+          itemName: item.name,
+          refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
+          refundImmediate: true,
+        }).catch(() => {});
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error('Vendor item cancel error:', err);

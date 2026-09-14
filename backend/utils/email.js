@@ -290,6 +290,45 @@ export function mailRefundConfirmed({ to, orderRef, amount }) {
   });
 }
 
+export function mailOrderCancelled({ to, orderRef, itemName, refundAmount, refundImmediate = false }) {
+  const what = itemName ? `<strong>${itemName}</strong> on order <strong>${orderRef}</strong>` : `order <strong>${orderRef}</strong>`;
+  const refundLine = refundAmount != null
+    ? `<p style="margin:0 0 10px;color:#374151">A refund of <strong>£${Number(refundAmount).toFixed(2)}</strong> ${refundImmediate ? 'has been processed and is on its way' : 'has been scheduled and will be on its way'} back to your original payment method${refundImmediate ? '' : ' shortly'}.</p>`
+    : '';
+
+  return sendMail({
+    to,
+    subject: `Order cancelled – ${orderRef}`,
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Your order has been cancelled</p>
+      <p style="margin:0 0 10px;color:#374151">${what} has been cancelled.</p>
+      ${refundLine}
+      <p style="margin:10px 0"><a href="/account/orders.html" style="background:#0b6b6a;color:#fff;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:13px">View My Orders</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
+    </div>`,
+  });
+}
+
+export function mailCancellationReversed({ to, orderRef, itemName }) {
+  const what = itemName ? `<strong>${itemName}</strong> on order <strong>${orderRef}</strong>` : `order <strong>${orderRef}</strong>`;
+
+  return sendMail({
+    to,
+    subject: `Good news — your order is back on track – ${orderRef}`,
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">Your order is back on track</p>
+      <p style="margin:0 0 10px;color:#374151">${what} was briefly marked as cancelled, but this has now been reversed — your order is being processed as normal and no refund will be issued for it.</p>
+      <p style="margin:0 0 10px;color:#6b7280;font-size:12px">Sorry for any confusion — if you have any questions, just reply to this email or reach out via Ask Seller.</p>
+      <p style="margin:10px 0"><a href="/account/orders.html" style="background:#0b6b6a;color:#fff;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:13px">View My Orders</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
+    </div>`,
+  });
+}
+
 // Renders a marketing-email template (structured, admin-editable fields —
 // see models/emailTemplate.js) into the same visual shell every other
 // email here uses. {{name}} in heading/body is substituted with the

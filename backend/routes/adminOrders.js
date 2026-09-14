@@ -1,5 +1,5 @@
 import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
-import { mailReturnStatusChange } from '../utils/email.js';
+import { mailReturnStatusChange, mailOrderCancelled, mailCancellationReversed } from '../utils/email.js';
 import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
@@ -783,6 +783,17 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
     order.markModified('items');
     await order.save();
 
+    const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+    if (buyer?.email) {
+      mailOrderCancelled({
+        to: buyer.email,
+        orderRef: order.shortId || order._id,
+        itemName: item.name,
+        refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
+        refundImmediate: true,
+      }).catch(() => {});
+    }
+
     res.json({
       success: true,
       refunded: !!(refundResult && refundResult.success),
@@ -942,6 +953,18 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
 
     await order.save();
 
+    if (status === 'Cancelled') {
+      const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+      if (buyer?.email) {
+        mailOrderCancelled({
+          to: buyer.email,
+          orderRef: order.shortId || order._id,
+          refundAmount: order.refundScheduledAt ? Number(order.total || 0) : null,
+          refundImmediate: false,
+        }).catch(() => {});
+      }
+    }
+
     res.json({
       success: true,
       status: order.status,
@@ -1031,6 +1054,14 @@ router.patch('/:id/cancel-refund', authMiddleware, adminMiddleware, async (req, 
     order.status = getDerivedOrderStatus(order);
 
     await order.save();
+
+    const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+    if (buyer?.email) {
+      mailCancellationReversed({
+        to: buyer.email,
+        orderRef: order.shortId || order._id,
+      }).catch(() => {});
+    }
 
     res.json({
       success: true,
