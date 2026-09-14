@@ -359,7 +359,7 @@ router.post('/shipping-address', async (req, res) => {
     if (bearerToken) {
       try {
         const decoded = verifyToken(bearerToken);
-        authedUser = await User.findById(decoded.id).select('_id');
+        authedUser = await User.findById(decoded.id).select('_id name email guestOrigin');
         if (authedUser) authorizedBuyerId = String(authedUser._id);
       } catch { /* falls through to the clientSecret check below */ }
     }
@@ -469,7 +469,26 @@ router.post('/shipping-address', async (req, res) => {
     // above proves the right to complete THIS order, not a full account
     // session to write preferences onto.
     if (saveAsDefault && authedUser) {
-      await User.findByIdAndUpdate(authedUser._id, { defaultShippingAddress: address });
+      const update = { defaultShippingAddress: address };
+
+      // Guest checkout invents a placeholder name from the email's local
+      // part (see /guest-checkout) since it never collects a real one —
+      // that synthetic name then sits on the account forever, even after
+      // the buyer later types their genuine name right here at checkout.
+      // Only overwrite when it still exactly matches what guest-checkout
+      // would have generated (i.e. never actually edited since), so this
+      // never clobbers a real name the buyer deliberately set later via
+      // Account Settings — nor a shipping name for a gift/different
+      // recipient on a claimed account.
+      if (authedUser.guestOrigin && address.name) {
+        const namePart = (authedUser.email || '').split('@')[0].replace(/[^a-zA-Z]/g, '') || 'Guest';
+        const syntheticName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+        if (authedUser.name === syntheticName) {
+          update.name = address.name;
+        }
+      }
+
+      await User.findByIdAndUpdate(authedUser._id, update);
     }
 
     res.json({ success: true });
