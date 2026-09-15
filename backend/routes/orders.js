@@ -294,7 +294,15 @@ router.post('/guest-checkout', async (req, res) => {
       });
     }
 
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor: null });
+    // Same self-purchase guard the logged-in path uses (createOrderPaymentIntent
+    // throws if any item's product belongs to this vendor) — guest checkout
+    // used to hardcode vendor: null here, skipping it entirely. That's correct
+    // for a genuinely brand-new guest (no Vendor doc exists yet, so this still
+    // resolves to null), but wrong whenever the email matches an existing
+    // account that happens to be a real vendor — e.g. a seller checking out
+    // without being logged in could buy their own product with no guard at all.
+    const vendor = await Vendor.findOne({ userId: user._id });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor });
 
     if (isExistingClaimedAccount) {
       // No token/cookie here — this request never proved it's the real
