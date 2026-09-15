@@ -491,7 +491,13 @@ router.post('/shipping-address', async (req, res) => {
       if (authedUser.guestOrigin && address.name) {
         const namePart = (authedUser.email || '').split('@')[0].replace(/[^a-zA-Z]/g, '') || 'Guest';
         const syntheticName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-        if (authedUser.name === syntheticName) {
+        // Also backfill a genuinely blank name, not just an exact match on
+        // the synthetic pattern — some guest accounts ended up with no
+        // name at all rather than the synthetic placeholder (e.g. created
+        // before that generator existed, or via a slightly different
+        // path), and a blank name is just as clearly "never really set by
+        // the buyer" as the synthetic one.
+        if (!authedUser.name || authedUser.name === syntheticName) {
           update.name = address.name;
         }
       }
