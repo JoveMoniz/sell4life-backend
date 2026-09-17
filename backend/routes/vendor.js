@@ -27,7 +27,7 @@ import {
 } from '../utils/returnLogic.js';
 
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
-import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
 
 import User from '../models/user.js';
 import Product from '../models/product.js';
@@ -37,7 +37,7 @@ import Payout from '../models/payout.js';
 import Conversation from '../models/conversation.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
-import { mailOrderShipped } from '../utils/email.js';
+import { mailOrderShipped, mailOrderCancelled, mailCancelHeld } from '../utils/email.js';
 import stripe from '../config/stripe.js';
 
 // Shipping cost providers (registers CJ at import time)
@@ -2492,10 +2492,32 @@ router.patch(
         return res.status(400).json({ error: `Cannot cancel item in ${current} state` });
       }
 
+      // Ask CJ FIRST — only mark this item Cancelled once CJ actually
+      // confirms nothing will ship, instead of blindly refunding an item
+      // that might still be in transit (see holdItemForCjCancelDenied).
+      const cjResult = await attemptCjOrderCancel(item);
+
+      if (cjResult.attempted && !cjResult.cjCancelled) {
+        holdItemForCjCancelDenied(order, item, cjResult.reason);
+
+        order.markModified('items');
+        await order.save();
+
+        const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+        if (buyer?.email) {
+          mailCancelHeld({
+            to: buyer.email,
+            orderRef: order.shortId || order._id,
+            itemName: item.name,
+            holdHours: CJ_CANCEL_HOLD_HOURS,
+          }).catch(() => {});
+        }
+
+        return res.json({ success: true, held: true });
+      }
+
       item.status = 'Cancelled';
       item.cancelledAt = new Date();
-
-      await attemptCjOrderCancel(item);
 
       const isPaid = ['paid', 'partially_refunded'].includes(
         (order.paymentStatus || '').toLowerCase()
@@ -2557,13 +2579,54 @@ router.patch(
 
       const before = item.cjOrderStatus;
       await attemptCjOrderCancel(item);
-      await order.save();
 
       if (item.cjOrderStatus === before) {
+        await order.save();
         return res.status(400).json({ error: 'CJ declined the cancellation — check server logs for the exact reason' });
       }
 
-      res.json({ success: true });
+      // CJ has now confirmed the cancel. If this item was sitting in the
+      // 48h safety-net hold (item.status was deliberately left untouched
+      // while we waited), finalize it now instead of waiting for the
+      // worker: mark Cancelled and refund immediately — safe, since CJ
+      // just confirmed nothing shipped.
+      let refundResult = null;
+      const wasHeld = !!item.cjCancelDenied;
+      if (wasHeld) {
+        item.cjCancelDenied = false;
+        item.cjCancelDeniedAt = null;
+        item.refundScheduledAt = null;
+        item.refundStatus = 'none';
+        item.statusBeforeCancel = item.statusBeforeCancel || item.status;
+        item.status = 'Cancelled';
+        item.cancelledAt = new Date();
+
+        const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
+        const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+        if (isPaid && order.paymentIntentId && outstandingQty > 0) {
+          refundResult = await triggerItemRefund(order, item, outstandingQty, vendor._id);
+        }
+
+        pushUniqueHistory(order, 'Cancelled', `CJ confirmed cancellation for "${item.name}" on retry`);
+
+        await order.save();
+
+        const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+        if (buyer?.email) {
+          mailOrderCancelled({
+            to: buyer.email,
+            orderRef: order.shortId || order._id,
+            itemName: item.name,
+            refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
+            refundImmediate: true,
+            refundPending: !!refundResult && !refundResult.success,
+          }).catch(() => {});
+        }
+      } else {
+        await order.save();
+      }
+
+      res.json({ success: true, finalized: wasHeld });
     } catch (err) {
       console.error('Retry CJ cancel error:', err);
       res.status(500).json({ error: 'Server error' });

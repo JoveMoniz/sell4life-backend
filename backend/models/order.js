@@ -202,6 +202,9 @@ const orderItemSchema = new mongoose.Schema({
           'goodwill_refund_scheduled',
           'goodwill_refund_processed',
           'goodwill_refund_cancelled',
+
+          'cj_cancel_held',
+          'cj_cancel_hold_resolved',
         ],
       },
 
@@ -247,6 +250,14 @@ const orderItemSchema = new mongoose.Schema({
   // overwrote it — lets admin's "Cancel Refund" genuinely undo the
   // cancellation (revert fulfillment) rather than just stopping the money.
   statusBeforeCancel: { type: String, default: '' },
+
+  // Set when a cancel was requested but CJ refused it (order already
+  // dispatched) — item.status is deliberately left untouched (NOT advanced
+  // to Cancelled) while this is true, since the item may still be on its
+  // way. refundScheduledAt/refundStatus below hold a safety-net refund that
+  // fires automatically if nothing resolves this sooner (see refundWorker.js).
+  cjCancelDenied: { type: Boolean, default: false },
+  cjCancelDeniedAt: Date,
 
   archived: {
     type: Boolean,

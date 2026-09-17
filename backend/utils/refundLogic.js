@@ -8,6 +8,14 @@ import { calculateItemRefundAmount } from './returnLogic.js';
 // if a different window is ever needed.
 const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 2 * 60 * 60 * 1000);
 
+// How long to hold a refund when CJ refuses to cancel (item already
+// dispatched) before auto-refunding anyway as a customer-protection
+// guarantee. Deliberately much longer than REFUND_DELAY_MS above — that one
+// exists only to catch an accidental click; this one exists to give a
+// genuinely-in-transit parcel a real chance to resolve (returned to sender,
+// delivery refused, etc.) before we refund an item that might still arrive.
+export const CJ_CANCEL_HOLD_HOURS = Number(process.env.CJ_CANCEL_HOLD_HOURS || 48);
+
 export function scheduleRefund(order) {
   // 🚫 Prevent duplicate scheduling FIRST
   if (order.refundScheduledAt) return;
@@ -43,6 +51,32 @@ export function scheduleRefund(order) {
       vo.refundScheduledAt = refundTime;
     }
   });
+}
+
+// ======================================================
+// HOLD AN ITEM WHEN CJ REFUSES TO CANCEL
+// Leaves item.status exactly as it is (does NOT advance it to Cancelled —
+// the item may genuinely still be on its way) and schedules a safety-net
+// refund CJ_CANCEL_HOLD_HOURS out, picked up by refundWorker.js. Callers
+// must still order.markModified('items') and save() afterward.
+// ======================================================
+export function holdItemForCjCancelDenied(order, item, reason) {
+  item.cjCancelDenied = true;
+  item.cjCancelDeniedAt = new Date();
+  item.refundStatus = 'scheduled';
+  item.refundScheduledAt = new Date(Date.now() + CJ_CANCEL_HOLD_HOURS * 60 * 60 * 1000);
+
+  pushItemHistory(item, {
+    type: 'cj_cancel_held',
+    status: 'scheduled',
+    note: `Cancellation requested but CJ could not stop the shipment${reason ? ` (${reason})` : ''} — refund will process automatically in ~${CJ_CANCEL_HOLD_HOURS}h unless resolved sooner`,
+  });
+
+  pushUniqueHistory(
+    order,
+    'Cancel Held',
+    `"${item.name}" — CJ could not stop the shipment, holding refund pending resolution`
+  );
 }
 
 // ======================================================
