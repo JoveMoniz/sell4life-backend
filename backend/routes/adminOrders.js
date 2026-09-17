@@ -1,5 +1,5 @@
-import { scheduleRefund, triggerItemRefund } from '../utils/refundLogic.js';
-import { mailReturnStatusChange, mailOrderCancelled, mailCancellationReversed } from '../utils/email.js';
+import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
+import { mailReturnStatusChange, mailOrderCancelled, mailCancellationReversed, mailCancelHeld } from '../utils/email.js';
 import {
   canUpdateItemStatus,
   getDerivedOrderStatus,
@@ -760,11 +760,33 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
       return res.status(400).json({ error: 'This item has already been delivered — use Goodwill Refund instead of Cancel' });
     }
 
+    // Ask CJ FIRST — only mark this item Cancelled once CJ actually
+    // confirms nothing will ship, instead of blindly refunding an item
+    // that might still be in transit (see holdItemForCjCancelDenied).
+    const cjResult = await attemptCjOrderCancel(item);
+
+    if (cjResult.attempted && !cjResult.cjCancelled) {
+      holdItemForCjCancelDenied(order, item, cjResult.reason);
+
+      order.markModified('items');
+      await order.save();
+
+      const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+      if (buyer?.email) {
+        mailCancelHeld({
+          to: buyer.email,
+          orderRef: order.shortId || order._id,
+          itemName: item.name,
+          holdHours: CJ_CANCEL_HOLD_HOURS,
+        }).catch(() => {});
+      }
+
+      return res.json({ success: true, held: true });
+    }
+
     item.statusBeforeCancel = item.status;
     item.status = 'Cancelled';
     item.cancelledAt = new Date();
-
-    await attemptCjOrderCancel(item);
 
     const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
     const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
@@ -839,18 +861,54 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     // CANCELLED
     // =====================================================
 
+    // True if any item couldn't be confirmed cancelled by CJ (still in
+    // transit) — read further down to skip the blunt whole-order refund
+    // in that case, since it would refund for an item that might still
+    // arrive; genuinely-cancelled items get refunded individually instead.
+    let anyHeld = false;
+
     if (status === 'Cancelled') {
+      const heldVendorIds = new Set();
+
+      for (const item of order.items) {
+        if (!['Pending', 'Processing', 'Cancel Requested'].includes(item.status)) continue;
+
+        // Ask CJ FIRST — only advance this item to Cancelled once CJ
+        // actually confirms nothing will ship (see holdItemForCjCancelDenied).
+        const cjResult = await attemptCjOrderCancel(item);
+
+        if (cjResult.attempted && !cjResult.cjCancelled) {
+          holdItemForCjCancelDenied(order, item, cjResult.reason);
+          heldVendorIds.add(String(item.vendorId));
+          anyHeld = true;
+          continue;
+        }
+
+        item.statusBeforeCancel = item.status;
+        item.status = 'Cancelled';
+        item.cancelledAt = now;
+      }
+
       order.vendorOrders.forEach((vo) => {
+        // A vendorOrder with a held item may still have something in
+        // transit — leave its status alone rather than marking it Cancelled.
+        if (heldVendorIds.has(String(vo.vendorId))) return;
         vo.status = 'Cancelled';
         vo.cancelledAt = now;
       });
 
-      for (const item of order.items) {
-        if (['Pending', 'Processing', 'Cancel Requested'].includes(item.status)) {
-          item.statusBeforeCancel = item.status;
-          item.status = 'Cancelled';
-          item.cancelledAt = now;
-          await attemptCjOrderCancel(item);
+      // Mixed outcome: some items held, some genuinely cancelled. The
+      // whole-order refund below refunds the ENTIRE remaining Stripe
+      // balance with no per-item split — wrong here, since it would also
+      // refund for the held item(s). Refund only the items CJ actually
+      // confirmed, immediately (safe: nothing shipped for those).
+      if (anyHeld && order.paymentStatus === 'paid' && order.paymentIntentId) {
+        for (const item of order.items) {
+          if (item.status !== 'Cancelled' || item.refundStatus === 'processed') continue;
+          const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+          if (outstandingQty > 0) {
+            await triggerItemRefund(order, item, outstandingQty, req.user._id);
+          }
         }
       }
     }
@@ -905,7 +963,12 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     // ORDER HISTORY
     // =====================================================
 
-    pushUniqueHistory(order, status);
+    // Skip the generic "Cancelled" entry when some items are held — the
+    // per-item "Cancel Held" entries already pushed above tell the real
+    // story, and a blanket "Cancelled" right after would contradict them.
+    if (!(status === 'Cancelled' && anyHeld)) {
+      pushUniqueHistory(order, status);
+    }
 
     // =====================================================
     // AUTO REFUND SCHEDULING
@@ -919,7 +982,7 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     const alreadyRefunded =
       order.paymentStatus === 'refunded' || order.refundStatus === 'processed';
 
-    const shouldScheduleRefund = status === 'Cancelled' || status === 'Returned';
+    const shouldScheduleRefund = (status === 'Cancelled' && !anyHeld) || status === 'Returned';
 
     if (
       shouldScheduleRefund &&
@@ -957,12 +1020,20 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
     if (status === 'Cancelled') {
       const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
       if (buyer?.email) {
-        mailOrderCancelled({
-          to: buyer.email,
-          orderRef: order.shortId || order._id,
-          refundAmount: order.refundScheduledAt ? Number(order.total || 0) : null,
-          refundImmediate: false,
-        }).catch(() => {});
+        if (anyHeld) {
+          mailCancelHeld({
+            to: buyer.email,
+            orderRef: order.shortId || order._id,
+            holdHours: CJ_CANCEL_HOLD_HOURS,
+          }).catch(() => {});
+        } else {
+          mailOrderCancelled({
+            to: buyer.email,
+            orderRef: order.shortId || order._id,
+            refundAmount: order.refundScheduledAt ? Number(order.total || 0) : null,
+            refundImmediate: false,
+          }).catch(() => {});
+        }
       }
     }
 
@@ -970,6 +1041,7 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
       success: true,
       status: order.status,
       paymentStatus: order.paymentStatus,
+      held: anyHeld,
     });
   } catch (err) {
     console.error('ADMIN STATUS UPDATE ERROR:', err);

@@ -313,6 +313,24 @@ export function mailOrderCancelled({ to, orderRef, itemName, refundAmount, refun
   });
 }
 
+export function mailCancelHeld({ to, orderRef, itemName, holdHours = 48 }) {
+  const what = itemName ? `<strong>${itemName}</strong> on order <strong>${orderRef}</strong>` : `order <strong>${orderRef}</strong>`;
+
+  return sendMail({
+    to,
+    subject: `Cancellation update – ${orderRef}`,
+    html: `<div style="font-family:sans-serif;font-size:13px;max-width:560px;margin:0 auto;color:#111827">
+      ${logoHeader}
+      <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">We're looking into your cancellation</p>
+      <p style="margin:0 0 10px;color:#374151">You asked to cancel ${what}, but our shipping partner wasn't able to stop it in time — it may already be on its way to you.</p>
+      <p style="margin:0 0 10px;color:#374151">We're checking on this now. If it isn't resolved within <strong>${holdHours} hours</strong>, you'll be refunded automatically — no need to do anything further.</p>
+      <p style="margin:10px 0"><a href="/account/orders.html" style="background:#0b6b6a;color:#fff;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:13px">View My Orders</a></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+      <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
+    </div>`,
+  });
+}
+
 export function mailCancellationReversed({ to, orderRef, itemName }) {
   const what = itemName ? `<strong>${itemName}</strong> on order <strong>${orderRef}</strong>` : `order <strong>${orderRef}</strong>`;
 

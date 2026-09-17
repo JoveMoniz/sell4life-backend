@@ -4,9 +4,81 @@
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
 import { getDerivedOrderStatus } from '../utils/orderLogic.js';
 import { calculateItemRefundAmount } from '../utils/returnLogic.js';
+import { triggerItemRefund } from '../utils/refundLogic.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
+
+// ======================================================
+// CJ CANCEL SAFETY-NET REFUNDS — item-level, fires only when CJ refused a
+// cancel (item possibly still in transit) and nothing resolved it manually
+// within the hold window. See utils/refundLogic.js holdItemForCjCancelDenied.
+// ======================================================
+async function processCjCancelHoldRefunds(now) {
+  const orders = await Order.find({
+    'items.cjCancelDenied': true,
+    'items.refundStatus': 'scheduled',
+    'items.refundScheduledAt': { $lte: now },
+  });
+
+  for (const order of orders) {
+    let changed = false;
+
+    for (const item of order.items) {
+      if (!item.cjCancelDenied || item.refundStatus !== 'scheduled') continue;
+      if (!item.refundScheduledAt || item.refundScheduledAt > now) continue;
+
+      changed = true;
+
+      const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+
+      if (outstandingQty <= 0 || !order.paymentIntentId) {
+        item.cjCancelDenied = false;
+        item.refundScheduledAt = null;
+        item.refundStatus = 'failed';
+        pushUniqueHistory(order, 'Refund Failed', `CJ-cancel-hold refund failed for ${item.name}: nothing left to refund`);
+        continue;
+      }
+
+      item.statusBeforeCancel = item.statusBeforeCancel || item.status;
+      item.status = 'Cancelled';
+      item.cancelledAt = item.cancelledAt || now;
+      item.cjCancelDenied = false;
+      item.refundScheduledAt = null;
+      // triggerItemRefund reads/overwrites refundStatus itself below
+
+      const result = await triggerItemRefund(order, item, outstandingQty, null);
+
+      pushItemHistory(item, {
+        type: 'cj_cancel_hold_resolved',
+        status: result.success ? 'processed' : 'failed',
+        amount: result.refundedAmount || 0,
+        note: result.success
+          ? `Safety-net refund processed — CJ never confirmed the cancellation within the hold window`
+          : `Safety-net refund attempt failed: ${result.error}`,
+      });
+
+      pushUniqueHistory(
+        order,
+        'Cancelled',
+        `"${item.name}" — CJ never confirmed cancellation within the hold window, auto-refunded as a safety net`
+      );
+    }
+
+    if (changed) {
+      order.paymentStatus = order.items.every((i) => i.refundStatus === 'processed')
+        ? 'refunded'
+        : order.items.some((i) => ['processed', 'partially_refunded'].includes(i.refundStatus))
+          ? 'partially_refunded'
+          : order.paymentStatus;
+
+      order.status = getDerivedOrderStatus(order);
+
+      order.markModified('items');
+      await order.save();
+    }
+  }
+}
 
 // ======================================================
 // GOODWILL REFUNDS — vendor-scheduled, item-level, 24h delay
@@ -128,6 +200,12 @@ export function startRefundWorker() {
       await processGoodwillRefunds(now);
     } catch (err) {
       console.error('💥 GOODWILL REFUND WORKER ERROR:', err.message);
+    }
+
+    try {
+      await processCjCancelHoldRefunds(now);
+    } catch (err) {
+      console.error('💥 CJ CANCEL HOLD REFUND WORKER ERROR:', err.message);
     }
 
     try {

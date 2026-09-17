@@ -686,13 +686,23 @@ export async function checkUkShippingForOneVendor(vendor) {
 // Mutates item.cjOrderStatus in place on success — caller still needs to
 // save() the order afterwards.
 // ======================================================
+// Returns { attempted, cjCancelled, reason }. `attempted: false` means there
+// was no live CJ order to check (not dropshipped, already resolved, or no
+// vendor credential) — callers should treat that the same as a confirmed
+// cancel, since there's nothing on CJ's side that could still ship.
+// `attempted: true, cjCancelled: false` means CJ was actually asked and
+// refused — most commonly because the order already moved past CREATED
+// (i.e. it's been dispatched) — callers must NOT treat this as a clean
+// cancel, since the item may genuinely still be on its way.
 export async function attemptCjOrderCancel(item) {
-  if (!item?.cjOrderId || item.cjOrderStatus !== 'CREATED') return;
+  if (!item?.cjOrderId || item.cjOrderStatus !== 'CREATED') {
+    return { attempted: false, cjCancelled: false };
+  }
 
   try {
     const vendor = await Vendor.findById(item.vendorId).select('supplierCredentials');
     const rawCred = vendor?.supplierCredentials?.cjdropshipping;
-    if (!rawCred) return;
+    if (!rawCred) return { attempted: false, cjCancelled: false };
 
     const credential = decryptCredential(rawCred);
     const result = await cjProvider.cancelOrder(item.cjOrderId, credential);
@@ -700,10 +710,13 @@ export async function attemptCjOrderCancel(item) {
     if (result?.success) {
       item.cjOrderStatus = 'cancelled';
       console.log(`[cj-auto-cancel] cancelled CJ order ${item.cjOrderId} for item ${item._id}`);
-    } else {
-      console.warn(`[cj-auto-cancel] could not cancel CJ order ${item.cjOrderId} for item ${item._id}:`, result?.error);
+      return { attempted: true, cjCancelled: true };
     }
+
+    console.warn(`[cj-auto-cancel] could not cancel CJ order ${item.cjOrderId} for item ${item._id}:`, result?.error);
+    return { attempted: true, cjCancelled: false, reason: result?.error };
   } catch (err) {
     console.warn(`[cj-auto-cancel] error cancelling CJ order for item ${item._id}:`, err.message);
+    return { attempted: true, cjCancelled: false, reason: err.message };
   }
 }
