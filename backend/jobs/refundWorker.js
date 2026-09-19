@@ -30,6 +30,33 @@ async function processCjCancelHoldRefunds(now) {
 
       changed = true;
 
+      // The CJ tracking sync worker (cjOrderStatusSyncWorker.js) keeps polling
+      // held items exactly like any other in-flight item and will flip this to
+      // 'Delivered' the moment CJ confirms it — independently of this hold.
+      // If that happened before the 48h timer fired, auto-refunding here would
+      // hand the buyer the item AND the money back. Pull it out of the
+      // auto-refund queue and leave it for a human to resolve (normal return
+      // flow, or an explicit manual refund) instead of firing blind.
+      if (item.status === 'Delivered') {
+        item.refundStatus = 'requested';
+        item.refundScheduledAt = null;
+
+        pushItemHistory(item, {
+          type: 'cj_cancel_hold_resolved',
+          status: 'failed',
+          amount: 0,
+          note: `Safety-net refund withheld — CJ confirmed delivery of "${item.name}" during the hold window. Needs manual review instead of an automatic refund.`,
+        });
+
+        pushUniqueHistory(
+          order,
+          'Refund Held — Needs Review',
+          `"${item.name}" — delivered during the CJ-cancel hold window; auto-refund withheld, needs manual review`
+        );
+
+        continue;
+      }
+
       const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
 
       if (outstandingQty <= 0 || !order.paymentIntentId) {
