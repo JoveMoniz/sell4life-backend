@@ -8,13 +8,20 @@ import { calculateItemRefundAmount } from './returnLogic.js';
 // if a different window is ever needed.
 const REFUND_DELAY_MS = Number(process.env.REFUND_DELAY_MS || 2 * 60 * 60 * 1000);
 
-// How long to hold a refund when CJ refuses to cancel (item already
-// dispatched) before auto-refunding anyway as a customer-protection
-// guarantee. Deliberately much longer than REFUND_DELAY_MS above — that one
-// exists only to catch an accidental click; this one exists to give a
-// genuinely-in-transit parcel a real chance to resolve (returned to sender,
-// delivery refused, etc.) before we refund an item that might still arrive.
-export const CJ_CANCEL_HOLD_HOURS = Number(process.env.CJ_CANCEL_HOLD_HOURS || 48);
+// When CJ refuses to cancel (item already dispatched), the refund is never
+// fired on a blind timer — it only fires once CJ actually confirms the
+// cancellation. To get that confirmation as fast as possible, the worker
+// re-asks CJ every CJ_CANCEL_RETRY_INTERVAL_HOURS. If nothing has resolved
+// within CJ_CANCEL_MAX_RETRY_HOURS of the original hold, auto-retry stops
+// and the item is left for a human (vendor/admin) to decide — no automatic
+// refund fires past that point, since CJ never actually confirmed the item
+// won't arrive.
+export const CJ_CANCEL_RETRY_INTERVAL_HOURS = Number(process.env.CJ_CANCEL_RETRY_INTERVAL_HOURS || 2);
+export const CJ_CANCEL_MAX_RETRY_HOURS = Number(process.env.CJ_CANCEL_MAX_RETRY_HOURS || 24);
+// Kept only so CJ_CANCEL_HOLD_HOURS-named references elsewhere (e.g. the
+// buyer-facing "cancellation update" email) still have a human-readable
+// window to quote — reflects the auto-retry ceiling, not a refund deadline.
+export const CJ_CANCEL_HOLD_HOURS = CJ_CANCEL_MAX_RETRY_HOURS;
 
 export function scheduleRefund(order) {
   // 🚫 Prevent duplicate scheduling FIRST
@@ -56,27 +63,65 @@ export function scheduleRefund(order) {
 // ======================================================
 // HOLD AN ITEM WHEN CJ REFUSES TO CANCEL
 // Leaves item.status exactly as it is (does NOT advance it to Cancelled —
-// the item may genuinely still be on its way) and schedules a safety-net
-// refund CJ_CANCEL_HOLD_HOURS out, picked up by refundWorker.js. Callers
-// must still order.markModified('items') and save() afterward.
+// the item may genuinely still be on its way). refundScheduledAt here means
+// "next auto-retry due", not "refund at" — refundWorker.js re-asks CJ every
+// CJ_CANCEL_RETRY_INTERVAL_HOURS and only refunds once CJ actually confirms
+// the cancellation. Callers must still order.markModified('items') and
+// save() afterward.
 // ======================================================
 export function holdItemForCjCancelDenied(order, item, reason) {
   item.cjCancelDenied = true;
   item.cjCancelDeniedAt = new Date();
   item.refundStatus = 'scheduled';
-  item.refundScheduledAt = new Date(Date.now() + CJ_CANCEL_HOLD_HOURS * 60 * 60 * 1000);
+  item.refundScheduledAt = new Date(Date.now() + CJ_CANCEL_RETRY_INTERVAL_HOURS * 60 * 60 * 1000);
 
   pushItemHistory(item, {
     type: 'cj_cancel_held',
     status: 'scheduled',
-    note: `Cancellation requested but CJ could not stop the shipment${reason ? ` (${reason})` : ''} — refund will process automatically in ~${CJ_CANCEL_HOLD_HOURS}h unless resolved sooner`,
+    note: `Cancellation requested but CJ could not stop the shipment${reason ? ` (${reason})` : ''} — we'll keep checking with the supplier and refund as soon as the cancellation is confirmed`,
   });
 
   pushUniqueHistory(
     order,
     'Cancel Held',
-    `"${item.name}" — CJ could not stop the shipment, holding refund pending resolution`
+    `"${item.name}" — CJ could not stop the shipment, holding refund pending confirmation`
   );
+}
+
+// ======================================================
+// FINALIZE A HELD ITEM ONCE CJ CONFIRMS THE CANCELLATION
+// Shared by the vendor's manual "Retry CJ cancel" button (vendor.js) and the
+// worker's automatic retry (refundWorker.js) so both resolve a confirmed
+// hold identically: mark Cancelled, refund immediately (safe — CJ confirming
+// cancellation means nothing shipped/nothing charged to the vendor), and
+// notify the buyer. Callers must still order.markModified('items') and
+// save() afterward; this does not touch res/req so it works from either a
+// route handler or a background worker tick.
+// ======================================================
+export async function finalizeCjCancelHold(order, item, vendorId, resolutionNote) {
+  item.cjCancelDenied = false;
+  item.cjCancelDeniedAt = null;
+  item.refundScheduledAt = null;
+  item.refundStatus = 'none';
+  item.statusBeforeCancel = item.statusBeforeCancel || item.status;
+  item.status = 'Cancelled';
+  item.cancelledAt = item.cancelledAt || new Date();
+
+  const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
+  const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+
+  let refundResult = null;
+  if (isPaid && order.paymentIntentId && outstandingQty > 0) {
+    refundResult = await triggerItemRefund(order, item, outstandingQty, vendorId || null);
+  }
+
+  pushUniqueHistory(
+    order,
+    'Cancelled',
+    `"${item.name}" — ${resolutionNote || 'CJ confirmed cancellation'}`
+  );
+
+  return { refundResult };
 }
 
 // ======================================================

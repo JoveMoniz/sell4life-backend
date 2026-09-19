@@ -323,7 +323,7 @@ export function mailCancelHeld({ to, orderRef, itemName, holdHours = 48 }) {
       ${logoHeader}
       <p style="font-size:15px;font-weight:700;color:#0b6b6a;margin:0 0 8px">We're looking into your cancellation</p>
       <p style="margin:0 0 10px;color:#374151">You asked to cancel ${what}, but our shipping partner wasn't able to stop it in time — it may already be on its way to you.</p>
-      <p style="margin:0 0 10px;color:#374151">We're checking on this now. If it isn't resolved within <strong>${holdHours} hours</strong>, you'll be refunded automatically — no need to do anything further.</p>
+      <p style="margin:0 0 10px;color:#374151">We're checking with them now and will refund you automatically the moment they confirm the cancellation. If we haven't heard back within <strong>${holdHours} hours</strong>, we'll follow up manually to sort this out — no need to do anything further in the meantime.</p>
       <p style="margin:10px 0"><a href="/account/orders.html" style="background:#0b6b6a;color:#fff;padding:7px 14px;border-radius:6px;text-decoration:none;font-size:13px">View My Orders</a></p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
       <p style="font-size:11px;color:#9ca3af">Sell4Life · Order ${orderRef}</p>
