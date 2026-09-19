@@ -115,6 +115,15 @@ export async function finalizeCjCancelHold(order, item, vendorId, resolutionNote
     refundResult = await triggerItemRefund(order, item, outstandingQty, vendorId || null);
   }
 
+  pushItemHistory(item, {
+    type: 'cj_cancel_confirmed',
+    status: refundResult?.success !== false ? 'processed' : 'failed',
+    amount: refundResult?.refundedAmount || 0,
+    note: refundResult && !refundResult.success
+      ? `${resolutionNote || 'CJ confirmed cancellation'} — refund attempt failed: ${refundResult.error}`
+      : resolutionNote || 'CJ confirmed cancellation',
+  });
+
   pushUniqueHistory(
     order,
     'Cancelled',

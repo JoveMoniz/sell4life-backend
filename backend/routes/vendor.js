@@ -2537,6 +2537,17 @@ router.patch(
       item.status = 'Cancelled';
       item.cancelledAt = new Date();
 
+      // Visible confirmation that CJ was actually asked and agreed, for the
+      // common case where that happens instantly and would otherwise look
+      // identical to "no CJ check ran at all" — see item.cjOrderId ? below.
+      if (item.cjOrderId && cjResult.cjCancelled) {
+        pushItemHistory(item, {
+          type: 'cj_cancel_confirmed',
+          status: 'processed',
+          note: 'CJ confirmed the cancellation — nothing was dispatched, refunding immediately',
+        });
+      }
+
       const isPaid = ['paid', 'partially_refunded'].includes(
         (order.paymentStatus || '').toLowerCase()
       );
@@ -2605,10 +2616,11 @@ router.patch(
 
       if (!item.cjOrderId) return res.status(400).json({ error: 'No CJ order on this item' });
       if (item.cjOrderStatus === 'cancelled') return res.status(400).json({ error: 'Already cancelled on CJ' });
-      if (item.cjOrderStatus !== 'CREATED') {
-        return res.status(400).json({ error: `CJ order is ${item.cjOrderStatus || 'past CREATED'} — likely already paid for, can't auto-cancel` });
-      }
 
+      // Deliberately no longer blocks here just because the cached
+      // cjOrderStatus has moved past CREATED — that's exactly the case this
+      // retry exists for (see attemptCjOrderCancel). Let CJ's live response
+      // be the real answer instead of a locally-cached guess.
       const before = item.cjOrderStatus;
       await attemptCjOrderCancel(item);
 
