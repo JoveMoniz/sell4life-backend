@@ -4,17 +4,23 @@
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
 import { getDerivedOrderStatus } from '../utils/orderLogic.js';
 import { calculateItemRefundAmount } from '../utils/returnLogic.js';
-import { triggerItemRefund } from '../utils/refundLogic.js';
+import { finalizeCjCancelHold, CJ_CANCEL_RETRY_INTERVAL_HOURS, CJ_CANCEL_MAX_RETRY_HOURS } from '../utils/refundLogic.js';
+import { attemptCjOrderCancel } from '../utils/cjProductSync.js';
+import { mailOrderCancelled } from '../utils/email.js';
 
 import Order from '../models/order.js';
 import stripe from '../config/stripe.js';
 
 // ======================================================
-// CJ CANCEL SAFETY-NET REFUNDS — item-level, fires only when CJ refused a
-// cancel (item possibly still in transit) and nothing resolved it manually
-// within the hold window. See utils/refundLogic.js holdItemForCjCancelDenied.
+// CJ CANCEL HOLD — item-level. Never refunds on a blind timer: a held item
+// only gets refunded once CJ actually confirms the cancellation. This job
+// re-asks CJ every CJ_CANCEL_RETRY_INTERVAL_HOURS (refundScheduledAt here
+// means "next retry due", not "refund at" — see holdItemForCjCancelDenied).
+// If nothing confirms within CJ_CANCEL_MAX_RETRY_HOURS of the original hold,
+// auto-retry stops and the item is left for a human (vendor/admin) to
+// decide — no refund fires automatically past that point.
 // ======================================================
-async function processCjCancelHoldRefunds(now) {
+async function processCjCancelHoldRetries(now) {
   const orders = await Order.find({
     'items.cjCancelDenied': true,
     'items.refundStatus': 'scheduled',
@@ -33,10 +39,8 @@ async function processCjCancelHoldRefunds(now) {
       // The CJ tracking sync worker (cjOrderStatusSyncWorker.js) keeps polling
       // held items exactly like any other in-flight item and will flip this to
       // 'Delivered' the moment CJ confirms it — independently of this hold.
-      // If that happened before the 48h timer fired, auto-refunding here would
-      // hand the buyer the item AND the money back. Pull it out of the
-      // auto-refund queue and leave it for a human to resolve (normal return
-      // flow, or an explicit manual refund) instead of firing blind.
+      // Refunding here would hand the buyer the item AND the money back, so
+      // pull it out of the retry queue and leave it for a human to resolve.
       if (item.status === 'Delivered') {
         item.refundStatus = 'requested';
         item.refundScheduledAt = null;
@@ -45,7 +49,7 @@ async function processCjCancelHoldRefunds(now) {
           type: 'cj_cancel_hold_resolved',
           status: 'failed',
           amount: 0,
-          note: `Safety-net refund withheld — CJ confirmed delivery of "${item.name}" during the hold window. Needs manual review instead of an automatic refund.`,
+          note: `Auto-refund withheld — CJ confirmed delivery of "${item.name}" during the hold window. Needs manual review instead of an automatic refund.`,
         });
 
         pushUniqueHistory(
@@ -57,39 +61,71 @@ async function processCjCancelHoldRefunds(now) {
         continue;
       }
 
-      const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
+      // Re-ask CJ. Two independent confirmation signals: attemptCjOrderCancel
+      // actively retries the cancel call itself (catches a transient earlier
+      // failure — auth blip, rate limit — while the order is still genuinely
+      // uncommitted on CJ's side); item.cjOrderStatus === 'CANCELLED' catches
+      // CJ (or the vendor, directly in CJ's dashboard) having cancelled it
+      // independently, which the general tracking sync deliberately never
+      // acts on for a normal order but is exactly the confirmation we want
+      // for an item we ourselves already flagged as held.
+      const retry = await attemptCjOrderCancel(item);
+      const confirmed = retry?.cjCancelled || item.cjOrderStatus === 'CANCELLED';
 
-      if (outstandingQty <= 0 || !order.paymentIntentId) {
-        item.cjCancelDenied = false;
-        item.refundScheduledAt = null;
-        item.refundStatus = 'failed';
-        pushUniqueHistory(order, 'Refund Failed', `CJ-cancel-hold refund failed for ${item.name}: nothing left to refund`);
+      if (confirmed) {
+        const { refundResult } = await finalizeCjCancelHold(order, item, null, 'CJ confirmed cancellation on automatic retry');
+
+        pushItemHistory(item, {
+          type: 'cj_cancel_hold_resolved',
+          status: refundResult?.success ? 'processed' : (refundResult ? 'failed' : 'processed'),
+          amount: refundResult?.refundedAmount || 0,
+          note: refundResult
+            ? (refundResult.success
+                ? 'Refund processed — CJ confirmed the cancellation on automatic retry'
+                : `Refund attempt failed after CJ confirmed cancellation: ${refundResult.error}`)
+            : 'CJ confirmed the cancellation on automatic retry — nothing left to refund',
+        });
+
+        const buyer = await order.populate('user', 'email').then((o) => o.user).catch(() => null);
+        if (buyer?.email) {
+          mailOrderCancelled({
+            to: buyer.email,
+            orderRef: order.shortId || order._id,
+            itemName: item.name,
+            refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
+            refundImmediate: true,
+            refundPending: !!refundResult && !refundResult.success,
+          }).catch(() => {});
+        }
+
         continue;
       }
 
-      item.statusBeforeCancel = item.statusBeforeCancel || item.status;
-      item.status = 'Cancelled';
-      item.cancelledAt = item.cancelledAt || now;
-      item.cjCancelDenied = false;
-      item.refundScheduledAt = null;
-      // triggerItemRefund reads/overwrites refundStatus itself below
+      const hoursSinceHold = (now - item.cjCancelDeniedAt) / (60 * 60 * 1000);
 
-      const result = await triggerItemRefund(order, item, outstandingQty, null);
+      if (hoursSinceHold >= CJ_CANCEL_MAX_RETRY_HOURS) {
+        item.refundStatus = 'requested';
+        item.refundScheduledAt = null;
 
-      pushItemHistory(item, {
-        type: 'cj_cancel_hold_resolved',
-        status: result.success ? 'processed' : 'failed',
-        amount: result.refundedAmount || 0,
-        note: result.success
-          ? `Safety-net refund processed — CJ never confirmed the cancellation within the hold window`
-          : `Safety-net refund attempt failed: ${result.error}`,
-      });
+        pushItemHistory(item, {
+          type: 'cj_cancel_hold_resolved',
+          status: 'failed',
+          amount: 0,
+          note: `CJ still hasn't confirmed cancellation of "${item.name}" after ${CJ_CANCEL_MAX_RETRY_HOURS}h of retries — stopping automatic retry, needs a vendor/admin decision`,
+        });
 
-      pushUniqueHistory(
-        order,
-        'Cancelled',
-        `"${item.name}" — CJ never confirmed cancellation within the hold window, auto-refunded as a safety net`
-      );
+        pushUniqueHistory(
+          order,
+          'Refund Held — Needs Review',
+          `"${item.name}" — CJ never confirmed cancellation after ${CJ_CANCEL_MAX_RETRY_HOURS}h; automatic retry stopped, needs manual decision`
+        );
+
+        continue;
+      }
+
+      // Still unresolved, still within the window — check again in
+      // CJ_CANCEL_RETRY_INTERVAL_HOURS.
+      item.refundScheduledAt = new Date(now.getTime() + CJ_CANCEL_RETRY_INTERVAL_HOURS * 60 * 60 * 1000);
     }
 
     if (changed) {
@@ -230,9 +266,9 @@ export function startRefundWorker() {
     }
 
     try {
-      await processCjCancelHoldRefunds(now);
+      await processCjCancelHoldRetries(now);
     } catch (err) {
-      console.error('💥 CJ CANCEL HOLD REFUND WORKER ERROR:', err.message);
+      console.error('💥 CJ CANCEL HOLD RETRY WORKER ERROR:', err.message);
     }
 
     try {

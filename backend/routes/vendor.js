@@ -27,7 +27,7 @@ import {
 } from '../utils/returnLogic.js';
 
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
-import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, finalizeCjCancelHold, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
 
 import User from '../models/user.js';
 import Product from '../models/product.js';
@@ -2618,28 +2618,14 @@ router.patch(
       }
 
       // CJ has now confirmed the cancel. If this item was sitting in the
-      // 48h safety-net hold (item.status was deliberately left untouched
-      // while we waited), finalize it now instead of waiting for the
-      // worker: mark Cancelled and refund immediately — safe, since CJ
-      // just confirmed nothing shipped.
+      // held state (item.status was deliberately left untouched while we
+      // waited), finalize it now instead of waiting for the worker's next
+      // retry: mark Cancelled and refund immediately — safe, since CJ just
+      // confirmed nothing shipped.
       let refundResult = null;
       const wasHeld = !!item.cjCancelDenied;
       if (wasHeld) {
-        item.cjCancelDenied = false;
-        item.cjCancelDeniedAt = null;
-        item.refundScheduledAt = null;
-        item.refundStatus = 'none';
-        item.statusBeforeCancel = item.statusBeforeCancel || item.status;
-        item.status = 'Cancelled';
-        item.cancelledAt = new Date();
-
-        const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
-        const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
-        if (isPaid && order.paymentIntentId && outstandingQty > 0) {
-          refundResult = await triggerItemRefund(order, item, outstandingQty, vendor._id);
-        }
-
-        pushUniqueHistory(order, 'Cancelled', `CJ confirmed cancellation for "${item.name}" on retry`);
+        ({ refundResult } = await finalizeCjCancelHold(order, item, vendor._id, 'CJ confirmed cancellation on retry'));
 
         await order.save();
 
