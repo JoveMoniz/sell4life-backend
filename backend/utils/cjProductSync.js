@@ -607,16 +607,32 @@ export async function checkUkShippingForAllProducts() {
 // save() the order afterwards.
 // ======================================================
 // Returns { attempted, cjCancelled, reason }. `attempted: false` means there
-// was no live CJ order to check (not dropshipped, already resolved, or no
-// vendor credential) — callers should treat that the same as a confirmed
-// cancel, since there's nothing on CJ's side that could still ship.
-// `attempted: true, cjCancelled: false` means CJ was actually asked and
-// refused — most commonly because the order already moved past CREATED
+// was no live CJ order to check (not dropshipped, or already resolved on
+// CJ's side as cancelled/failed) — callers should treat that the same as a
+// confirmed cancel, since there's nothing on CJ's side that could still
+// ship. `attempted: true, cjCancelled: false` means CJ was actually asked
+// and refused — most commonly because the order already moved past CREATED
 // (i.e. it's been dispatched) — callers must NOT treat this as a clean
 // cancel, since the item may genuinely still be on its way.
+//
+// Deliberately does NOT skip the live call just because our own cached
+// item.cjOrderStatus has already moved past CREATED (e.g. the tracking sync
+// updated it to PROCESSING/SHIPPED) — that's exactly the case a real
+// confirmation matters most for. A cached local status can be stale, and
+// treating "not CREATED locally" as "nothing to check" used to make every
+// one of those cancels fall straight through to an immediate refund with
+// CJ never actually asked — the opposite of what this function exists for.
+// Only a genuinely terminal *CJ-side* state (already cancelled, or the CJ
+// order was never really created) skips the live call.
 export async function attemptCjOrderCancel(item) {
-  if (!item?.cjOrderId || item.cjOrderStatus !== 'CREATED') {
+  if (!item?.cjOrderId) {
     return { attempted: false, cjCancelled: false };
+  }
+  if (item.cjOrderStatus === 'cancelled') {
+    return { attempted: false, cjCancelled: true };
+  }
+  if (item.cjOrderStatus === 'failed') {
+    return { attempted: false, cjCancelled: true };
   }
 
   try {

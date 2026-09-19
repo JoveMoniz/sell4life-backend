@@ -73,18 +73,9 @@ async function processCjCancelHoldRetries(now) {
       const confirmed = retry?.cjCancelled || item.cjOrderStatus === 'CANCELLED';
 
       if (confirmed) {
+        // finalizeCjCancelHold logs its own item-level 'cj_cancel_confirmed'
+        // history entry — no need to duplicate it here.
         const { refundResult } = await finalizeCjCancelHold(order, item, null, 'CJ confirmed cancellation on automatic retry');
-
-        pushItemHistory(item, {
-          type: 'cj_cancel_hold_resolved',
-          status: refundResult?.success ? 'processed' : (refundResult ? 'failed' : 'processed'),
-          amount: refundResult?.refundedAmount || 0,
-          note: refundResult
-            ? (refundResult.success
-                ? 'Refund processed — CJ confirmed the cancellation on automatic retry'
-                : `Refund attempt failed after CJ confirmed cancellation: ${refundResult.error}`)
-            : 'CJ confirmed the cancellation on automatic retry — nothing left to refund',
-        });
 
         const buyer = await order.populate('user', 'email').then((o) => o.user).catch(() => null);
         if (buyer?.email) {

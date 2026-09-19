@@ -788,6 +788,17 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
     item.status = 'Cancelled';
     item.cancelledAt = new Date();
 
+    // Visible confirmation that CJ was actually asked and agreed, for the
+    // common case where that happens instantly and would otherwise look
+    // identical to "no CJ check ran at all".
+    if (item.cjOrderId && cjResult.cjCancelled) {
+      pushItemHistory(item, {
+        type: 'cj_cancel_confirmed',
+        status: 'processed',
+        note: 'CJ confirmed the cancellation — nothing was dispatched, refunding immediately',
+      });
+    }
+
     const isPaid = ['paid', 'partially_refunded'].includes((order.paymentStatus || '').toLowerCase());
     const outstandingQty = Math.max(0, Number(item.quantity || 0) - Number(item.refundedQuantity || 0));
 
@@ -875,6 +886,14 @@ router.patch('/:id/status', authMiddleware, adminMiddleware, async (req, res) =>
         item.statusBeforeCancel = item.status;
         item.status = 'Cancelled';
         item.cancelledAt = now;
+
+        if (item.cjOrderId && cjResult.cjCancelled) {
+          pushItemHistory(item, {
+            type: 'cj_cancel_confirmed',
+            status: 'processed',
+            note: 'CJ confirmed the cancellation — nothing was dispatched, refunding immediately',
+          });
+        }
       }
 
       order.vendorOrders.forEach((vo) => {

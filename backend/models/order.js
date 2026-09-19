@@ -205,6 +205,7 @@ const orderItemSchema = new mongoose.Schema({
 
           'cj_cancel_held',
           'cj_cancel_hold_resolved',
+          'cj_cancel_confirmed',
         ],
       },
 
