@@ -10,6 +10,7 @@ import {
 } from '../utils/orderLogic.js';
 import { canRefund } from '../utils/refundGuard.js';
 import { attemptCjOrderCancel } from '../utils/cjProductSync.js';
+import { convertRefundToChargeCurrency } from '../utils/chargeCurrency.js';
 
 import {
   findOrderItem,
@@ -1231,9 +1232,14 @@ router.post('/:id/items/:itemId/refund', authMiddleware, adminMiddleware, async 
       stripeRefundId = order.stripeRefundId;
     } else {
       console.log('🚨 STRIPE REFUND EXECUTING');
+      // refund.total is GBP (item.price etc. are always GBP) — convert to
+      // whatever this order was actually charged in using its OWN stored
+      // rate (never a freshly re-fetched live rate), so this stays
+      // mathematically consistent with the original charge.
+      const { stripeAmount: refundStripeAmount } = convertRefundToChargeCurrency(order, refund.total);
       const stripeRefund = await stripe.refunds.create({
         payment_intent: order.paymentIntentId,
-        amount: Math.round(refund.total * 100),
+        amount: refundStripeAmount,
         metadata: {
           orderId: String(order._id),
           itemId: String(item._id),

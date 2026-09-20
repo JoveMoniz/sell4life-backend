@@ -5,6 +5,7 @@ import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
 import { getDerivedOrderStatus } from '../utils/orderLogic.js';
 import { calculateItemRefundAmount } from '../utils/returnLogic.js';
 import { finalizeCjCancelHold, CJ_CANCEL_RETRY_INTERVAL_HOURS, CJ_CANCEL_MAX_RETRY_HOURS } from '../utils/refundLogic.js';
+import { convertRefundToChargeCurrency, convertChargeToGbp } from '../utils/chargeCurrency.js';
 import { attemptCjOrderCancel } from '../utils/cjProductSync.js';
 import { mailOrderCancelled } from '../utils/email.js';
 
@@ -154,33 +155,41 @@ async function processGoodwillRefunds(now) {
       changed = true;
 
       try {
-        let amount = Number(item.goodwillRefundAmount || 0);
+        let amount = Number(item.goodwillRefundAmount || 0); // GBP — admin enters this like every other money field
+        let cappedFrom = null;
 
         if (amount <= 0 || !order.paymentIntentId) {
           throw new Error('Invalid goodwill refund amount or missing payment intent');
         }
 
+        // Convert to whatever this order was actually charged in (GBP/rate
+        // 1 for the vast majority) using the order's OWN stored rate —
+        // never a freshly re-fetched live rate — so this stays
+        // mathematically consistent with the original charge.
+        let { stripeAmount } = convertRefundToChargeCurrency(order, amount);
+
         // The amount was validated at scheduling time against a ceiling built
         // from item.shippingCost, which can be stale — re-check against the
         // real remaining charge balance right before sending to Stripe, so a
         // stale-data mismatch degrades to "refund what's available" instead
-        // of failing silently 24h after the vendor scheduled it.
+        // of failing silently 24h after the vendor scheduled it. Comparison
+        // happens in charge-currency minor units throughout.
         const pi = await stripe.paymentIntents.retrieve(order.paymentIntentId, {
           expand: ['latest_charge'],
         });
         const charge = pi.latest_charge;
-        let cappedFrom = null;
 
         if (charge && typeof charge === 'object') {
-          const remaining = (charge.amount - charge.amount_refunded) / 100;
+          const remainingStripeAmount = charge.amount - charge.amount_refunded;
 
-          if (amount > remaining + 0.005) {
+          if (stripeAmount > remainingStripeAmount) {
             cappedFrom = amount;
-            amount = Math.max(0, remaining);
+            stripeAmount = Math.max(0, remainingStripeAmount);
+            amount = convertChargeToGbp(stripeAmount, order.chargeCurrency || 'GBP', order.chargeToGbpRate || 1);
           }
         }
 
-        if (amount <= 0) {
+        if (stripeAmount <= 0) {
           throw new Error('Nothing left unrefunded on this charge');
         }
 
@@ -188,7 +197,7 @@ async function processGoodwillRefunds(now) {
 
         const stripeRefund = await stripe.refunds.create({
           payment_intent: order.paymentIntentId,
-          amount: Math.round(amount * 100),
+          amount: stripeAmount,
           metadata: {
             orderId: String(order._id),
             itemId: String(item._id),

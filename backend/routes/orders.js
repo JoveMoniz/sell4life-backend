@@ -34,6 +34,7 @@ import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getPlatformConfig } from '../models/platformConfig.js';
 import { COOKIE_OPTS, createUniqueUsername, createToken, verifyToken } from '../utils/authTokens.js';
 import { buildRegistrationAttribution } from './auth.js';
+import { resolveChargeCurrency, convertGbpToCharge } from '../utils/chargeCurrency.js';
 
 const router = express.Router();
 
@@ -80,6 +81,10 @@ function normalizeOrder(order) {
     displayCurrencySymbol: order.displayCurrencySymbol || '£',
     displayCurrencyRate: order.displayCurrencyRate || 1,
 
+    chargeCurrency: order.chargeCurrency || 'GBP',
+    chargeAmount: order.chargeAmount || 0,
+    chargeToGbpRate: order.chargeToGbpRate || 1,
+
     status: getDerivedOrderStatus(order),
 
     paymentStatus: getDerivedPaymentStatus(order),
@@ -101,7 +106,7 @@ function normalizeOrder(order) {
 // Shared by the authenticated and guest checkout routes — item validation,
 // pricing, the EU-selling gate, and PaymentIntent creation are identical
 // either way, the only difference is where buyerId/vendor come from.
-async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessionId, displayCurrency }) {
+async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessionId, displayCurrency, country }) {
   if (!Array.isArray(items) || !items.length) {
     const err = new Error('Invalid cart data');
     err.status = 400;
@@ -208,13 +213,41 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
   const shippingAmount = Number(normalizedItems.reduce((sum, item) => sum + item.shippingCost, 0).toFixed(2));
   const total = Number((subtotal + shippingAmount).toFixed(2));
 
+  // The buyer's REAL charge currency — resolved from their validated
+  // shipping country (never a client-supplied currency code), via an
+  // explicit allow-list (currently just US) that's deliberately narrower
+  // than the display-only currency logic. Everyone else keeps charging
+  // GBP, byte-for-byte identical to before this existed. Stripe's currency
+  // is fixed forever at PaymentIntent creation, so this must be resolved
+  // and correct right here, before the create() call below.
+  const charge = await resolveChargeCurrency(country);
+  const { amount: chargeAmount, stripeAmount } = convertGbpToCharge(total, charge.currency, charge.rate);
+
+  // For a converted order, the confirmation email/thank-you page should
+  // show the figure that was actually charged, not a separately-computed
+  // display estimate that could technically drift from it — override
+  // whatever GeoIP-based displayCurrency the frontend sent with the real
+  // charge currency in that case. A GBP order (still the vast majority)
+  // keeps using the buyer's own displayed currency exactly as before.
+  const effectiveDisplayCurrency = charge.currency !== 'GBP'
+    ? { currency: charge.currency, symbol: charge.symbol, rate: charge.rate }
+    : displayCurrency;
+
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(total * 100),
-    currency: 'gbp',
+    amount: stripeAmount,
+    currency: charge.currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
     metadata: {
       userId: String(buyerId),
       shipping: String(shippingAmount),
+      // The webhook used to set order.total straight from
+      // paymentIntent.amount/100 — correct back when every charge was
+      // GBP, but that's now the CHARGED currency's amount (e.g. USD
+      // dollars for a US order), not GBP. order.total must stay GBP always
+      // (vendor balance/HMRC/every other GBP figure on this document
+      // assumes it is), so the original GBP total is passed through
+      // explicitly here rather than reverse-derived from the charge.
+      gbpTotal: String(total),
       // The browser-tab analytics session id (client-info.js) that led to
       // this checkout — copied onto the Order at webhook time so the admin
       // analytics page can link a session to its order directly instead of
@@ -222,17 +255,23 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
       // across devices/guest-checkout account creation. Purely a reporting
       // aid — never used for anything order-critical.
       analyticsSessionId: String(analyticsSessionId || '').slice(0, 100),
-      // The currency/rate/symbol the buyer was actually shown during
-      // checkout (currency.js, GeoIP-based, display-only — the real Stripe
-      // charge above is always GBP). Copied onto the Order at webhook time
-      // purely so the confirmation email/thank-you page can show the same
-      // figure the buyer saw here instead of always showing GBP. Never
-      // trusted for anything financial — just display text.
+      // What was ACTUALLY charged — copied onto the Order at webhook time.
+      // Every refund against this order must reuse chargeToGbpRate (never
+      // a freshly re-fetched live rate) so it stays mathematically
+      // consistent with this exact charge. subtotal/total/platformFee
+      // elsewhere on the order stay GBP always, unaffected.
+      chargeCurrency: charge.currency,
+      chargeAmount: String(chargeAmount),
+      chargeToGbpRate: String(charge.rate),
+      // The currency/rate/symbol shown to the buyer at checkout — for a
+      // converted (non-GBP) order this now IS the real charge, see above;
+      // for a GBP order it's still just the buyer's displayed estimate.
+      // Never trusted for anything financial — just display text.
       displayCurrency: JSON.stringify({
-        code: /^[A-Z]{3}$/.test(displayCurrency?.currency) ? displayCurrency.currency : 'GBP',
-        symbol: String(displayCurrency?.symbol || '£').slice(0, 5),
-        rate: Number.isFinite(Number(displayCurrency?.rate)) && Number(displayCurrency?.rate) > 0
-          ? Number(displayCurrency.rate)
+        code: /^[A-Z]{3}$/.test(effectiveDisplayCurrency?.currency) ? effectiveDisplayCurrency.currency : 'GBP',
+        symbol: String(effectiveDisplayCurrency?.symbol || '£').slice(0, 5),
+        rate: Number.isFinite(Number(effectiveDisplayCurrency?.rate)) && Number(effectiveDisplayCurrency?.rate) > 0
+          ? Number(effectiveDisplayCurrency.rate)
           : 1,
       }),
       items: JSON.stringify(
@@ -256,7 +295,7 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const vendor = await Vendor.findOne({ userId: req.user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency, country: req.body.country });
     res.json(result);
   } catch (err) {
     console.error('PAYMENT ERROR:', err);
@@ -326,7 +365,7 @@ router.post('/guest-checkout', async (req, res) => {
     // account that happens to be a real vendor — e.g. a seller checking out
     // without being logged in could buy their own product with no guard at all.
     const vendor = await Vendor.findOne({ userId: user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency, country: req.body.country });
 
     if (isExistingClaimedAccount) {
       // No token/cookie here — this request never proved it's the real
