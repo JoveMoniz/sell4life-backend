@@ -76,6 +76,10 @@ function normalizeOrder(order) {
 
     currency: order.currency,
 
+    displayCurrencyCode: order.displayCurrencyCode || 'GBP',
+    displayCurrencySymbol: order.displayCurrencySymbol || '£',
+    displayCurrencyRate: order.displayCurrencyRate || 1,
+
     status: getDerivedOrderStatus(order),
 
     paymentStatus: getDerivedPaymentStatus(order),
@@ -97,7 +101,7 @@ function normalizeOrder(order) {
 // Shared by the authenticated and guest checkout routes — item validation,
 // pricing, the EU-selling gate, and PaymentIntent creation are identical
 // either way, the only difference is where buyerId/vendor come from.
-async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessionId }) {
+async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessionId, displayCurrency }) {
   if (!Array.isArray(items) || !items.length) {
     const err = new Error('Invalid cart data');
     err.status = 400;
@@ -218,6 +222,19 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
       // across devices/guest-checkout account creation. Purely a reporting
       // aid — never used for anything order-critical.
       analyticsSessionId: String(analyticsSessionId || '').slice(0, 100),
+      // The currency/rate/symbol the buyer was actually shown during
+      // checkout (currency.js, GeoIP-based, display-only — the real Stripe
+      // charge above is always GBP). Copied onto the Order at webhook time
+      // purely so the confirmation email/thank-you page can show the same
+      // figure the buyer saw here instead of always showing GBP. Never
+      // trusted for anything financial — just display text.
+      displayCurrency: JSON.stringify({
+        code: /^[A-Z]{3}$/.test(displayCurrency?.currency) ? displayCurrency.currency : 'GBP',
+        symbol: String(displayCurrency?.symbol || '£').slice(0, 5),
+        rate: Number.isFinite(Number(displayCurrency?.rate)) && Number(displayCurrency?.rate) > 0
+          ? Number(displayCurrency.rate)
+          : 1,
+      }),
       items: JSON.stringify(
         normalizedItems.map((item) => ({
           productId: String(item.productId),
@@ -239,7 +256,7 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const vendor = await Vendor.findOne({ userId: req.user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor, analyticsSessionId: req.body.analyticsSessionId });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency });
     res.json(result);
   } catch (err) {
     console.error('PAYMENT ERROR:', err);
@@ -309,7 +326,7 @@ router.post('/guest-checkout', async (req, res) => {
     // account that happens to be a real vendor — e.g. a seller checking out
     // without being logged in could buy their own product with no guard at all.
     const vendor = await Vendor.findOne({ userId: user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor, analyticsSessionId: req.body.analyticsSessionId });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor, analyticsSessionId: req.body.analyticsSessionId, displayCurrency: req.body.displayCurrency });
 
     if (isExistingClaimedAccount) {
       // No token/cookie here — this request never proved it's the real

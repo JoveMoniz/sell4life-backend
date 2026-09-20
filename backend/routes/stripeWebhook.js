@@ -230,6 +230,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         shippingAddress = undefined;
       }
 
+      let displayCurrency;
+      try {
+        displayCurrency = paymentIntent.metadata.displayCurrency
+          ? JSON.parse(paymentIntent.metadata.displayCurrency)
+          : undefined;
+      } catch (_) {
+        displayCurrency = undefined;
+      }
+
       // Order.email was defined on the schema but never actually populated
       // here — every order in the system had it blank. Needed so pages that
       // can't rely on a login session (e.g. the thank-you page after a
@@ -252,6 +261,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           paymentIntentId: paymentIntent.id,
           shippingAddress,
           analyticsSessionId: paymentIntent.metadata?.analyticsSessionId || '',
+          displayCurrencyCode: displayCurrency?.code || 'GBP',
+          displayCurrencySymbol: displayCurrency?.symbol || '£',
+          displayCurrencyRate: displayCurrency?.rate || 1,
           statusHistory: [],
         });
       } catch (createErr) {
@@ -416,6 +428,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               orderRef: order.shortId || String(order._id).slice(-8).toUpperCase(),
               items: items.map(i => ({ name: i.name, qty: i.quantity, price: i.subtotal })),
               total: order.total,
+              currencySymbol: order.displayCurrencySymbol,
+              currencyRate: order.displayCurrencyRate,
               shippingAddress: shippingAddress
                 ? [shippingAddress.name, shippingAddress.address1, shippingAddress.address2, shippingAddress.city, shippingAddress.county, shippingAddress.postcode]
                     .filter(Boolean).join(', ')

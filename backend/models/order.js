@@ -600,6 +600,15 @@ const orderSchema = new mongoose.Schema(
     // read for anything order-critical.
     analyticsSessionId: { type: String, default: '', index: true },
 
+    // The currency/rate/symbol the buyer was actually shown during checkout
+    // (currency.js, GeoIP-based, display-only) — lets the confirmation email
+    // and thank-you page show the same figure the buyer saw at checkout
+    // instead of always defaulting to GBP. The real Stripe charge is always
+    // GBP regardless of this — never used for anything financial.
+    displayCurrencyCode: { type: String, default: 'GBP' },
+    displayCurrencySymbol: { type: String, default: '£' },
+    displayCurrencyRate: { type: Number, default: 1 },
+
     shippingMethod: String,
     trackingNumber: String,
     carrier: String,

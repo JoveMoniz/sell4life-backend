@@ -80,9 +80,15 @@ function titleCase(name) {
 
 // ---- Pre-built templates ----
 
-export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddress }) {
+// currencySymbol/currencyRate: the display currency the buyer actually saw
+// at checkout (GBP/£/1 by default) — the real Stripe charge is always GBP,
+// this just keeps the email consistent with what was shown on-screen
+// instead of always showing £ regardless of what the buyer paid in.
+export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddress, currencySymbol = '£', currencyRate = 1 }) {
+  const fmt = (gbpAmount) => `${currencySymbol}${(Number(gbpAmount) * currencyRate).toFixed(2)}`;
+
   const itemRows = items.map(i =>
-    `<tr><td style="padding:4px 0;font-size:13px">${i.name}</td><td style="padding:4px 8px;font-size:13px" align="right">x${i.qty}</td><td style="padding:4px 0;font-size:13px" align="right">£${Number(i.price).toFixed(2)}</td></tr>`
+    `<tr><td style="padding:4px 0;font-size:13px">${i.name}</td><td style="padding:4px 8px;font-size:13px" align="right">x${i.qty}</td><td style="padding:4px 0;font-size:13px" align="right">${fmt(i.price)}</td></tr>`
   ).join('');
 
   return sendMail({
@@ -94,7 +100,7 @@ export function mailOrderConfirmation({ to, orderRef, items, total, shippingAddr
       <p style="margin:0 0 10px;color:#374151">Thank you for your purchase. Reference: <strong>${orderRef}</strong></p>
       <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;margin-top:10px;font-size:13px">
         ${itemRows}
-        <tr><td colspan="2" style="padding-top:8px;font-weight:600">Total</td><td style="padding-top:8px;font-weight:600" align="right">£${Number(total).toFixed(2)}</td></tr>
+        <tr><td colspan="2" style="padding-top:8px;font-weight:600">Total</td><td style="padding-top:8px;font-weight:600" align="right">${fmt(total)}</td></tr>
       </table>
       ${shippingAddress ? `<p style="margin-top:12px;color:#6b7280;font-size:12px">Shipping to: ${shippingAddress}</p>` : ''}
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
