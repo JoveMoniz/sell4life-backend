@@ -214,12 +214,14 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
   const total = Number((subtotal + shippingAmount).toFixed(2));
 
   // The buyer's REAL charge currency — resolved from their validated
-  // shipping country (never a client-supplied currency code), via an
-  // explicit allow-list (currently just US) that's deliberately narrower
-  // than the display-only currency logic. Everyone else keeps charging
-  // GBP, byte-for-byte identical to before this existed. Stripe's currency
-  // is fixed forever at PaymentIntent creation, so this must be resolved
-  // and correct right here, before the create() call below.
+  // shipping country (never a client-supplied currency code). Mirrors the
+  // display-only "GB=GBP, Europe=EUR, rest of world=USD" policy, except
+  // Europe/EUR is deliberately held back to GBP here until VAT/OSS
+  // registration is sorted (see utils/chargeCurrency.js) — GB and Europe
+  // keep charging GBP, byte-for-byte identical to before this existed;
+  // the US and everywhere else outside Europe now charge in real USD.
+  // Stripe's currency is fixed forever at PaymentIntent creation, so this
+  // must be resolved and correct right here, before the create() call below.
   const charge = await resolveChargeCurrency(country);
   const { amount: chargeAmount, stripeAmount } = convertGbpToCharge(total, charge.currency, charge.rate);
 

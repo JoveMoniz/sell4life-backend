@@ -1,16 +1,25 @@
 // ======================================================
 // REAL CHARGE CURRENCY — resolves what currency a Stripe PaymentIntent is
 // actually created/refunded in, as opposed to utils/currency.js's
-// display-only GBP-to-shown-currency conversion. Deliberately a separate,
-// narrower allow-list: currencyForCountry() already knows DE -> EUR, but
-// Germany/EUR stays GBP-charged here until Stripe Tax/VAT registration is
-// sorted (see project notes) — this file is what actually gates real
-// money, so it must never silently follow the broader display list.
+// display-only GBP-to-shown-currency conversion.
+//
+// Mirrors currencyForCountry()'s "rest of world" policy — GB stays GBP,
+// USD is the practical global default for everywhere else — with ONE
+// deliberate carve-out: Europe/EUR is explicitly held back to GBP here
+// even though currencyForCountry() already knows those countries map to
+// EUR for display, because EU VAT/OSS registration isn't sorted yet (see
+// project notes). This file is what actually gates real money, so that
+// carve-out must never silently disappear just because the display list
+// changes — it's re-declared here on purpose, not inherited.
 // ======================================================
 
-import { currencyForCountry, getDisplayRate, currencySymbol } from './currency.js';
+import { getDisplayRate, currencySymbol } from './currency.js';
+import { EU_CODES } from './shippingScope.js';
 
-const CHARGEABLE_COUNTRIES = new Set(['US']);
+// Matches currency.js's own EUR_COUNTRIES (EU members + Cape Verde, whose
+// escudo is hard-pegged to EUR) — the set of countries deliberately held
+// back to GBP here pending VAT/OSS registration.
+const EUR_DEFERRED_COUNTRIES = new Set([...EU_CODES, 'CV']);
 
 // GBP/USD/EUR are all 2-decimal minor units — written generically (not
 // hardcoded *100 inline at every call site) so a future zero-decimal
@@ -19,14 +28,19 @@ const CHARGEABLE_COUNTRIES = new Set(['US']);
 const MINOR_UNIT_DIGITS = { GBP: 2, USD: 2, EUR: 2 };
 
 // Resolves the currency + rate a NEW charge for this shipping country
-// should use. Everything not explicitly allow-listed above charges GBP at
-// rate 1 — unaffected, byte-for-byte identical to today's behavior.
+// should use.
 export async function resolveChargeCurrency(countryCode) {
   const country = String(countryCode || '').toUpperCase();
-  if (!CHARGEABLE_COUNTRIES.has(country)) {
+
+  if (country === 'GB' || EUR_DEFERRED_COUNTRIES.has(country)) {
     return { currency: 'GBP', rate: 1, symbol: '£' };
   }
-  const currency = currencyForCountry(country);
+
+  // Everywhere else — the US and the rest of the world outside Europe —
+  // charges in USD, same "rest of world" fallback currencyForCountry()
+  // already uses for display (GB and the EU set above are the only other
+  // branches it has, and both are already excluded by this point).
+  const currency = 'USD';
   const rate = await getDisplayRate(currency); // includes the same conversion markup already used for display
   return { currency, rate, symbol: currencySymbol(currency) };
 }
