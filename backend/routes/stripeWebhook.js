@@ -239,6 +239,17 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         displayCurrency = undefined;
       }
 
+      // What was actually charged (see utils/chargeCurrency.js) — GBP/1
+      // for every order that predates this or wasn't converted. order.total
+      // itself must stay GBP always; see the gbpTotal metadata comment in
+      // orders.js for why it can't be reverse-derived from paymentIntent.amount.
+      const chargeCurrency = paymentIntent.metadata.chargeCurrency || 'GBP';
+      const chargeAmount = Number(paymentIntent.metadata.chargeAmount || 0);
+      const chargeToGbpRate = Number(paymentIntent.metadata.chargeToGbpRate || 1);
+      const gbpTotal = paymentIntent.metadata.gbpTotal
+        ? Number(paymentIntent.metadata.gbpTotal)
+        : paymentIntent.amount / 100; // pre-existing PaymentIntents created before this field existed
+
       // Order.email was defined on the schema but never actually populated
       // here — every order in the system had it blank. Needed so pages that
       // can't rely on a login session (e.g. the thank-you page after a
@@ -255,7 +266,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           vendorOrders,
           subtotal: orderSubtotal,
           shippingAmount: orderShipping,
-          total: paymentIntent.amount / 100,
+          total: gbpTotal,
           status: 'Pending',
           paymentStatus: 'paid',
           paymentIntentId: paymentIntent.id,
@@ -264,6 +275,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           displayCurrencyCode: displayCurrency?.code || 'GBP',
           displayCurrencySymbol: displayCurrency?.symbol || '£',
           displayCurrencyRate: displayCurrency?.rate || 1,
+          chargeCurrency,
+          chargeAmount,
+          chargeToGbpRate,
           statusHistory: [],
         });
       } catch (createErr) {

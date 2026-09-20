@@ -1,6 +1,7 @@
 import stripe from '../config/stripe.js';
 import { pushUniqueHistory, pushItemHistory } from './historyLogic.js';
 import { calculateItemRefundAmount } from './returnLogic.js';
+import { convertRefundToChargeCurrency, convertChargeToGbp } from './chargeCurrency.js';
 
 // Default gives a real same-day safety window (long enough to catch an
 // accidental order cancel and hit "Cancel Refund") without holding a
@@ -142,8 +143,14 @@ export async function finalizeCjCancelHold(order, item, vendorId, resolutionNote
 export async function triggerItemRefund(order, item, refundQty, actorId) {
   try {
     const qty = Number(refundQty);
-    let refundTotal = calculateItemRefundAmount(item, qty).total;
+    let refundTotal = calculateItemRefundAmount(item, qty).total; // GBP — item.price etc. are always GBP
     let cappedFrom = null;
+
+    // Convert to whatever this order was actually charged in (GBP/rate 1
+    // for the vast majority of orders) using the order's OWN stored rate —
+    // never a freshly re-fetched live rate — so this refund is guaranteed
+    // mathematically consistent with the original charge.
+    let { stripeAmount: refundStripeAmount } = convertRefundToChargeCurrency(order, refundTotal);
 
     let stripeRefundId = null;
 
@@ -157,28 +164,34 @@ export async function triggerItemRefund(order, item, refundQty, actorId) {
       // hard-reject an over-large request, cap against what's actually still
       // unrefunded on the real charge before calling Stripe. This makes any future
       // stale-data case degrade to "refund what's available" instead of a failure
-      // that needs a manual admin data patch.
+      // that needs a manual admin data patch. Comparison happens in charge-currency
+      // minor units throughout — charge.amount/amount_refunded are already in
+      // whatever currency this PaymentIntent was actually created in.
       const pi = await stripe.paymentIntents.retrieve(order.paymentIntentId, {
         expand: ['latest_charge'],
       });
       const charge = pi.latest_charge;
 
       if (charge && typeof charge === 'object') {
-        const remaining = (charge.amount - charge.amount_refunded) / 100;
+        const remainingStripeAmount = charge.amount - charge.amount_refunded;
 
-        if (refundTotal > remaining + 0.005) {
+        if (refundStripeAmount > remainingStripeAmount) {
           cappedFrom = refundTotal;
-          refundTotal = Math.max(0, remaining);
+          refundStripeAmount = Math.max(0, remainingStripeAmount);
+          // Re-derive the GBP figure from the capped charge-currency amount
+          // for item.refundedAmount bookkeeping below, which stays GBP
+          // always regardless of charge currency.
+          refundTotal = convertChargeToGbp(refundStripeAmount, order.chargeCurrency || 'GBP', order.chargeToGbpRate || 1);
         }
       }
 
-      if (refundTotal <= 0) {
+      if (refundStripeAmount <= 0) {
         throw new Error('Nothing left unrefunded on this charge');
       }
 
       const stripeRefund = await stripe.refunds.create({
         payment_intent: order.paymentIntentId,
-        amount: Math.round(refundTotal * 100),
+        amount: refundStripeAmount,
         metadata: {
           orderId:  String(order._id),
           itemId:   String(item._id),

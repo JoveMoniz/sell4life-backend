@@ -602,12 +602,28 @@ const orderSchema = new mongoose.Schema(
 
     // The currency/rate/symbol the buyer was actually shown during checkout
     // (currency.js, GeoIP-based, display-only) — lets the confirmation email
-    // and thank-you page show the same figure the buyer saw at checkout
-    // instead of always defaulting to GBP. The real Stripe charge is always
-    // GBP regardless of this — never used for anything financial.
+    // and thank-you page show the same figure the buyer saw at checkout.
+    // For an order whose real charge WAS converted (chargeCurrency below),
+    // these are set identically to it at webhook time, so every existing
+    // consumer of these fields keeps working unchanged and now shows the
+    // real charged figure rather than a separate estimate. For everyone
+    // else (GBP orders — still the vast majority) this stays purely
+    // cosmetic, same as before.
     displayCurrencyCode: { type: String, default: 'GBP' },
     displayCurrencySymbol: { type: String, default: '£' },
     displayCurrencyRate: { type: Number, default: 1 },
+
+    // The currency/amount ACTUALLY sent to Stripe for this order's
+    // PaymentIntent — see utils/chargeCurrency.js. Every refund against
+    // this order must convert using chargeToGbpRate (never a freshly
+    // re-fetched live rate), so a refund is always mathematically
+    // consistent with the original charge regardless of market-rate drift
+    // since. subtotal/total/platformFee etc. everywhere else on this
+    // document remain GBP always — vendor payouts, fees and HMRC reporting
+    // are computed from those and are completely unaffected by this.
+    chargeCurrency: { type: String, default: 'GBP' },
+    chargeAmount: { type: Number, default: 0 },
+    chargeToGbpRate: { type: Number, default: 1 },
 
     shippingMethod: String,
     trackingNumber: String,
