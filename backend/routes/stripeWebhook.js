@@ -251,6 +251,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           paymentStatus: 'paid',
           paymentIntentId: paymentIntent.id,
           shippingAddress,
+          analyticsSessionId: paymentIntent.metadata?.analyticsSessionId || '',
           statusHistory: [],
         });
       } catch (createErr) {

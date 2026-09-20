@@ -97,7 +97,7 @@ function normalizeOrder(order) {
 // Shared by the authenticated and guest checkout routes — item validation,
 // pricing, the EU-selling gate, and PaymentIntent creation are identical
 // either way, the only difference is where buyerId/vendor come from.
-async function createOrderPaymentIntent({ items, buyerId, vendor }) {
+async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessionId }) {
   if (!Array.isArray(items) || !items.length) {
     const err = new Error('Invalid cart data');
     err.status = 400;
@@ -211,6 +211,13 @@ async function createOrderPaymentIntent({ items, buyerId, vendor }) {
     metadata: {
       userId: String(buyerId),
       shipping: String(shippingAmount),
+      // The browser-tab analytics session id (client-info.js) that led to
+      // this checkout — copied onto the Order at webhook time so the admin
+      // analytics page can link a session to its order directly instead of
+      // guessing by "same logged-in account, paid within ~2h", which breaks
+      // across devices/guest-checkout account creation. Purely a reporting
+      // aid — never used for anything order-critical.
+      analyticsSessionId: String(analyticsSessionId || '').slice(0, 100),
       items: JSON.stringify(
         normalizedItems.map((item) => ({
           productId: String(item.productId),
@@ -232,7 +239,7 @@ async function createOrderPaymentIntent({ items, buyerId, vendor }) {
 router.post('/create-payment-intent', authMiddleware, async (req, res) => {
   try {
     const vendor = await Vendor.findOne({ userId: req.user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: req.user._id, vendor, analyticsSessionId: req.body.analyticsSessionId });
     res.json(result);
   } catch (err) {
     console.error('PAYMENT ERROR:', err);
@@ -302,7 +309,7 @@ router.post('/guest-checkout', async (req, res) => {
     // account that happens to be a real vendor — e.g. a seller checking out
     // without being logged in could buy their own product with no guard at all.
     const vendor = await Vendor.findOne({ userId: user._id });
-    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor });
+    const result = await createOrderPaymentIntent({ items: req.body.items, buyerId: user._id, vendor, analyticsSessionId: req.body.analyticsSessionId });
 
     if (isExistingClaimedAccount) {
       // No token/cookie here — this request never proved it's the real
