@@ -594,6 +594,12 @@ const orderSchema = new mongoose.Schema(
     shippingAddress: addressSchema,
     billingAddress: addressSchema,
 
+    // Browser-tab analytics session (client-info.js) that led to this order
+    // — a reporting aid only, lets the admin analytics page link a session
+    // to its order directly instead of guessing by account+time. Never
+    // read for anything order-critical.
+    analyticsSessionId: { type: String, default: '', index: true },
+
     shippingMethod: String,
     trackingNumber: String,
     carrier: String,

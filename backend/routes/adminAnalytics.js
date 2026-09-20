@@ -587,10 +587,20 @@ router.get('/sessions', async (req, res) => {
       (eventsBySession[e.sessionId] = eventsBySession[e.sessionId] || []).push(e);
     });
 
-    // Best-effort only — orders don't store a sessionId, so this infers a
-    // likely match by "same logged-in user, paid within a couple of hours
-    // of the session" rather than a guaranteed link. Good enough to tell
-    // an admin "yes, they did buy shortly after" vs "no, they didn't."
+    // Orders placed since analyticsSessionId started being captured link
+    // directly to the session that created them — exact, not a guess.
+    // Older orders (or a session where tracking failed/was blocked) have no
+    // analyticsSessionId, so those fall back to the previous best-effort
+    // inference: "same logged-in user, paid within a couple of hours of the
+    // session" — good enough to tell an admin "yes, shortly after" vs "no,"
+    // but breaks across devices/accounts (guest checkout, a different
+    // logged-in account than whatever the browsing session tracked).
+    const browserSessionIds = sessions.map((s) => s.sessionId);
+    const directMatches = browserSessionIds.length
+      ? await Order.find({ analyticsSessionId: { $in: browserSessionIds }, paymentStatus: { $in: PAID } }).select('analyticsSessionId').lean()
+      : [];
+    const directlyMatchedSessionIds = new Set(directMatches.map((o) => o.analyticsSessionId));
+
     const userIds = [...new Set(sessions.filter((s) => s.userId).map((s) => String(s.userId)))];
     const orders = userIds.length
       ? await Order.find({ user: { $in: userIds }, paymentStatus: { $in: PAID } }).select('user createdAt total').lean()
@@ -598,9 +608,11 @@ router.get('/sessions', async (req, res) => {
 
     res.json(sessions.map((s) => {
       const windowEnd = new Date((s.lastSeenAt || s.startedAt).getTime() + 2 * 3600 * 1000);
-      const purchasedNearby = s.userId
-        ? orders.some((o) => String(o.user) === String(s.userId) && o.createdAt >= s.startedAt && o.createdAt <= windowEnd)
-        : false;
+      const purchasedNearby = directlyMatchedSessionIds.has(s.sessionId)
+        ? true
+        : s.userId
+          ? orders.some((o) => String(o.user) === String(s.userId) && o.createdAt >= s.startedAt && o.createdAt <= windowEnd)
+          : false;
 
       return {
         sessionId: s.sessionId,
