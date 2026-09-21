@@ -1,4 +1,4 @@
-import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, finalizeCjCancelHold, abandonCjCancelHold, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
 import { mailReturnStatusChange, mailOrderCancelled, mailCancellationReversed, mailCancelHeld } from '../utils/email.js';
 import {
   canUpdateItemStatus,
@@ -836,6 +836,96 @@ router.patch('/:id/items/:itemId/cancel', authMiddleware, adminMiddleware, async
     });
   } catch (err) {
     console.error('Admin item cancel error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   RETRY A CJ ORDER CANCEL (ADMIN)
+   On-demand version of attemptCjOrderCancel() — mirrors the vendor route.
+====================================================== */
+router.patch('/:id/items/:itemId/retry-cj-cancel', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (!item.cjOrderId) return res.status(400).json({ error: 'No CJ order on this item' });
+    if (item.cjOrderStatus === 'cancelled') return res.status(400).json({ error: 'Already cancelled on CJ' });
+
+    const before = item.cjOrderStatus;
+    await attemptCjOrderCancel(item);
+
+    if (item.cjOrderStatus === before) {
+      await order.save();
+      return res.status(400).json({ error: 'CJ declined the cancellation — check server logs for the exact reason' });
+    }
+
+    let refundResult = null;
+    const wasHeld = !!item.cjCancelDenied;
+    if (wasHeld) {
+      ({ refundResult } = await finalizeCjCancelHold(order, item, null, 'CJ confirmed cancellation on retry'));
+
+      await order.save();
+
+      const buyer = await order.populate('user', 'email').then(o => o.user).catch(() => null);
+      if (buyer?.email) {
+        mailOrderCancelled({
+          to: buyer.email,
+          orderRef: order.shortId || order._id,
+          itemName: item.name,
+          refundAmount: refundResult?.success ? refundResult.refundedAmount : null,
+          refundImmediate: true,
+          refundPending: !!refundResult && !refundResult.success,
+        }).catch(() => {});
+      }
+    } else {
+      await order.save();
+    }
+
+    res.json({ success: true, finalized: wasHeld });
+  } catch (err) {
+    console.error('Admin retry CJ cancel error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   ABANDON A CJ-CANCEL HOLD (ADMIN)
+   Admin decides to let a held item ship after all, instead of continuing
+   to retry a cancellation CJ never confirmed. Never touches Stripe — no
+   refund has fired at this point, this just clears the hold/retry state.
+====================================================== */
+router.patch('/:id/items/:itemId/abandon-cj-cancel', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (!item.cjCancelDenied) {
+      return res.status(400).json({ error: 'No active cancel hold on this item' });
+    }
+
+    abandonCjCancelHold(order, item, 'admin kept the item instead of continuing to cancel');
+
+    order.markModified('items');
+    await order.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin abandon CJ cancel hold error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

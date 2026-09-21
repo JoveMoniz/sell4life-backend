@@ -90,6 +90,35 @@ export function holdItemForCjCancelDenied(order, item, reason) {
 }
 
 // ======================================================
+// ABANDON A CJ-CANCEL HOLD — the merchant decides to let the shipment
+// proceed instead of continuing to chase a confirmation that was never
+// coming. Item.status is left exactly as it already is (it was never
+// advanced to Cancelled while held), so the order just continues its
+// normal fulfillment lifecycle. No refund has fired at this point — this
+// only clears the hold/retry state, never touches Stripe.
+// Callers must still order.markModified('items') and save() afterward.
+// ======================================================
+export function abandonCjCancelHold(order, item, actorNote) {
+  item.cjCancelDenied = false;
+  item.cjCancelDeniedAt = null;
+  item.refundStatus = 'none';
+  item.refundScheduledAt = null;
+
+  pushItemHistory(item, {
+    type: 'cj_cancel_abandoned',
+    status: 'cancelled',
+    amount: 0,
+    note: `Cancellation abandoned${actorNote ? ` (${actorNote})` : ''} — CJ never confirmed it could stop the shipment, so the order continues as normal instead of retrying.`,
+  });
+
+  pushUniqueHistory(
+    order,
+    'Cancel Abandoned',
+    `"${item.name}" — cancellation abandoned, order continues as normal`
+  );
+}
+
+// ======================================================
 // FINALIZE A HELD ITEM ONCE CJ CONFIRMS THE CANCELLATION
 // Shared by the vendor's manual "Retry CJ cancel" button (vendor.js) and the
 // worker's automatic retry (refundWorker.js) so both resolve a confirmed

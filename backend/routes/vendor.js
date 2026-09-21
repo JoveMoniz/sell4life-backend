@@ -27,7 +27,7 @@ import {
 } from '../utils/returnLogic.js';
 
 import { pushUniqueHistory, pushItemHistory } from '../utils/historyLogic.js';
-import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, finalizeCjCancelHold, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
+import { scheduleRefund, triggerItemRefund, holdItemForCjCancelDenied, finalizeCjCancelHold, abandonCjCancelHold, CJ_CANCEL_HOLD_HOURS } from '../utils/refundLogic.js';
 
 import User from '../models/user.js';
 import Product from '../models/product.js';
@@ -2659,6 +2659,53 @@ router.patch(
       res.json({ success: true, finalized: wasHeld });
     } catch (err) {
       console.error('Retry CJ cancel error:', err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+/* ======================================================
+   ABANDON A CJ-CANCEL HOLD
+   The vendor decides to let a held item ship after all, instead of
+   continuing to retry a cancellation CJ never confirmed. Never touches
+   Stripe — no refund has fired at this point, this just clears the
+   hold/retry state so the order continues normally.
+====================================================== */
+
+router.patch(
+  '/orders/:orderId/items/:itemId/abandon-cj-cancel',
+  authMiddleware,
+  requireApprovedVendor,
+  async (req, res) => {
+    const { orderId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const vendor = req.vendor;
+      const item = findOrderItem(order, itemId);
+      if (!item) return res.status(404).json({ error: 'Item not found' });
+      if (String(item.vendorId) !== String(vendor._id)) {
+        return res.status(403).json({ error: 'Not your item' });
+      }
+
+      if (!item.cjCancelDenied) {
+        return res.status(400).json({ error: 'No active cancel hold on this item' });
+      }
+
+      abandonCjCancelHold(order, item, 'vendor kept the item instead of continuing to cancel');
+
+      order.markModified('items');
+      await order.save();
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Abandon CJ cancel hold error:', err);
       res.status(500).json({ error: 'Server error' });
     }
   }
