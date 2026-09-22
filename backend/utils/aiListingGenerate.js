@@ -64,15 +64,31 @@ ${taxonomyPromptBlock()}`;
 // not merely "starts with image/".
 const ANTHROPIC_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
+// CJ's CDN reliably mislabels some images: a real product batch confirmed
+// URLs served with a "Content-Type: image/jpeg" header whose actual bytes
+// are WebP, which Claude rejects (media_type must match the real format,
+// not just be in the allowlist). Sniff the real format from the file's own
+// magic bytes instead of trusting the header — cheap, and the header is
+// only demonstrably wrong, never demonstrably more reliable.
+function sniffImageMediaType(buf) {
+  const b = Buffer.from(buf);
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (b.length >= 6 && (b.toString('ascii', 0, 6) === 'GIF87a' || b.toString('ascii', 0, 6) === 'GIF89a')) return 'image/gif';
+  if (b.length >= 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 async function fetchImageAsBase64(url) {
   try {
     const res = await fetch(url, { headers: { Referer: CJ_REFERER } });
     if (!res.ok) return null;
-    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim();
-    if (!ANTHROPIC_IMAGE_TYPES.has(contentType)) return null;
     const buf = await res.arrayBuffer();
     if (!buf.byteLength || buf.byteLength > 5 * 1024 * 1024) return null;
-    return { mediaType: contentType, data: Buffer.from(buf).toString('base64') };
+    const headerType = (res.headers.get('content-type') || '').split(';')[0].trim();
+    const mediaType = sniffImageMediaType(buf) || headerType;
+    if (!ANTHROPIC_IMAGE_TYPES.has(mediaType)) return null;
+    return { mediaType, data: Buffer.from(buf).toString('base64') };
   } catch (_) {
     return null;
   }
