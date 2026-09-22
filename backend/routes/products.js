@@ -260,6 +260,12 @@ router.get('/', async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
 
+    // Same browse-time-only check as the single-product routes below — the
+    // seller's stated shipping scope, never a live CJ call here. Card-level
+    // Add to Basket (product-card.js/quick-add.js) reads this the same way
+    // the product page's Buy button already does.
+    const { country: buyerCountry } = lookupGeo(req.ip);
+
     const products = rawProducts.map((p) => {
       const obj = p.toObject();
 
@@ -269,6 +275,7 @@ router.get('/', async (req, res) => {
           Array.isArray(obj.images) && obj.images.length
             ? obj.images[0]
             : '/assets/images/products/sell4life-placeholder.png',
+        shippableToBuyer: isCountryAllowedByScope(p, buyerCountry),
       };
     });
 

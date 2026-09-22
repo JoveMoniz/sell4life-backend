@@ -4,6 +4,8 @@
 
 import express from 'express';
 import Vendor from '../models/vendor.js';
+import { lookupGeo } from '../utils/geoip.js';
+import { isCountryAllowedByScope } from '../utils/shippingScope.js';
 
 const router = express.Router();
 
@@ -63,6 +65,12 @@ router.get('/:slug', async (req, res) => {
       .select('-costPrice -supplier -supplierUrl')
       .sort({ createdAt: -1 })
       .lean();
+
+    // Same browse-time-only check as products.js's own routes — lets the
+    // storefront's product cards block Add to Basket the same way the
+    // single-product page already does.
+    const { country: buyerCountry } = lookupGeo(req.ip);
+    products.forEach((p) => { p.shippableToBuyer = isCountryAllowedByScope(p, buyerCountry); });
 
     res.json({
       store: {
