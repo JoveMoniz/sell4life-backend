@@ -372,12 +372,22 @@ export async function getShippingCostDiagnostic(input, credential) {
     products:         [{ vid: supplierVariantRef, quantity }],
   });
   const body = await resp.json().catch(() => ({}));
+  const options = Array.isArray(body?.data) ? body.data : [];
   return {
     ok: resp.ok,
     httpStatus: resp.status,
     code: body?.code,
     message: body?.message,
-    optionsCount: Array.isArray(body?.data) ? body.data.length : null,
+    optionsCount: options.length,
+    // Full list, not just the cheapest getShippingCost() would pick — lets
+    // a real discrepancy against CJ's own storefront page (which sometimes
+    // shows a promotional/free method this general freight-calculate API
+    // doesn't expose at all) be confirmed instead of guessed at.
+    options: options.map(o => ({
+      name: o.logisticName,
+      price: o.logisticPrice,
+      etaDays: o.logisticAging,
+    })),
   };
 }
 
