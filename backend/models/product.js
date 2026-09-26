@@ -125,15 +125,6 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // TEMPORARY — captures exactly what the last CJ sync's shipping-quote
-    // loop actually did (vid used, origins tried, raw quote per attempt),
-    // so a wrong stored shippingCost can be inspected via the normal
-    // product API instead of needing Render log access. Remove once the
-    // wrong-shippingCost investigation is resolved.
-    shippingDebug: {
-      type: mongoose.Schema.Types.Mixed,
-    },
-
     // ISO country code the current shippingCost/delivery estimate was
     // actually quoted from — 'CN' unless CJ sync found real stock in a
     // closer warehouse and quoted from there instead. Lets order creation

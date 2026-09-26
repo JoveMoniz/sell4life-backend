@@ -5,8 +5,7 @@ import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } fr
 import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
 import { checkUkShippingForAllProducts } from '../utils/cjProductSync.js';
-import cjProvider, { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
-import { countriesForScope } from '../utils/shippingScope.js';
+import { getShippingCostDiagnostic } from '../utils/shippingProviders/cjdropshipping.js';
 import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { generateSlug } from './products.js';
 
@@ -1312,47 +1311,6 @@ router.get('/check-cj-shipping/:productId/diagnostic', async (req, res) => {
     res.json({ productId: product._id, name: product.name, cjVid, destinationCountry, startCountryCode, diag });
   } catch (err) {
     console.error('Shipping diagnostic error:', err);
-    res.status(500).json({ error: 'Server error', message: err.message });
-  }
-});
-
-// Temporary — traces exactly what syncProductFromCj's own quote-resolution
-// loop does for a product, using the REAL getShippingCost() (not the
-// diagnostic bypass), with caching forced off so a stale cache entry can't
-// hide what's actually happening. Investigating why the real sync keeps
-// landing on a non-zero cross-border quote for products CJ's own API
-// confirms have a genuine $0 domestic option. Not linked from any UI.
-router.get('/check-cj-shipping/:productId/trace-real-sync', async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
-    const vendor = await Vendor.findById(product.vendor);
-    if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
-    const credential = decryptCredential(vendor.supplierCredentials.cjdropshipping);
-    const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
-    if (!cjVid) return res.status(400).json({ error: 'No cjVid on this product' });
-
-    // Mirrors cjProductSync.js's own originCandidates/quoteDestination
-    // logic closely enough to debug with (skips the live inventories fetch
-    // — not needed here since we already know shippingOriginCountry).
-    const knownOrigin = product.shippingOriginCountry;
-    const originCandidates = knownOrigin && knownOrigin !== 'CN' ? [knownOrigin, 'CN'] : ['CN'];
-    const scopeCountries = countriesForScope(product);
-    const quoteDestination = scopeCountries && scopeCountries.length ? scopeCountries[0] : 'GB';
-
-    const attempts = [];
-    for (const startCountryCode of originCandidates) {
-      const quote = await cjProvider.getShippingCost(
-        { supplierVariantRef: cjVid, destinationCountry: quoteDestination, quantity: 1, startCountryCode, noCache: true },
-        credential
-      );
-      attempts.push({ startCountryCode, destinationCountry: quoteDestination, quote });
-      if (quote && Number.isFinite(Number(quote.cost))) break;
-    }
-
-    res.json({ productId: product._id, name: product.name, cjVid, quoteDestination, originCandidates, attempts });
-  } catch (err) {
-    console.error('Shipping trace error:', err);
     res.status(500).json({ error: 'Server error', message: err.message });
   }
 });
