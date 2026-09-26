@@ -94,7 +94,7 @@ const cjProvider = {
   // item is actually stocked (see candidateOrigins() below).
   // Returns: { cost, currency, etaDays, raw } | null
   async getShippingCost(input, credential) {
-    const { supplierVariantRef, destinationCountry = 'GB', quantity = 1, startCountryCode = 'CN' } = input;
+    const { supplierVariantRef, destinationCountry = 'GB', quantity = 1, startCountryCode = 'CN', noCache = false } = input;
     if (!supplierVariantRef || !credential) {
       console.warn('[cjdropshipping] skipped — supplierVariantRef=%s hasCredential=%s', supplierVariantRef, !!credential);
       return null;
@@ -119,7 +119,7 @@ const cjProvider = {
     // is a genuinely different freight lookup, not a cache hit/miss of the
     // same thing.
     const key    = cacheKey('cjdropshipping', supplierVariantRef, destinationCountry, startCountryCode);
-    const cached = getCached(key);
+    const cached = noCache ? undefined : getCached(key);
     if (cached !== undefined) return cached; // null = already tried + failed
 
     try {
