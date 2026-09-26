@@ -362,8 +362,19 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   // is a real cross-border freight cost, not the free/cheap domestic rate
   // CJ actually offers for the market this product is scoped to. GB stays
   // the default for 'worldwide'-scoped products, same as before.
+  //
+  // Prefer the product's own origin as the destination when it's actually
+  // inside the allowed scope, rather than always scopeCountries[0] — the
+  // 'uk_eu' preset's list always starts with GB (['GB', ...EU_CODES]), so
+  // a Germany- or France-warehouse product scoped 'uk_eu' would otherwise
+  // always get quoted GB delivery, never its own real DE/FR domestic
+  // route, even though that's exactly the free/cheap rate this exists to
+  // find. Only 'custom' with a single matching country happened to dodge
+  // this before, which is why it looked US-only.
   const scopeCountries = countriesForScope(product);
-  const quoteDestination = scopeCountries && scopeCountries.length ? scopeCountries[0] : 'GB';
+  const quoteDestination = !scopeCountries || !scopeCountries.length
+    ? 'GB'
+    : (knownOrigin && scopeCountries.includes(knownOrigin) ? knownOrigin : scopeCountries[0]);
   let shippingGbp = null;
   if (firstCjVid) {
     for (const startCountryCode of originCandidates) {
