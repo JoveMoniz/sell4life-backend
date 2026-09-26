@@ -1034,8 +1034,16 @@ router.post('/products/bulk-fetch-cj-images', authMiddleware, requireApprovedVen
 
     const query = { vendor: vendor._id };
     if (requestedIds.length) query._id = { $in: requestedIds };
+    // markupPct/shipIncluded/shippingCost/shippingOriginCountry/shippingScope/
+    // shippingCountries/supplier were missing here — syncProductFromCj reads
+    // all of them (shippingScope/shippingCountries via countriesForScope()),
+    // and a restrictive .select() silently makes them undefined rather than
+    // erroring, so the bulk sync path was quoting shipping for the wrong
+    // (default GB/CN) market on every product regardless of its real scope,
+    // while the single-product sync route (a plain findOne with no .select())
+    // never had this problem.
     const allProducts = await Product.find(query)
-      .select('_id name category subcategory variants images supplierUrl supplierVariantRef sku videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5 stock stockZeroPendingSince').lean();
+      .select('_id name category subcategory variants images supplierUrl supplierVariantRef sku videoUrl videoUrl2 videoUrl3 videoUrl4 videoUrl5 stock stockZeroPendingSince markupPct shipIncluded shippingCost shippingOriginCountry shippingScope shippingCountries supplier').lean();
 
     // Target every product CJ-syncable via any of the paths
     // syncProductFromCj actually checks: a variant ref/SKU, OR (for a
