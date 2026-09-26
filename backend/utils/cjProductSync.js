@@ -8,6 +8,7 @@ import cjProvider, { getProductImages as cjGetProductImages, testCredentialAuth,
 import { decryptCredential } from './shippingProviders/registry.js';
 import { matchCjCategory, matchProductTitle } from './categoryMatch.js';
 import { matchProductTitleAI } from './aiCategoryMatch.js';
+import { countriesForScope } from './shippingScope.js';
 
 // CJ video URLs come from a download-only domain that browsers can't stream.
 // Re-host on Cloudinary (same cloud/preset the vendor upload UI uses) —
@@ -355,11 +356,19 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   const originCandidates = knownOrigin && knownOrigin !== 'CN'
     ? [knownOrigin, ...candidateOrigins(firstCjInventories).filter(c => c !== knownOrigin)]
     : candidateOrigins(firstCjInventories);
+  // Quote for wherever the seller has actually scoped this product to ship
+  // (e.g. a US-warehouse product restricted to shippingCountries: ['US'])
+  // instead of always GB — a US-origin item quoted for delivery to the UK
+  // is a real cross-border freight cost, not the free/cheap domestic rate
+  // CJ actually offers for the market this product is scoped to. GB stays
+  // the default for 'worldwide'-scoped products, same as before.
+  const scopeCountries = countriesForScope(product);
+  const quoteDestination = scopeCountries && scopeCountries.length ? scopeCountries[0] : 'GB';
   let shippingGbp = null;
   if (firstCjVid) {
     for (const startCountryCode of originCandidates) {
       const quote = await cjProvider.getShippingCost(
-        { supplierVariantRef: firstCjVid, destinationCountry: 'GB', quantity: 1, startCountryCode },
+        { supplierVariantRef: firstCjVid, destinationCountry: quoteDestination, quantity: 1, startCountryCode },
         credential
       );
       if (quote && Number.isFinite(Number(quote.cost))) {
