@@ -365,12 +365,17 @@ export async function syncProductFromCj(product, credential, { forceCategory = f
   const scopeCountries = countriesForScope(product);
   const quoteDestination = scopeCountries && scopeCountries.length ? scopeCountries[0] : 'GB';
   let shippingGbp = null;
+  // TEMPORARY — see models/product.js's shippingDebug field.
+  const storedVid = (product.variants || []).map(v => v.cjVid).find(Boolean) || null;
+  const shipDebugAttempts = [];
+  updateDoc.shippingDebug = { firstCjVid, storedVid, originCandidates, quoteDestination, attempts: shipDebugAttempts };
   if (firstCjVid) {
     for (const startCountryCode of originCandidates) {
       const quote = await cjProvider.getShippingCost(
         { supplierVariantRef: firstCjVid, destinationCountry: quoteDestination, quantity: 1, startCountryCode },
         credential
       );
+      shipDebugAttempts.push({ startCountryCode, quote });
       if (quote && Number.isFinite(Number(quote.cost))) {
         shippingGbp = Math.round(Number(quote.cost) * usdGbp * 100) / 100;
         updateDoc.shippingCost = shippingGbp;
