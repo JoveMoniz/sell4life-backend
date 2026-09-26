@@ -1298,11 +1298,17 @@ router.get('/check-cj-shipping/:productId/diagnostic', async (req, res) => {
     const cjVid = (product.variants || []).map(v => v.cjVid).find(Boolean);
     if (!cjVid) return res.status(400).json({ error: 'No cjVid on this product' });
     const destinationCountry = req.query.country || 'GB';
+    // Defaulted to 'CN' before (getShippingCostDiagnostic's own default) —
+    // silently quoting China->destination regardless of where the product
+    // is actually stocked, which doesn't match what the real sync path
+    // does (it tries the product's own shippingOriginCountry first). Same
+    // default here now, overridable via ?start= for testing other origins.
+    const startCountryCode = req.query.start || product.shippingOriginCountry || 'CN';
     const diag = await getShippingCostDiagnostic(
-      { supplierVariantRef: cjVid, destinationCountry, quantity: 1 },
+      { supplierVariantRef: cjVid, destinationCountry, quantity: 1, startCountryCode },
       credential
     );
-    res.json({ productId: product._id, name: product.name, cjVid, destinationCountry, diag });
+    res.json({ productId: product._id, name: product.name, cjVid, destinationCountry, startCountryCode, diag });
   } catch (err) {
     console.error('Shipping diagnostic error:', err);
     res.status(500).json({ error: 'Server error', message: err.message });
