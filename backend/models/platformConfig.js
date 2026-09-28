@@ -28,11 +28,17 @@ const platformConfigSchema = new mongoose.Schema(
     reviewsEnabled:   { type: Boolean, default: false },
     reviewsMinCount:  { type: Number, default: 3, min: 1 },
 
-    // Blocks real checkout for any non-GB vendor until DAC7 (EU digital
-    // platform reporting) registration is sorted — a vendor can still sign
-    // up and list from an EU country, this only stops a real transaction
-    // from completing, since that's what starts the registration clock.
+    // Blocks real checkout for any non-GB, non-US vendor until DAC7 (EU
+    // digital platform reporting) registration is sorted — a vendor can
+    // still sign up and list from an EU country, this only stops a real
+    // transaction from completing, since that's what starts the
+    // registration clock. US vendors have their own separate flag below —
+    // DAC7 doesn't apply to them, so they don't need to wait on this.
     euSellingEnabled: { type: Boolean, default: false },
+
+    // Same idea as euSellingEnabled, but for US vendors specifically — no
+    // external registration blocks this one, it's purely a rollout switch.
+    usSellingEnabled: { type: Boolean, default: false },
 
     // Founding Seller program — discounts commission (rate, default 0 =
     // fully free) for each seller's first N sales, for the first `cap`

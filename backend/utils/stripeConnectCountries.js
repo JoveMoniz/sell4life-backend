@@ -8,7 +8,7 @@
 // this list. Nothing else needs to change — routes/vendor.js reads this
 // list both to populate the country picker and to validate a vendor's
 // choice before creating their Stripe account.
-export const STRIPE_CONNECT_COUNTRIES = ['GB', 'PT'];
+export const STRIPE_CONNECT_COUNTRIES = ['GB', 'PT', 'US'];
 
 export function isStripeConnectCountry(code) {
   return STRIPE_CONNECT_COUNTRIES.includes(String(code || '').toUpperCase());

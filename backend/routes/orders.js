@@ -194,14 +194,21 @@ async function createOrderPaymentIntent({ items, buyerId, vendor, analyticsSessi
 
   // A completed sale is what starts the clock on DAC7 (EU digital
   // platform reporting) registration for the platform, which isn't
-  // sorted yet — so real checkout stays blocked for any non-GB vendor
-  // until an admin flips euSellingEnabled on. Listing/browsing an EU
-  // vendor's products is unaffected, only completing a real purchase.
+  // sorted yet — so real checkout stays blocked for any non-GB, non-US
+  // vendor until an admin flips euSellingEnabled on. US vendors have
+  // their own separate usSellingEnabled flag — DAC7 doesn't apply to
+  // them, so they were never meant to be gated by this one. Listing/
+  // browsing a blocked vendor's products is unaffected, only completing
+  // a real purchase.
   const cfg = await getPlatformConfig();
-  if (!cfg.euSellingEnabled) {
+  if (!cfg.euSellingEnabled || !cfg.usSellingEnabled) {
     const vendorIds = [...new Set(normalizedItems.map((item) => String(item.vendorId)))];
     const sellingVendors = await Vendor.find({ _id: { $in: vendorIds } }).select('country storeName');
-    const blockedVendor = sellingVendors.find((v) => v.country && v.country !== 'GB');
+    const blockedVendor = sellingVendors.find((v) => {
+      if (!v.country || v.country === 'GB') return false;
+      if (v.country === 'US') return !cfg.usSellingEnabled;
+      return !cfg.euSellingEnabled;
+    });
     if (blockedVendor) {
       const err = new Error(`"${blockedVendor.storeName}" isn't available for purchase yet — international seller payouts are still being finalized. Please check back soon.`);
       err.status = 400;

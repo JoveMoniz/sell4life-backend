@@ -9,6 +9,7 @@ import Vendor from '../models/vendor.js';
 import Payout from '../models/payout.js';
 import stripe from '../config/stripe.js';
 import { computeVendorBalance, MIN_PAYOUT } from '../utils/vendorBalance.js';
+import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
 import { mailPayoutProcessed } from '../utils/email.js';
 
 export async function processAutoPayouts() {
@@ -45,9 +46,12 @@ export async function processAutoPayouts() {
 
       const payout = await Payout.create({ vendorId: vendor._id, amount: pendingBalance });
 
+      const { currency: payoutCurrency, rate: payoutToGbpRate } = await resolvePayoutCurrency(vendor.country);
+      const { amount: payoutAmount, stripeAmount } = convertGbpToPayout(pendingBalance, payoutCurrency, payoutToGbpRate);
+
       const transfer = await stripe.transfers.create({
-        amount: Math.round(pendingBalance * 100),
-        currency: 'gbp',
+        amount: stripeAmount,
+        currency: payoutCurrency.toLowerCase(),
         destination: vendor.stripeAccountId,
         description: `Sell4Life auto payout ${payout._id}`,
         metadata: { payoutId: String(payout._id), vendorId: String(vendor._id), auto: 'true' },
@@ -58,6 +62,9 @@ export async function processAutoPayouts() {
       payout.reference = transfer.id;
       payout.stripeTransferId = transfer.id;
       payout.note = 'Automatic payout';
+      payout.payoutCurrency = payoutCurrency;
+      payout.payoutAmount = payoutAmount;
+      payout.payoutToGbpRate = payoutToGbpRate;
       await payout.save();
 
       console.log(`💸 Auto payout sent: vendor ${vendor._id} £${pendingBalance} (${transfer.id})`);
