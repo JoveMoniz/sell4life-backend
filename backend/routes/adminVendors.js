@@ -1,6 +1,7 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
 import { computeVendorBalance } from '../utils/vendorBalance.js';
+import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
 import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
 import { commissionAfterRefund } from '../utils/commission.js';
 import { processAutoPayouts } from '../jobs/vendorPayoutWorker.js';
@@ -959,7 +960,7 @@ router.patch('/payouts/:id', async (req, res) => {
 
     const payout = await Payout.findById(id).populate({
       path: 'vendorId',
-      select: 'storeName userId stripeAccountId payoutEnabled',
+      select: 'storeName userId stripeAccountId payoutEnabled country',
       populate: { path: 'userId', select: 'email' },
     });
     if (!payout) return res.status(404).json({ error: 'Payout not found' });
@@ -975,14 +976,19 @@ router.patch('/payouts/:id', async (req, res) => {
       const vendor = payout.vendorId;
       if (vendor?.stripeAccountId && vendor.payoutEnabled) {
         try {
+          const { currency: payoutCurrency, rate: payoutToGbpRate } = await resolvePayoutCurrency(vendor.country);
+          const { amount: payoutAmount, stripeAmount } = convertGbpToPayout(Number(payout.amount), payoutCurrency, payoutToGbpRate);
           const transfer = await stripe.transfers.create({
-            amount: Math.round(Number(payout.amount) * 100),
-            currency: 'gbp',
+            amount: stripeAmount,
+            currency: payoutCurrency.toLowerCase(),
             destination: vendor.stripeAccountId,
             description: `Sell4Life payout ${payout._id}`,
             metadata: { payoutId: String(payout._id), vendorId: String(vendor._id) },
           });
           payout.stripeTransferId = transfer.id;
+          payout.payoutCurrency = payoutCurrency;
+          payout.payoutAmount = payoutAmount;
+          payout.payoutToGbpRate = payoutToGbpRate;
           finalReference = finalReference || transfer.id;
         } catch (transferErr) {
           console.error('Stripe transfer error:', transferErr);

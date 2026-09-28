@@ -499,6 +499,40 @@ router.put('/eu-selling', async (req, res) => {
 });
 
 /* ======================================================
+   GET /api/admin/config/us-selling
+====================================================== */
+router.get('/us-selling', async (_req, res) => {
+  try {
+    const cfg = await getPlatformConfig();
+    res.json({ usSellingEnabled: cfg.usSellingEnabled ?? false });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
+   PUT /api/admin/config/us-selling
+   Body: { usSellingEnabled }
+====================================================== */
+router.put('/us-selling', async (req, res) => {
+  try {
+    const { usSellingEnabled } = req.body;
+    if (usSellingEnabled === undefined) {
+      return res.status(400).json({ error: 'usSellingEnabled is required' });
+    }
+    const cfg = await PlatformConfig.findOneAndUpdate(
+      { _key: 'global' },
+      { $set: { usSellingEnabled: Boolean(usSellingEnabled) } },
+      { upsert: true, new: true }
+    );
+    res.json({ ok: true, usSellingEnabled: cfg.usSellingEnabled });
+  } catch (err) {
+    console.error('US selling config PUT error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ======================================================
    SUBCATEGORY SUGGESTIONS — pending proposals from the AI category
    matcher (aiCategoryMatch.js) for a product it couldn't place in any
    existing subcategory. Never auto-applied; approving here only marks
