@@ -891,11 +891,23 @@ router.post('/stripe/connect', authMiddleware, requireApprovedVendor, async (req
         });
       }
 
+      // Stripe rejects requesting `transfers` alone for a US individual
+      // account ("You cannot request the transfers capability without the
+      // card_payments capability for accounts in US") — confirmed directly
+      // against the Stripe API, not documented anywhere obvious. GB doesn't
+      // need it. We never actually charge cards on the vendor's own
+      // connected account (separate charges and transfers model — buyer
+      // charges always go through the platform's account), this capability
+      // just has to be present for Stripe to allow US transfers at all.
+      const capabilities = vendor.country === 'US'
+        ? { card_payments: { requested: true }, transfers: { requested: true } }
+        : { transfers: { requested: true } };
+
       const account = await stripe.accounts.create({
         type: 'express',
         country: vendor.country,
         email: req.user.email,
-        capabilities: { transfers: { requested: true } },
+        capabilities,
         business_type: 'individual',
         metadata: { vendorId: String(vendor._id) },
       });
