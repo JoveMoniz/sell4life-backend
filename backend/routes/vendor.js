@@ -328,6 +328,14 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
 
     const netRevenue = grossRevenue - revenueLoss;
 
+    // Display-only estimate in the vendor's real currency (e.g. USD for a
+    // US vendor) — every figure here stays GBP-canonical underneath, this
+    // is purely for the vendor's own reading convenience. See
+    // payoutCurrency.js for why the RAW rate (not the buyer-facing marked-
+    // up one) is used.
+    const { currency: dispCurrency, rate: dispRate, symbol: dispSymbol } = await resolvePayoutCurrency(vendor.country);
+    const displayCurrency = dispCurrency !== 'GBP' ? { currency: dispCurrency, rate: dispRate, symbol: dispSymbol } : null;
+
     res.json({
       products,
 
@@ -340,6 +348,7 @@ router.get('/dashboard', authMiddleware, requireVendor, async (req, res) => {
       grossRevenue,
       revenueLoss,
       netRevenue,
+      displayCurrency,
     });
   } catch (err) {
     console.error('Vendor dashboard error:', err);
@@ -651,8 +660,16 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
       feeCfg?.reserveRateStandard, feeCfg?.reserveRateStandardSetAt);
     // totalSales is already net (returns deducted via netAmount) so don't subtract totalRefunds again
     const net = Number(totalSales.toFixed(2));
+
+    // For a non-GB vendor, the frontend replaces every £ figure on this
+    // page with the converted amount in their real currency — see
+    // payoutCurrency.js. Real accounting stays GBP underneath regardless.
+    const { currency: txCurrency, rate: txRate, symbol: txSymbol } = await resolvePayoutCurrency(vendor.country);
+    const displayCurrency = txCurrency !== 'GBP' ? { currency: txCurrency, rate: txRate, symbol: txSymbol } : null;
+
     res.json({
       transactions,
+      displayCurrency,
       summary: {
         totalSales:       Number(totalSales.toFixed(2)),
         totalRefunds:     Number(totalRefunds.toFixed(2)),
@@ -759,14 +776,13 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       }
     }
 
-    // Display-only estimate of what the pending balance is worth in the
-    // vendor's real payout currency — the actual transfer always moves in
-    // GBP (see payoutCurrency.js), Stripe converts on arrival, so this is
-    // just an estimate shown ahead of time, not what gets sent to Stripe.
+    // For a non-GB vendor, the frontend replaces every £ figure on this
+    // page with the converted amount in their real currency — the actual
+    // transfer always moves in GBP (see payoutCurrency.js), Stripe converts
+    // on arrival, so this is a display-only estimate for anything not yet
+    // paid out.
     const { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } = await resolvePayoutCurrency(vendor.country);
-    const payoutEstimate = payoutCurrency !== 'GBP'
-      ? { currency: payoutCurrency, symbol: payoutSymbol, amount: convertGbpToPayout(balance.pendingBalance, payoutCurrency, payoutToGbpRate).amount }
-      : null;
+    const displayCurrency = payoutCurrency !== 'GBP' ? { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } : null;
 
     res.json({
       ...balance,
@@ -777,7 +793,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
       period: period || 'all',
       periodStats,
-      payoutEstimate,
+      displayCurrency,
       payouts: payouts.map(p => ({
         _id: p._id,
         amount: p.amount,
@@ -1892,7 +1908,12 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
       }
     }
 
-    res.json({ orders: filteredOrders });
+    // For a non-GB vendor, the frontend replaces every £ figure on this
+    // page with the converted amount in their real currency.
+    const { currency: ordCurrency, rate: ordRate, symbol: ordSymbol } = await resolvePayoutCurrency(vendor.country);
+    const displayCurrency = ordCurrency !== 'GBP' ? { currency: ordCurrency, rate: ordRate, symbol: ordSymbol } : null;
+
+    res.json({ orders: filteredOrders, displayCurrency });
   } catch (err) {
     console.error('Vendor orders fetch error:', err);
 
@@ -1938,6 +1959,9 @@ router.get('/orders/:id', authMiddleware, requireVendor, async (req, res) => {
       });
     }
 
+    const { currency: ordCurrency, rate: ordRate, symbol: ordSymbol } = await resolvePayoutCurrency(vendor.country);
+    const displayCurrency = ordCurrency !== 'GBP' ? { currency: ordCurrency, rate: ordRate, symbol: ordSymbol } : null;
+
     res.json({
       ...order.toObject(),
 
@@ -1946,6 +1970,7 @@ router.get('/orders/:id', authMiddleware, requireVendor, async (req, res) => {
       refundScheduledAt: vendorOrder.refundScheduledAt || null,
 
       allowedActions: buildVendorAllowedActions(order, vendor._id),
+      displayCurrency,
     });
   } catch (err) {
     console.error('Vendor order fetch error:', err);
