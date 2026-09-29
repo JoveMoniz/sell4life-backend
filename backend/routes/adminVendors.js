@@ -637,6 +637,14 @@ router.get('/:id/transactions', async (req, res) => {
     const currentCommissionRate = await resolveCommissionRateForOrder(vendor, new Date());
     const net = Number((totalSales - totalRefunds).toFixed(2));
     const balance = await computeVendorBalance(vendor._id);
+
+    // Same display-only estimate as the vendor's own Payouts page — the
+    // real transfer always moves in GBP, Stripe converts on arrival.
+    const { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } = await resolvePayoutCurrency(vendor.country);
+    balance.payoutEstimate = payoutCurrency !== 'GBP'
+      ? { currency: payoutCurrency, symbol: payoutSymbol, amount: convertGbpToPayout(balance.pendingBalance, payoutCurrency, payoutToGbpRate).amount }
+      : null;
+
     res.json({
       vendor: {
         _id:          vendor._id,
@@ -645,6 +653,7 @@ router.get('/:id/transactions', async (req, res) => {
         email:        vendor.userId?.email || '—',
         status:       vendor.status,
         type:         vendor.type || 'casual',
+        country:      vendor.country || null,
         vatRegistered: isVatRegistered,
         vatNumber:    vendor.vatNumber || '',
       },
@@ -933,13 +942,31 @@ router.get('/payouts', async (req, res) => {
     const payouts = await Payout.find(filter)
       .populate({
         path: 'vendorId',
-        select: 'storeName storeSlug stripeAccountId payoutEnabled',
+        select: 'storeName storeSlug stripeAccountId payoutEnabled country',
         populate: { path: 'userId', select: 'email' },
       })
       .sort({ requestedAt: -1 })
       .limit(100);
 
-    res.json({ payouts });
+    // For a still-'requested' payout (not yet transferred), show admins the
+    // same display-only USD/etc. estimate the vendor sees on their own
+    // Payouts page — the real transfer always moves in GBP and Stripe
+    // converts on arrival, so this is an estimate, not what gets sent.
+    // A 'paid' payout already has its real payoutCurrency/payoutAmount
+    // stored from the actual transfer — never overwrite those with a
+    // fresh estimate computed at a possibly-different rate.
+    const payoutsWithEstimate = await Promise.all(payouts.map(async (p) => {
+      const obj = p.toObject();
+      if (p.status === 'requested' && p.vendorId?.country) {
+        const { currency, rate, symbol } = await resolvePayoutCurrency(p.vendorId.country);
+        obj.payoutEstimate = currency !== 'GBP'
+          ? { currency, symbol, amount: convertGbpToPayout(p.amount, currency, rate).amount }
+          : null;
+      }
+      return obj;
+    }));
+
+    res.json({ payouts: payoutsWithEstimate });
   } catch (err) {
     console.error('Admin payouts list error:', err);
     res.status(500).json({ error: 'Server error' });

@@ -44,6 +44,7 @@ import stripe from '../config/stripe.js';
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
+import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj, attemptCjOrderCancel } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
@@ -758,6 +759,15 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       }
     }
 
+    // Display-only estimate of what the pending balance is worth in the
+    // vendor's real payout currency — the actual transfer always moves in
+    // GBP (see payoutCurrency.js), Stripe converts on arrival, so this is
+    // just an estimate shown ahead of time, not what gets sent to Stripe.
+    const { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } = await resolvePayoutCurrency(vendor.country);
+    const payoutEstimate = payoutCurrency !== 'GBP'
+      ? { currency: payoutCurrency, symbol: payoutSymbol, amount: convertGbpToPayout(balance.pendingBalance, payoutCurrency, payoutToGbpRate).amount }
+      : null;
+
     res.json({
       ...balance,
       vendorType: vendor.type || 'casual',
@@ -767,6 +777,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       taxInfoCompletedAt: vendor.taxInfoCompletedAt || null,
       period: period || 'all',
       periodStats,
+      payoutEstimate,
       payouts: payouts.map(p => ({
         _id: p._id,
         amount: p.amount,
@@ -775,6 +786,8 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
         paidAt: p.paidAt,
         reference: p.reference,
         note: p.note,
+        payoutCurrency: p.payoutCurrency,
+        payoutAmount: p.payoutAmount,
       })),
     });
   } catch (err) {
