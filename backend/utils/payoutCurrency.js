@@ -1,15 +1,20 @@
 // ======================================================
-// REAL PAYOUT CURRENCY — resolves what currency a Stripe Connect transfer
-// to a vendor actually moves in, mirroring chargeCurrency.js's principle
-// for the other side of the ledger: internal accounting (computeVendorBalance,
-// commission, HMRC, payout.amount) stays GBP-canonical everywhere; real-currency
-// conversion happens ONLY at the actual transfer boundary, using a rate
-// resolved and stored once at that moment.
+// PAYOUT CURRENCY ESTIMATE — this does NOT pick what currency the actual
+// Stripe transfer moves in. Confirmed live against Stripe's API: the
+// platform's Stripe balance is GBP-only (no separate USD pool), so asking
+// for a `currency: 'usd'` transfer fails outright with balance_insufficient
+// no matter how much GBP is available. Every transfer is always sent in GBP
+// (see vendorPayoutWorker.js / adminVendors.js) — Stripe auto-converts it
+// into the connected account's OWN currency the instant it lands there (a
+// real test transfer of £5.00 landed as $6.48 on a US test account), then
+// pays that account out to their real bank in their real currency
+// automatically. No platform-side USD balance is needed for that to work.
 //
-// Deliberately uses the RAW rate from exchangeRates.js's getRates(), never
-// currency.js's getDisplayRate() — that rate bakes in a buyer-protecting
-// markup meant to offset what a buyer's card issuer would charge; applying
-// it here would overpay the vendor at the platform's expense.
+// What this file IS for: computing a vendor-facing ESTIMATE of what a GBP
+// payout is worth in their local currency, for display (dashboard, payout
+// emails) — using the RAW rate from exchangeRates.js's getRates(), never
+// currency.js's getDisplayRate() (that one bakes in a buyer-protecting
+// markup that has no place in an estimate shown to the vendor).
 // ======================================================
 
 import { getRates } from './exchangeRates.js';

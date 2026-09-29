@@ -46,12 +46,22 @@ export async function processAutoPayouts() {
 
       const payout = await Payout.create({ vendorId: vendor._id, amount: pendingBalance });
 
+      // Always transfer in GBP — confirmed live against Stripe's test API that
+      // the platform's balance is GBP-only (no separate USD pool), so a
+      // `currency: 'usd'` transfer fails outright with balance_insufficient
+      // regardless of GBP balance. Stripe auto-converts a GBP transfer into
+      // the connected account's OWN currency the moment it lands there (a
+      // real £5.00 test transfer landed as $6.48 on a US test account's
+      // balance), and pays that account out to their real bank in their
+      // real currency automatically — no platform-side USD balance needed.
+      // payoutCurrency/payoutAmount below are stored purely as an estimate
+      // for vendor-facing display, not used to pick the transfer currency.
       const { currency: payoutCurrency, rate: payoutToGbpRate } = await resolvePayoutCurrency(vendor.country);
-      const { amount: payoutAmount, stripeAmount } = convertGbpToPayout(pendingBalance, payoutCurrency, payoutToGbpRate);
+      const { amount: payoutAmount } = convertGbpToPayout(pendingBalance, payoutCurrency, payoutToGbpRate);
 
       const transfer = await stripe.transfers.create({
-        amount: stripeAmount,
-        currency: payoutCurrency.toLowerCase(),
+        amount: Math.round(pendingBalance * 100),
+        currency: 'gbp',
         destination: vendor.stripeAccountId,
         description: `Sell4Life auto payout ${payout._id}`,
         metadata: { payoutId: String(payout._id), vendorId: String(vendor._id), auto: 'true' },

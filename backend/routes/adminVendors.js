@@ -976,11 +976,17 @@ router.patch('/payouts/:id', async (req, res) => {
       const vendor = payout.vendorId;
       if (vendor?.stripeAccountId && vendor.payoutEnabled) {
         try {
+          // Always transfer in GBP — see vendorPayoutWorker.js for why: the
+          // platform's Stripe balance is GBP-only, so a currency:'usd'
+          // transfer fails with balance_insufficient no matter the GBP
+          // balance. Stripe auto-converts a GBP transfer to the connected
+          // account's own currency on arrival (confirmed live). payoutCurrency
+          // /payoutAmount are stored as a display estimate only.
           const { currency: payoutCurrency, rate: payoutToGbpRate } = await resolvePayoutCurrency(vendor.country);
-          const { amount: payoutAmount, stripeAmount } = convertGbpToPayout(Number(payout.amount), payoutCurrency, payoutToGbpRate);
+          const { amount: payoutAmount } = convertGbpToPayout(Number(payout.amount), payoutCurrency, payoutToGbpRate);
           const transfer = await stripe.transfers.create({
-            amount: stripeAmount,
-            currency: payoutCurrency.toLowerCase(),
+            amount: Math.round(Number(payout.amount) * 100),
+            currency: 'gbp',
             destination: vendor.stripeAccountId,
             description: `Sell4Life payout ${payout._id}`,
             metadata: { payoutId: String(payout._id), vendorId: String(vendor._id) },
