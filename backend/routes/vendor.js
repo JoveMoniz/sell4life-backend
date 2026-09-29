@@ -1999,9 +1999,20 @@ router.get('/me', authMiddleware, async (req, res) => {
       .select('-taxInfo')
       .sort({ createdAt: -1 });
 
+    // Same display-only currency every other vendor-facing page uses — a
+    // US vendor sees dollar everywhere they touch money on their own
+    // pages, exposed here too so pages that only call /me (e.g. Add/Edit
+    // Product) don't need a second request just for this.
+    let displayCurrency = null;
+    if (vendor?.country) {
+      const { currency, rate, symbol } = await resolvePayoutCurrency(vendor.country);
+      displayCurrency = currency !== 'GBP' ? { currency, rate, symbol } : null;
+    }
+
     res.json({
       isVendor: !!vendor,
       vendor: vendor || null,
+      displayCurrency,
     });
   } catch (err) {
     console.error('Vendor /me error:', err);
