@@ -422,6 +422,15 @@ router.post('/shipping-address', async (req, res) => {
     if (!name || !address1 || !city || !postcode) {
       return res.status(400).json({ error: 'Please fill in name, address, city and postcode' });
     }
+    // Country used to silently default to 'GB' below whenever this was
+    // missing or malformed, rather than being rejected like every other
+    // required field — it drives chargeCurrency, CJ shipping destination,
+    // HMRC reporting and shipping-scope enforcement, so a silently-wrong
+    // country here is a much bigger problem than a silently-missing one of
+    // those other fields would be. Reject it explicitly instead.
+    if (!/^[A-Z]{2}$/.test(String(country || '').toUpperCase())) {
+      return res.status(400).json({ error: 'Please select a valid country' });
+    }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
@@ -463,16 +472,13 @@ router.post('/shipping-address', async (req, res) => {
       city: String(city).trim(),
       county: String(county || '').trim(),
       postcode: String(postcode).trim(),
-      // Checkout's country field is now a real <select> of ISO 3166-1
-      // alpha-2 codes (frontend/assets/js/countries.js) — trust it, just
-      // sanity-check the shape. This used to be unconditionally forced to
-      // 'GB' regardless of what the buyer picked, silently mislabeling
-      // every non-UK order's real destination (CJ auto-order creation,
-      // HMRC reporting, and the shipping-scope check below all read this
+      // Already validated as a real 2-letter code above — no silent
+      // defaulting here. This used to be unconditionally forced to 'GB'
+      // regardless of what the buyer picked, silently mislabeling every
+      // non-UK order's real destination (CJ auto-order creation, HMRC
+      // reporting, and the shipping-scope check below all read this
       // field) — see project memory for the incident this caused.
-      country: /^[A-Z]{2}$/.test(String(country || '').toUpperCase())
-        ? String(country).toUpperCase()
-        : 'GB',
+      country: String(country).toUpperCase(),
     };
 
     // Real enforcement of each item's seller-set shipping scope — this is
