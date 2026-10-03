@@ -17,6 +17,75 @@ import { escapeRegex } from '../utils/searchRegex.js';
 const router = Router();
 
 /* ======================================================
+   MEDIA URL VALIDATION
+   Without a check here, a vendor (or anyone hitting this API directly,
+   bypassing the upload UI entirely) could set a product's image/video to
+   something like a `javascript:`/`data:`/`file:` URI instead of a real
+   link, or a malformed string.
+
+   NOT restricted to Cloudinary's own domain: every media field on a
+   product legitimately accepts an arbitrary external URL by design, not
+   just an upload — the product/variant/add-on image fields all let a
+   vendor paste an image URL directly ("Paste URL or upload…" in
+   vendor-add-product.js), the video fields explicitly invite a YouTube or
+   Vimeo link ("Or paste YouTube / Vimeo URL" in add-product.html), and a
+   CJ-sourced product's images/variant images come directly from CJ's own
+   CDN (cjProductSync.js writes those URLs straight in, and the
+   edit-product form resends the current images array on every save). A
+   single-host allowlist would have broken all of those real, existing
+   features. What this DOES still close off: non-https schemes and
+   malformed URLs — the realistic part of this class of risk that has no
+   legitimate use case here.
+====================================================== */
+
+function isSafeHttpsUrl(url) {
+  if (typeof url !== 'string' || !url) return false;
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// Returns an error string if any media field present in `fields` is
+// invalid, otherwise null. Only checks fields that are actually present
+// (undefined is skipped) so this works for both a full create payload
+// and a partial update payload.
+function validateMediaFields(fields) {
+  const { images, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5, variants, addOns } = fields;
+
+  if (images !== undefined) {
+    if (!Array.isArray(images) || images.some((img) => !isSafeHttpsUrl(img))) {
+      return 'One or more product images are not valid — please re-upload them.';
+    }
+  }
+
+  for (const v of [videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5]) {
+    if (v && !isSafeHttpsUrl(v)) {
+      return 'One or more video links are not valid.';
+    }
+  }
+
+  if (Array.isArray(variants)) {
+    for (const variant of variants) {
+      if (variant?.image && !isSafeHttpsUrl(variant.image)) {
+        return 'One or more variant images are not valid — please re-upload them.';
+      }
+    }
+  }
+
+  if (Array.isArray(addOns)) {
+    for (const addOn of addOns) {
+      if (addOn?.image && !isSafeHttpsUrl(addOn.image)) {
+        return 'One or more add-on images are not valid — please re-upload them.';
+      }
+    }
+  }
+
+  return null;
+}
+
+/* ======================================================
    🔥 SLUG GENERATOR (NEW)
 ====================================================== */
 
@@ -65,6 +134,12 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
         error: 'Invalid product price',
       });
     }
+
+    const mediaError = validateMediaFields({ images, videoUrl, videoUrl2, videoUrl3, videoUrl4, videoUrl5 });
+    if (mediaError) {
+      return res.status(400).json({ error: mediaError });
+    }
+
     /* ======================================================
        🔥 SLUG CREATION + UNIQUE CHECK (NEW)
     ====================================================== */
@@ -481,6 +556,11 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       return res.status(400).json({
         error: 'Invalid product price',
       });
+    }
+
+    const mediaError = validateMediaFields(updates);
+    if (mediaError) {
+      return res.status(400).json({ error: mediaError });
     }
 
     /* ======================================================
