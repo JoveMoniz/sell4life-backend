@@ -24,6 +24,7 @@ import {
   applyMarkItemReturned,
 } from '../utils/returnLogic.js';
 import { pushItemHistory, pushUniqueHistory } from '../utils/historyLogic.js';
+import { escapeRegex } from '../utils/searchRegex.js';
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -45,7 +46,7 @@ const router = express.Router();
 ====================================================== */
 router.get('/autocomplete', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    let q = (req.query.q || '').trim();
+    let q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
 
     if (!q) return res.json([]);
 
@@ -54,10 +55,11 @@ router.get('/autocomplete', authMiddleware, adminMiddleware, async (req, res) =>
     }
 
     const firstChar = q[0];
+    const qSafe = escapeRegex(q);
 
     if (/^[0-9]$/.test(firstChar)) {
       const orders = await Order.find({
-        shortId: { $regex: q + '$', $options: 'i' },
+        shortId: { $regex: qSafe + '$', $options: 'i' },
       })
         .sort({ shortId: 1 })
         .limit(6)
@@ -68,7 +70,7 @@ router.get('/autocomplete', authMiddleware, adminMiddleware, async (req, res) =>
 
     if (/^[a-zA-Z]$/.test(firstChar)) {
       const users = await User.find({
-        email: { $regex: '^' + q, $options: 'i' },
+        email: { $regex: '^' + qSafe, $options: 'i' },
       })
         .limit(6)
         .select('email');
@@ -88,7 +90,9 @@ router.get('/autocomplete', authMiddleware, adminMiddleware, async (req, res) =>
 ====================================================== */
 router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { q = '', status = 'all', page = 1 } = req.query;
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : 'all';
+    const page = req.query.page || 1;
 
     const limit = 20;
     const skip = (page - 1) * limit;
@@ -104,6 +108,7 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
       if (search.toUpperCase().startsWith('S4L-')) {
         search = search.slice(4);
       }
+      search = escapeRegex(search);
 
       const users = await User.find({
         email: { $regex: search, $options: 'i' },

@@ -27,7 +27,9 @@ router.post('/event', async (req, res) => {
 
   try {
     const body = req.body || {};
-    const { sessionId, visitorId, type } = body;
+    const sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
+    const visitorId = typeof body.visitorId === 'string' ? body.visitorId : '';
+    const { type } = body;
 
     if (!sessionId || !visitorId || !EVENT_TYPES.includes(type)) return;
 

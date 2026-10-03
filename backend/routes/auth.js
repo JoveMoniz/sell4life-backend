@@ -313,7 +313,12 @@ router.get('/me', authMiddleware, async (req, res) => {
 ====================================================== */
 
 router.get('/verify-email', async (req, res) => {
-  const { token } = req.query;
+  // Must be a plain string — a crafted query like ?token[$ne]=x parses via
+  // Express's qs middleware into an object, which Mongo would treat as an
+  // operator instead of a literal value, matching ANY pending verification
+  // record instead of the one real token. See reset-password below for the
+  // same class of bug (that one is the more severe, account-takeover case).
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
   if (!token) return res.status(400).json({ ok: false, msg: 'Missing token' });
 
   try {

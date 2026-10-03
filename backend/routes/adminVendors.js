@@ -38,7 +38,8 @@ router.use(adminMiddleware);
 
 router.get('/', async (req, res) => {
   try {
-    const { q, status } = req.query;
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
 
     const page = Number(req.query.page) || 1;
     // Wider net for search than plain browsing — see matching comment in

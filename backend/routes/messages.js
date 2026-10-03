@@ -24,6 +24,9 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!productId || !body?.trim()) {
       return res.status(400).json({ error: 'productId and message body are required.' });
     }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product id.' });
+    }
     if (body.trim().length > 2000) {
       return res.status(400).json({ error: 'Message cannot exceed 2000 characters.' });
     }
@@ -179,6 +182,9 @@ router.post('/offer', authMiddleware, async (req, res) => {
     const amount = Number(req.body?.amount);
 
     if (!productId) return res.status(400).json({ error: 'productId is required.' });
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product id.' });
+    }
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Enter a valid offer amount.' });
     }
