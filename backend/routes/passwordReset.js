@@ -47,7 +47,15 @@ router.post('/forgot-password', async (req, res) => {
 // ── Reset password ─────────────────────────────────────────
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, password } = req.body || {};
+    // token MUST be a plain string — a crafted body like
+    // {"token":{"$ne":null}} would otherwise pass straight into the Mongo
+    // filter below as a real operator, matching ANY unexpired reset record
+    // in the whole collection instead of the one real token. That's a full
+    // account-takeover bypass (attacker calls /forgot-password for a victim,
+    // then /reset-password with the injection, needing zero access to the
+    // victim's real email). Reject anything that isn't a string outright.
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const { password } = req.body || {};
 
     if (!token || !password) {
       return res.status(400).json({ error: 'Token and password are required' });

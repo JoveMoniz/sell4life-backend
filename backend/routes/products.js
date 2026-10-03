@@ -12,6 +12,7 @@ import { decryptCredential } from '../utils/shippingProviders/registry.js';
 import { syncProductFromCj, looksCjSourced, deriveBasePriceFromVariants, scaleVariantPricesToTarget } from '../utils/cjProductSync.js';
 import { lookupGeo } from '../utils/geoip.js';
 import { isCountryAllowedByScope } from '../utils/shippingScope.js';
+import { escapeRegex } from '../utils/searchRegex.js';
 
 const router = Router();
 
@@ -211,9 +212,16 @@ router.get('/category/counts', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const { category, subcategory, vendor, search, q, page = 1, limit = 20 } = req.query;
-
-    const searchTerm = search || q;
+    const { vendor, page = 1, limit = 20 } = req.query;
+    // Every field below must be a plain string before it can touch a Mongo
+    // filter — a crafted query like ?category[$ne]=x parses (via Express's
+    // qs middleware) into an object, which Mongo reads as a real operator
+    // instead of a literal value, on this PUBLIC unauthenticated endpoint.
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const subcategory = typeof req.query.subcategory === 'string' ? req.query.subcategory : undefined;
+    const searchTerm =
+      typeof req.query.search === 'string' ? req.query.search :
+      typeof req.query.q === 'string' ? req.query.q : undefined;
 
     const query = {
       active: true,
@@ -230,10 +238,16 @@ router.get('/', async (req, res) => {
 
     /* 🔥 FIXED SEARCH (q + search support) */
     if (searchTerm) {
+      // Escape regex metacharacters FIRST (closes a ReDoS/regex-injection
+      // hole — this is public and unauthenticated, so a crafted
+      // catastrophic-backtracking pattern in ?q= was attacker-reachable
+      // with no login) — quote characters aren't in escapeRegex's
+      // metacharacter set, so the quote-equivalence substitution below
+      // still runs correctly on the escaped string.
       // Treat straight and curly quotes as equivalent — product names sometimes
       // pick up smart quotes (’ “ ”) from autocorrect, which would otherwise
       // silently fail to match a customer typing a plain ' or ".
-      const normalizedTerm = searchTerm
+      const normalizedTerm = escapeRegex(searchTerm)
         .replace(/['‘’]/g, "['‘’]")
         .replace(/["“”]/g, '["“”]');
       query.$or = [

@@ -45,6 +45,7 @@ import { getProvider, listProviders, encryptCredential, decryptCredential } from
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
 import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
 import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
+import { escapeRegex } from '../utils/searchRegex.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
 import { syncProductFromCj, checkUkShippingForOneVendor, attemptCjOrderCancel } from '../utils/cjProductSync.js';
 import { rematchProductCategoryFromTitle } from '../utils/localCategoryMatch.js';
@@ -1828,7 +1829,8 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
       });
     }
 
-    const { status, q } = req.query;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
 
     const filter = {
       vendorOrders: {
@@ -1844,6 +1846,7 @@ router.get('/orders', authMiddleware, requireVendor, async (req, res) => {
       if (search.toUpperCase().startsWith('S4L-')) {
         search = search.slice(4);
       }
+      search = escapeRegex(search);
 
       const users = await User.find({
         email: {
