@@ -48,7 +48,7 @@ router.get('/sitemap.xml', async (req, res) => {
     const productUrls = products
       .filter((p) => p.slug)
       .map((p) => ({
-        loc: `${SITE}/product/product.html?slug=${encodeURIComponent(p.slug)}`,
+        loc: `${SITE}/product/${encodeURIComponent(p.slug)}`,
         changefreq: 'weekly',
         priority: '0.7',
         lastmod: p.updatedAt ? new Date(p.updatedAt).toISOString().slice(0, 10) : undefined,
