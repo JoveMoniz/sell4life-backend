@@ -419,7 +419,36 @@ router.post('/shipping-address', async (req, res) => {
     if (!paymentIntentId) {
       return res.status(400).json({ error: 'Missing paymentIntentId' });
     }
-    if (!name || !address1 || !city || !postcode) {
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    // Fetched early (not just for the shipping-scope check further down)
+    // because whether every item in this order is collection-only decides
+    // which fields are actually required below — a buyer collecting an
+    // item in person was previously forced through the same "enter a full
+    // postal address" flow as a normal shipped order, which is confusing
+    // enough that it looks like a real cause of checkout abandonment on at
+    // least one collection-only listing.
+    let orderProducts = [];
+    try {
+      const metaItems = JSON.parse(paymentIntent?.metadata?.items || '[]');
+      const productIds = [...new Set(metaItems.map(i => i.productId))];
+      orderProducts = await Product.find({ _id: { $in: productIds } })
+        .select('name shippingScope shippingCountries variants vendor shippingOriginCountry collectionOnly');
+    } catch { /* malformed/missing items metadata — treated as not collection-only below */ }
+    const allCollectionOnly = orderProducts.length > 0 && orderProducts.every(p => p.collectionOnly);
+
+    if (!name) {
+      return res.status(400).json({ error: 'Please fill in your name' });
+    }
+    if (allCollectionOnly) {
+      // Nothing is being posted — the seller still needs a real way to
+      // reach the buyer to arrange pickup, so phone stands in for the
+      // postal-address fields instead.
+      if (!phone) {
+        return res.status(400).json({ error: 'Please add a phone number so the seller can arrange collection' });
+      }
+    } else if (!address1 || !city || !postcode) {
       return res.status(400).json({ error: 'Please fill in name, address, city and postcode' });
     }
     // Country used to silently default to 'GB' below whenever this was
@@ -427,12 +456,13 @@ router.post('/shipping-address', async (req, res) => {
     // required field — it drives chargeCurrency, CJ shipping destination,
     // HMRC reporting and shipping-scope enforcement, so a silently-wrong
     // country here is a much bigger problem than a silently-missing one of
-    // those other fields would be. Reject it explicitly instead.
+    // those other fields would be. Reject it explicitly instead. Still
+    // required for a collection-only order too — CJ-sourced/HMRC logic
+    // aside, you can't collect an item without Sell4Life or the seller
+    // knowing roughly where you are.
     if (!/^[A-Z]{2}$/.test(String(country || '').toUpperCase())) {
       return res.status(400).json({ error: 'Please select a valid country' });
     }
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     // Two ways to prove this request is allowed to set the address on this
     // specific order: a normal logged-in session matching the buyer, or —
@@ -467,11 +497,15 @@ router.post('/shipping-address', async (req, res) => {
     const address = {
       name: String(name).trim(),
       phone: String(phone || '').trim(),
-      address1: String(address1).trim(),
+      // Empty string, not the literal text "undefined" — these are
+      // genuinely optional now for a collection-only order (validated
+      // above), so String(address1) alone would stringify a real
+      // undefined into "undefined" and store that as if it were a value.
+      address1: String(address1 || '').trim(),
       address2: String(address2 || '').trim(),
-      city: String(city).trim(),
+      city: String(city || '').trim(),
       county: String(county || '').trim(),
-      postcode: String(postcode).trim(),
+      postcode: String(postcode || '').trim(),
       // Already validated as a real 2-letter code above — no silent
       // defaulting here. This used to be unconditionally forced to 'GB'
       // regardless of what the buyer picked, silently mislabeling every
@@ -486,12 +520,12 @@ router.post('/shipping-address', async (req, res) => {
     // UI only, never trust that alone). Runs here specifically because
     // it's the earliest point the real destination country is known, and
     // it's before stripe.confirmPayment ever runs client-side, so a reject
-    // here means no money has moved yet.
+    // here means no money has moved yet. Skipped entirely for a
+    // collection-only order — "can this be posted to that country" isn't a
+    // meaningful question when nothing is being posted.
     try {
-      const items = JSON.parse(paymentIntent.metadata?.items || '[]');
-      const productIds = [...new Set(items.map(i => i.productId))];
-      const products = await Product.find({ _id: { $in: productIds } })
-        .select('name shippingScope shippingCountries variants vendor shippingOriginCountry');
+      const products = orderProducts;
+      if (!allCollectionOnly) {
       const blocked = products.find(p => !isCountryAllowedByScope(p, address.country));
       if (blocked) {
         return res.status(400).json({
@@ -540,6 +574,7 @@ router.post('/shipping-address', async (req, res) => {
           // error) is "unknown" — never block a sale over it.
         }
       }
+      } // !allCollectionOnly
     } catch (err) {
       // A malformed/missing items list shouldn't block a legitimate
       // checkout — this check is a safety net, not the primary validation
