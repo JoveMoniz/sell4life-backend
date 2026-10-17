@@ -15,6 +15,7 @@ const STATIC_URLS = [
   { loc: `${SITE}/`, changefreq: 'daily', priority: '1.0' },
   { loc: `${SITE}/shop/`, changefreq: 'daily', priority: '0.9' },
   { loc: `${SITE}/stores/`, changefreq: 'weekly', priority: '0.7' },
+  { loc: `${SITE}/ig/`, changefreq: 'daily', priority: '0.6' },
   { loc: `${SITE}/category/electronics.html`, changefreq: 'weekly', priority: '0.8' },
   { loc: `${SITE}/category/fashion.html`, changefreq: 'weekly', priority: '0.8' },
   { loc: `${SITE}/category/books.html`, changefreq: 'weekly', priority: '0.8' },
