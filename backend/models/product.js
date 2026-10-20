@@ -358,6 +358,18 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
+    // The moment this listing most recently went live (active: true) —
+    // distinct from createdAt, which only reflects when the document was
+    // first saved. A product left in Draft for weeks and activated today
+    // should still read as "new" in recency-sorted sections; createdAt
+    // alone can't tell that apart from something genuinely added a month
+    // ago. Null while never-yet-published.
+    publishedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     archived: {
       type: Boolean,
       default: false,
