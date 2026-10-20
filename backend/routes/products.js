@@ -189,6 +189,11 @@ router.post('/', authMiddleware, requireApprovedVendor, tierFieldGuard, async (r
       estDeliveryMinDays: Number(estDeliveryMinDays) >= 0 ? Number(estDeliveryMinDays) : 3,
       estDeliveryMaxDays: Number(estDeliveryMaxDays) >= 0 ? Number(estDeliveryMaxDays) : 7,
       active: active !== undefined ? !!active : true,
+      // Set the moment this listing first actually goes live — null while
+      // it's created as a draft, so recency-sorted sections (e.g. the
+      // homepage's "Just Listed") only count a product from when buyers
+      // could actually see it, not from whenever the draft was saved.
+      publishedAt: (active !== undefined ? !!active : true) ? new Date() : null,
       freeReturns: freeReturns !== undefined ? !!freeReturns : null,
       supplier: supplier || '',
       supplierUrl: supplierUrl || '',
@@ -345,7 +350,12 @@ router.get('/', async (req, res) => {
         },
       })
       /* 🔥 SMART SORT (text relevance OR newest) */
-      .sort({ featured: -1, createdAt: -1 })
+      // publishedAt (when a listing actually went live) ranks above
+      // createdAt (when the document was first saved) so a product
+      // reactivated from Draft today outranks one merely created earlier —
+      // createdAt stays as the tiebreak for the many existing products that
+      // predate publishedAt and so have it null.
+      .sort({ featured: -1, publishedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
 
@@ -588,6 +598,8 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
       product.slug = uniqueSlug;
     }
 
+    const wasActive = product.active;
+
     const allowedFields = [
       'name',
       'shortDescription',
@@ -660,6 +672,13 @@ router.patch('/:id', authMiddleware, requireApprovedVendor, tierFieldGuard, asyn
         product[field] = updates[field];
       }
     });
+
+    // A Draft product going live for the first time (or going live again
+    // after being unpublished) should read as newly published, not as
+    // whenever it was originally created — see publishedAt's schema comment.
+    if (!wasActive && product.active) {
+      product.publishedAt = new Date();
+    }
 
     // Keep the base "from £X" price honest — always the cheapest variant,
     // never an independently-maintained number that can silently drift away
