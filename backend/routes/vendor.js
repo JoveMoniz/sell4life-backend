@@ -713,10 +713,18 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
     if (period && !VALID_PERIODS.includes(period)) {
       return res.status(400).json({ error: 'Invalid period' });
     }
+    // Computed once up front (not just inside the periodStats block below) so
+    // the Payout History table and Released Reserves list can be filtered by
+    // it too — previously the period buttons only ever touched the stat
+    // tiles, leaving history looking unchanged no matter which was clicked.
+    const periodStart = period ? getPeriodStart(period) : null;
+
+    const payoutFilter = { vendorId };
+    if (periodStart) payoutFilter.requestedAt = { $gte: periodStart };
 
     const [balance, payouts, pendingRequest, foundingStatus] = await Promise.all([
       computeVendorBalance(vendorId),
-      Payout.find({ vendorId }).sort({ createdAt: -1 }).limit(50),
+      Payout.find(payoutFilter).sort({ createdAt: -1 }).limit(50),
       Payout.findOne({ vendorId, status: 'requested' }),
       getFoundingSellerStatus(vendor),
     ]);
@@ -724,7 +732,6 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
     // Period-filtered summary stats
     let periodStats = null;
     if (period) {
-      const periodStart = getPeriodStart(period);
       if (periodStart) {
         const RESERVE_RATE = balance.reserveRate || 0.10;
         const STRIPE_PCT   = 0.014;
@@ -785,8 +792,17 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
     const { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } = await resolvePayoutCurrency(vendor.country);
     const displayCurrency = payoutCurrency !== 'GBP' ? { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } : null;
 
+    // Released Reserves list follows the same period filter as Payout
+    // History (both are backward-looking). Upcoming Reserve Releases is left
+    // unfiltered — it's inherently forward-looking, so "this week" wouldn't
+    // mean the same thing there.
+    const releasedReserveSchedule = periodStart
+      ? (balance.releasedReserveSchedule || []).filter(r => new Date(r.date) >= periodStart)
+      : balance.releasedReserveSchedule;
+
     res.json({
       ...balance,
+      releasedReserveSchedule,
       vendorType: vendor.type || 'casual',
       minimumPayout: MIN_PAYOUT,
       hasPendingRequest: !!pendingRequest,
