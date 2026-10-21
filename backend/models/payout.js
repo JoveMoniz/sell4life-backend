@@ -21,6 +21,12 @@ const payoutSchema = new mongoose.Schema({
   payoutCurrency:   { type: String, default: 'GBP' },
   payoutAmount:     { type: Number },
   payoutToGbpRate:  { type: Number, default: 1 },
+  // How much of this payout's `amount` became available because a reserve
+  // hold released, rather than from normal order clearance — a snapshot
+  // (computeVendorBalance's lifetimeReserveReleased minus the vendor's
+  // cumulativeReserveReleased at the time) taken when the payout is
+  // created, not a literal earmark of specific funds (balance is pooled).
+  reserveReleasedSinceLastPayout: { type: Number, default: 0 },
 }, { timestamps: true });
 
 export default mongoose.model('Payout', payoutSchema);

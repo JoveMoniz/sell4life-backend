@@ -126,6 +126,14 @@ const vendorSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Snapshot of computeVendorBalance's lifetimeReserveReleased as of this
+    // vendor's most recent payout — lets each new Payout record its own
+    // reserveReleasedSinceLastPayout as a simple delta against this value.
+    cumulativeReserveReleased: {
+      type: Number,
+      default: 0,
+    },
+
     // ── HMRC Digital Platform Reporting ──
     reportingStatus: {
       type: String,
