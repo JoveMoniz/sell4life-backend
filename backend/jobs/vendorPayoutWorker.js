@@ -38,13 +38,23 @@ export async function processAutoPayouts() {
         continue;
       }
 
-      const { pendingBalance } = await computeVendorBalance(vendor._id);
+      const { pendingBalance, lifetimeReserveReleased } = await computeVendorBalance(vendor._id);
       if (pendingBalance < MIN_PAYOUT) {
         summary.skipped++;
         continue;
       }
 
-      const payout = await Payout.create({ vendorId: vendor._id, amount: pendingBalance });
+      // Same snapshot-delta approach as the manual request route in
+      // routes/vendor.js — see vendor.cumulativeReserveReleased's schema
+      // comment.
+      const reserveReleasedSinceLastPayout = Number(
+        Math.max(0, lifetimeReserveReleased - (vendor.cumulativeReserveReleased || 0)).toFixed(2)
+      );
+
+      const payout = await Payout.create({ vendorId: vendor._id, amount: pendingBalance, reserveReleasedSinceLastPayout });
+
+      vendor.cumulativeReserveReleased = lifetimeReserveReleased;
+      await vendor.save();
 
       // Always transfer in GBP — confirmed live against Stripe's test API that
       // the platform's balance is GBP-only (no separate USD pool), so a

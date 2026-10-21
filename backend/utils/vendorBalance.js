@@ -102,7 +102,9 @@ export async function computeVendorBalance(vendorId) {
   let totalShippingAllTime    = 0;
   let nextClearanceMs         = null;
   let nextReserveReleaseMs    = null;
-  const reserveByDate         = {}; // stores net-of-commission amount per release date
+  let totalReserveReleasedNet = 0; // lifetime sum of reserve that has already been released into pendingBalance
+  const reserveByDate         = {}; // stores net-of-commission amount per future release date
+  const releasedReserveByDate = {}; // stores net-of-commission amount per date reserve was actually released
 
   // Founding Seller free-sale rank — incremented once per paid order (not
   // per item) as we walk orders oldest-first, so "is this order among the
@@ -175,6 +177,15 @@ export async function computeVendorBalance(vendorId) {
       if (now >= reserveReleasesAt) {
         totalGross += itemValue;
         totalCommissionCleared += itemValue * ORDER_COMMISSION_RATE;
+
+        // The reserve portion of this item (the same ORDER_RESERVE_RATE slice
+        // that would have been held back) has already landed in pendingBalance
+        // above — tracked separately here purely so it can be shown back to
+        // the vendor as release history, not because it affects any total.
+        const releasedReserveNet = itemValue * ORDER_RESERVE_RATE * (1 - ORDER_COMMISSION_RATE);
+        totalReserveReleasedNet += releasedReserveNet;
+        const releasedDateKey = new Date(reserveReleasesAt).toISOString().slice(0, 10);
+        releasedReserveByDate[releasedDateKey] = (releasedReserveByDate[releasedDateKey] || 0) + releasedReserveNet;
       } else {
         const reserveHeld    = itemValue * ORDER_RESERVE_RATE;
         const reserveHeldNet = reserveHeld * (1 - ORDER_COMMISSION_RATE);
@@ -302,6 +313,21 @@ export async function computeVendorBalance(vendorId) {
     // Upcoming reserve releases: [{ date, amount }] — amount already net of per-order commission
     reserveSchedule: Object.entries(reserveByDate)
       .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({
+        date,
+        amount: Number(amount.toFixed(2)),
+      })),
+    // Lifetime total of reserve that has already been released into
+    // pendingBalance — used to snapshot "reserve released since last payout"
+    // on each new Payout record.
+    lifetimeReserveReleased: Number(totalReserveReleasedNet.toFixed(2)),
+    // Past reserve releases: [{ date, amount }], newest first — the history
+    // counterpart to reserveSchedule above. Capped (unlike the upcoming
+    // list, which is naturally bounded to a ~90-day window) since this
+    // grows for as long as the vendor has been selling.
+    releasedReserveSchedule: Object.entries(releasedReserveByDate)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 30)
       .map(([date, amount]) => ({
         date,
         amount: Number(amount.toFixed(2)),

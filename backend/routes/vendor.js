@@ -805,6 +805,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
         note: p.note,
         payoutCurrency: p.payoutCurrency,
         payoutAmount: p.payoutAmount,
+        reserveReleasedSinceLastPayout: p.reserveReleasedSinceLastPayout || 0,
       })),
     });
   } catch (err) {
@@ -831,7 +832,7 @@ router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (re
       return res.status(400).json({ error: 'A payout request is already pending' });
     }
 
-    const { pendingBalance } = await computeVendorBalance(vendorId);
+    const { pendingBalance, lifetimeReserveReleased } = await computeVendorBalance(vendorId);
 
     if (pendingBalance < MIN_PAYOUT) {
       return res.status(400).json({
@@ -839,7 +840,18 @@ router.post('/payouts/request', authMiddleware, requireApprovedVendor, async (re
       });
     }
 
-    const payout = await Payout.create({ vendorId, amount: pendingBalance });
+    // Snapshot how much reserve has released since this vendor's last payout —
+    // a delta against the running total stored on Vendor, not a literal
+    // earmark (pendingBalance is one pooled figure, not separate buckets).
+    const reserveReleasedSinceLastPayout = Number(
+      Math.max(0, lifetimeReserveReleased - (vendor.cumulativeReserveReleased || 0)).toFixed(2)
+    );
+
+    const payout = await Payout.create({ vendorId, amount: pendingBalance, reserveReleasedSinceLastPayout });
+
+    vendor.cumulativeReserveReleased = lifetimeReserveReleased;
+    await vendor.save();
+
     res.json({ success: true, payout });
   } catch (err) {
     console.error('Payout request error:', err);
