@@ -729,6 +729,14 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
       getFoundingSellerStatus(vendor),
     ]);
 
+    // Released Reserves list follows the same period filter as Payout
+    // History (both are backward-looking). Upcoming Reserve Releases is left
+    // unfiltered — it's inherently forward-looking, so "this week" wouldn't
+    // mean the same thing there.
+    const releasedReserveSchedule = periodStart
+      ? (balance.releasedReserveSchedule || []).filter(r => new Date(r.date) >= periodStart)
+      : balance.releasedReserveSchedule;
+
     // Period-filtered summary stats
     let periodStats = null;
     if (period) {
@@ -780,6 +788,17 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
           commissionPaid: Number(commission.toFixed(2)),
           stripeFees:     Number(stripeFees.toFixed(2)),
           reserve:        Number(reserve.toFixed(2)),
+          // Distinct from `reserve` above (new reserve being HELD from this
+          // period's sales) — this is reserve that actually RELEASED into
+          // available balance during this period, shown as its own card so
+          // the period buttons visibly do something without scrolling down
+          // to the history lists.
+          reserveReleased: Number(
+            releasedReserveSchedule.reduce((s, r) => s + r.amount, 0).toFixed(2)
+          ),
+          paidOut: Number(
+            payouts.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0).toFixed(2)
+          ),
         };
       }
     }
@@ -791,14 +810,6 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
     // paid out.
     const { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } = await resolvePayoutCurrency(vendor.country);
     const displayCurrency = payoutCurrency !== 'GBP' ? { currency: payoutCurrency, rate: payoutToGbpRate, symbol: payoutSymbol } : null;
-
-    // Released Reserves list follows the same period filter as Payout
-    // History (both are backward-looking). Upcoming Reserve Releases is left
-    // unfiltered — it's inherently forward-looking, so "this week" wouldn't
-    // mean the same thing there.
-    const releasedReserveSchedule = periodStart
-      ? (balance.releasedReserveSchedule || []).filter(r => new Date(r.date) >= periodStart)
-      : balance.releasedReserveSchedule;
 
     res.json({
       ...balance,
