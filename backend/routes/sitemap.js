@@ -25,15 +25,13 @@ const STATIC_URLS = [
   { loc: `${SITE}/about/`, changefreq: 'monthly', priority: '0.5' },
   { loc: `${SITE}/contact/`, changefreq: 'monthly', priority: '0.5' },
   { loc: `${SITE}/sell/`, changefreq: 'monthly', priority: '0.6' },
-  // /help/ itself 404s (no index.html in that directory, only faq.html) —
-  // list the real page, not the bare directory.
-  { loc: `${SITE}/help/faq.html`, changefreq: 'monthly', priority: '0.5' },
-  { loc: `${SITE}/legal/terms.html`, changefreq: 'yearly', priority: '0.3' },
-  { loc: `${SITE}/legal/privacy.html`, changefreq: 'yearly', priority: '0.3' },
-  // returns-refunds.html, not legal/returns.html — that was a duplicate
-  // page nothing on the site actually links to; see the .htaccess redirect.
-  { loc: `${SITE}/returns-refunds.html`, changefreq: 'yearly', priority: '0.3' },
-  { loc: `${SITE}/legal/vendor-tax-guide.html`, changefreq: 'yearly', priority: '0.3' },
+  // Clean URLs — these pages moved from /legal/*.html and /help/faq.html;
+  // the old paths now 301-redirect here (see frontend/.htaccess).
+  { loc: `${SITE}/faq/`, changefreq: 'monthly', priority: '0.5' },
+  { loc: `${SITE}/terms/`, changefreq: 'yearly', priority: '0.3' },
+  { loc: `${SITE}/privacy/`, changefreq: 'yearly', priority: '0.3' },
+  { loc: `${SITE}/returns/`, changefreq: 'yearly', priority: '0.3' },
+  { loc: `${SITE}/vendor-tax-guide/`, changefreq: 'yearly', priority: '0.3' },
 ];
 
 const escapeXml = (s) =>

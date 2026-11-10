@@ -48,6 +48,7 @@ import adminAnalyticsRoute from './routes/adminAnalytics.js';
 import sitemapRoute from './routes/sitemap.js';
 import currencyRoute from './routes/currency.js';
 import publicStatusRoute from './routes/publicStatus.js';
+import contactRoute from './routes/contact.js';
 import { initGeoIp, isGeoIpLoaded } from './utils/geoip.js';
 
 // ======================================================
@@ -171,6 +172,19 @@ const trackLimiter = rateLimit({
   message: { error: 'Too many requests — please try again shortly.' },
 });
 
+// A public, email-sending endpoint is a more attractive spam target than
+// general /api traffic (already covered by apiLimiter's much looser 5000),
+// so it gets its own tight limiter — same shape as authLimiter below, for
+// the same "shared-IP" reasoning, just applied to a single POST route
+// rather than a whole namespace.
+const contactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests — please try again shortly.' },
+});
+
 // Authenticated-admin-only route — abuse risk is much lower than a public
 // endpoint, and the dashboard genuinely needs the headroom (7 requests per
 // load, plus a 20s realtime poll for as long as the tab stays open).
@@ -191,6 +205,7 @@ app.post('/api/auth/register', authLimiter);
 app.post('/api/auth/forgot-password', authLimiter);
 app.post('/api/auth/reset-password', authLimiter);
 app.post('/api/auth/resend-verification', authLimiter);
+app.use('/api/contact', contactLimiter);
 
 // ======================================================
 // REQUEST LOGGER
@@ -300,6 +315,7 @@ app.use('/api/admin/analytics', adminAnalyticsRoute);
 app.use('/api', sitemapRoute);
 app.use('/api', publicStatusRoute);
 app.use('/api/currency', currencyRoute);
+app.use('/api/contact', contactRoute);
 
 // ======================================================
 // 404 HANDLER
