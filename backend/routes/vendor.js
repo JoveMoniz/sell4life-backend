@@ -37,7 +37,7 @@ import Payout from '../models/payout.js';
 import Conversation from '../models/conversation.js';
 
 import authMiddleware from '../middleware/authMiddleware.js';
-import { mailOrderShipped, mailOrderCancelled, mailCancelHeld } from '../utils/email.js';
+import { mailOrderShipped, mailOrderCancelled, mailCancelHeld, sendMail } from '../utils/email.js';
 import stripe from '../config/stripe.js';
 
 // Shipping cost providers (registers CJ at import time)
@@ -2061,6 +2061,62 @@ router.get('/me', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+/* ======================================================
+   VENDOR SUPPORT — separate inbox from the public buyer
+   contact form (routes/contact.js -> support@sell4life.com),
+   so support can tell at a glance whether a message is from
+   a buyer or a seller. Authenticated (authMiddleware) and
+   already rate-limited by the sitewide vendorLimiter mounted
+   on /api/vendor in server.js — no separate limiter/honeypot
+   needed for a route only a signed-in vendor can reach.
+====================================================== */
+router.post('/support', authMiddleware, async (req, res) => {
+  try {
+    const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const orderNumber = typeof req.body?.orderNumber === 'string' ? req.body.orderNumber.trim() : '';
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Please fill in a subject and message.' });
+    }
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'Message is too long (max 2000 characters).' });
+    }
+
+    const vendor = await Vendor.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
+    const storeName = vendor?.storeName || 'Unknown store';
+    const storeSlug = vendor?.storeSlug || 'unknown';
+
+    await sendMail({
+      to: 'vendor@sell4life.com',
+      subject: `Vendor support: ${storeName} (@${storeSlug}) — ${subject}`,
+      html: `
+        <p><strong>Store:</strong> ${vendorEscHtml(storeName)} (@${vendorEscHtml(storeSlug)})</p>
+        <p><strong>Account email:</strong> ${vendorEscHtml(req.user.email)}</p>
+        ${orderNumber ? `<p><strong>Order number:</strong> ${vendorEscHtml(orderNumber)}</p>` : ''}
+        <p><strong>Message:</strong></p>
+        <p>${vendorEscHtml(message).replace(/\n/g, '<br />')}</p>
+      `,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Vendor support error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Minimal inline escaper for the vendor support email template above —
+// server-side, no window.escHtml here (same reasoning as routes/contact.js).
+function vendorEscHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /* ======================================================
    GET TAX INFO (masked)
