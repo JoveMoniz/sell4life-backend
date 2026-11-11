@@ -2089,7 +2089,7 @@ router.post('/support', authMiddleware, async (req, res) => {
     const storeSlug = vendor?.storeSlug || 'unknown';
 
     await sendMail({
-      to: 'vendor@sell4life.com',
+      to: 'vendors@sell4life.com',
       subject: `Vendor support: ${storeName} (@${storeSlug}) — ${subject}`,
       html: `
         <p><strong>Store:</strong> ${vendorEscHtml(storeName)} (@${vendorEscHtml(storeSlug)})</p>
