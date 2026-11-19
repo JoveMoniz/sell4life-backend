@@ -799,7 +799,15 @@ router.get('/financials', async (req, res) => {
     let totalShipping = 0;
     let totalGoodwillPlatform = 0;
     let totalGoodwillVendor = 0;
-    const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds }
+    // Founding Seller free-promo visibility — so admin can see, in the open,
+    // that these sales are no longer costing the platform money out of
+    // pocket: gross/commission collected specifically on free-window sales,
+    // where commission now equals the real Stripe cost covered (see the
+    // Founding Seller fee-floor fix above), not platform margin.
+    let totalFoundingFreeGross      = 0;
+    let totalFoundingFreeCommission = 0;
+    const foundingFreeOrderKeys     = new Set(); // `${vendorId}_${orderId}` — distinct vendor-order pairs
+    const vendorMap = {}; // vendorId → { gross, refunds, commission, orderIds, foundingFreeOrderIds }
 
     for (const order of orders) {
       const orderShipping = (order.items || []).reduce(
@@ -835,6 +843,9 @@ router.get('/financials', async (req, res) => {
         const gross = Number(item.price || 0) * Number(item.quantity || 0);
         const vid = String(item.vendorId || '');
 
+        const founding = foundingCutoffs[vid];
+        const isFreeFoundingSale = !!founding && isWithinFoundingCutoff(order.createdAt, founding.cutoff);
+
         // Prefer stored commission; fall back to rate calculation for legacy orders
         let commission;
         if (storedCommission[vid] != null) {
@@ -865,6 +876,12 @@ router.get('/financials', async (req, res) => {
         totalCommission += commission;
         orderRefundedTotal += refunded;
 
+        if (isFreeFoundingSale) {
+          totalFoundingFreeGross      += gross;
+          totalFoundingFreeCommission += commission;
+          foundingFreeOrderKeys.add(`${vid}_${order._id}`);
+        }
+
         // Goodwill refunds already executed (refundedAmount populated by the worker) —
         // split out by who actually absorbed the cost.
         if (item.goodwillRefund && Number(item.refundedAmount) > 0) {
@@ -873,11 +890,12 @@ router.get('/financials', async (req, res) => {
         }
 
         if (vid && mongoose.Types.ObjectId.isValid(vid)) {
-          if (!vendorMap[vid]) vendorMap[vid] = { gross: 0, refunds: 0, commission: 0, orderIds: new Set() };
+          if (!vendorMap[vid]) vendorMap[vid] = { gross: 0, refunds: 0, commission: 0, orderIds: new Set(), foundingFreeOrderIds: new Set() };
           vendorMap[vid].gross += gross;
           vendorMap[vid].refunds += refunded;
           vendorMap[vid].commission += commission;
           vendorMap[vid].orderIds.add(String(order._id));
+          if (isFreeFoundingSale) vendorMap[vid].foundingFreeOrderIds.add(String(order._id));
         }
       }
 
@@ -912,6 +930,7 @@ router.get('/financials', async (req, res) => {
         type: v.type || 'casual',
         vatRegistered: v.vatRegistered || false,
         orderCount: m.orderIds ? m.orderIds.size : 0,
+        foundingFreeOrderCount: m.foundingFreeOrderIds ? m.foundingFreeOrderIds.size : 0,
         gross: Math.round(gross * 100) / 100,
         refunds: Math.round(refunds * 100) / 100,
         commission,
@@ -919,7 +938,10 @@ router.get('/financials', async (req, res) => {
       };
     }).sort((a, b) => b.gross - a.gross);
 
-    // Compute per-vendor balance (reserve + available) in parallel
+    // Compute per-vendor balance (reserve + available) in parallel — also the
+    // source of each vendor's live Founding Seller status (enrolled/active/
+    // remaining free sales), so the Vendor Breakdown table can show it without
+    // a second round trip.
     const balances = await Promise.all(
       vendorRowsBase.map(v => computeVendorBalance(v._id).catch(() => null))
     );
@@ -927,8 +949,10 @@ router.get('/financials', async (req, res) => {
       ...v,
       reservedBalance: Math.round((balances[i]?.reservedBalance || 0) * 100) / 100,
       pendingBalance:  Math.round((balances[i]?.pendingBalance  || 0) * 100) / 100,
+      foundingSeller:  balances[i]?.foundingSeller || null,
     }));
     const totalReserved = vendorRows.reduce((s, v) => s + v.reservedBalance, 0);
+    const foundingSellersActiveCount = vendorRows.filter(v => v.foundingSeller?.active).length;
 
     res.json({
       summary: {
@@ -947,6 +971,14 @@ router.get('/financials', async (req, res) => {
         orderCount:        orders.length,
         vendorCount:       vendorIds.length,
         totalReserved:     Math.round(totalReserved * 100) / 100,
+        // Founding Seller free-promo visibility — totalFoundingFreeCommission
+        // should track close to the Stripe cost of these same orders (the
+        // fee-floor fix), confirming the platform is breaking even on them
+        // rather than paying Stripe out of pocket with zero revenue.
+        foundingFreeOrderCount:      foundingFreeOrderKeys.size,
+        foundingFreeGross:           Math.round(totalFoundingFreeGross * 100) / 100,
+        foundingFreeCommission:      Math.round(totalFoundingFreeCommission * 100) / 100,
+        foundingSellersActiveCount,
       },
       vendors: vendorRows,
     });
