@@ -14,6 +14,19 @@ export const MIN_PAYOUT        = 20;
 export const STRIPE_PCT   = 0.014;
 export const STRIPE_FIXED = 0.20;
 
+// Real (or, before the webhook has landed, estimated) Stripe processing cost
+// for an order, expressed as a fraction of the order total. Used to floor a
+// Founding Seller's free-sale rate so a 0% promo order never costs the
+// platform money outright — see computeVendorBalance below.
+export function stripeFeeRateForOrder(order) {
+  const orderTotal = Number(order.total || 0);
+  if (orderTotal <= 0) return 0;
+  const rawFee       = Number(order.stripeFeeAmount || 0);
+  const estimatedFee = Number((orderTotal * STRIPE_PCT + STRIPE_FIXED).toFixed(2));
+  const orderFee     = rawFee > 0 ? rawFee : estimatedFee;
+  return orderFee / orderTotal;
+}
+
 export function resolveReserveRate(vendor, ordersRaw) {
   const approvedAt = vendor.approvedAt ? new Date(vendor.approvedAt).getTime() : Date.now();
   const monthsApproved = (Date.now() - approvedAt) / (30 * 24 * 60 * 60 * 1000);
@@ -123,8 +136,13 @@ export async function computeVendorBalance(vendorId) {
     const isFreeFoundingSale = !!vendor?.foundingSeller?.enrolled
       && vendor.foundingSeller.freeSalesLimit != null
       && paidOrderRank <= vendor.foundingSeller.freeSalesLimit;
+    // A Founding Seller's free-sale rate is floored at this order's real Stripe
+    // processing cost — the platform still earns £0 margin on these sales, but
+    // no longer pays the real card fee out of its own pocket. Promo-only: once
+    // a vendor rolls onto a normal paid tier, that commission already comfortably
+    // exceeds Stripe's cut, so resolveCommissionRateForOrder below is untouched.
     const ORDER_COMMISSION_RATE = isFreeFoundingSale
-      ? (vendor.foundingSeller.rate ?? 0)
+      ? Math.max(vendor.foundingSeller.rate ?? 0, stripeFeeRateForOrder(order))
       : await resolveCommissionRateForOrder(vendor, order.createdAt);
     const ORDER_RESERVE_RATE    = resolveReserveRateAtTime(vendor, cfg, order.createdAt);
 
