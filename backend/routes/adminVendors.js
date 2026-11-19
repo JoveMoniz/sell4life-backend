@@ -1,6 +1,6 @@
 import { calculateVendorMetrics } from '../utils/vendorMetrics.js';
 import { mailPayoutProcessed, mailVendorStatusChange } from '../utils/email.js';
-import { computeVendorBalance } from '../utils/vendorBalance.js';
+import { computeVendorBalance, getFoundingSellerStatus, isWithinFoundingCutoff, stripeFeeRateForOrder } from '../utils/vendorBalance.js';
 import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
 import { resolveCommissionRate, getFeeConfig, resolveCommissionRateForOrder } from '../utils/feeConfig.js';
 import { commissionAfterRefund } from '../utils/commission.js';
@@ -459,8 +459,17 @@ router.get('/:id/transactions', async (req, res) => {
     let totalStripeFees = 0;
     let totalShipping = 0;
 
+    // Founding Seller status for this vendor — used below to floor a free-promo
+    // order's commission at its real Stripe cost, same rule applied to the
+    // vendor's own Transactions page (routes/vendor.js) and the real payout
+    // math (utils/vendorBalance.js), so admin sees the same number as both.
+    const foundingStatus = await getFoundingSellerStatus(vendor);
+
     for (const order of ordersRaw) {
-      const COMMISSION_RATE = await resolveCommissionRateForOrder(vendor, order.createdAt);
+      const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
+      const COMMISSION_RATE = isFreeFoundingSale
+        ? Math.max(foundingStatus.rate, stripeFeeRateForOrder(order))
+        : await resolveCommissionRateForOrder(vendor, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
         vo => String(vo.vendorId) === String(vendor._id)
       );
@@ -720,9 +729,9 @@ router.get('/financials', async (req, res) => {
 
     const [orders, feeConfig, allVendorDocs] = await Promise.all([
       Order.find({ paymentStatus: { $in: PAID }, ...dateFilter })
-        .select('items vendorOrders paymentStatus stripeFeeAmount createdAt'),
+        .select('items vendorOrders paymentStatus stripeFeeAmount createdAt total'),
       getFeeConfig(),
-      Vendor.find({}).select('type commissionOverride commissionOverrideSetAt').lean(),
+      Vendor.find({}).select('type commissionOverride commissionOverrideSetAt foundingSeller').lean(),
     ]);
 
     // Build vendor lookup (date-aware commission resolution happens per item)
@@ -735,7 +744,26 @@ router.get('/financials', async (req, res) => {
       };
     }
 
-    function getItemCommissionRate(vid, orderCreatedAt) {
+    // Founding Seller cutoffs — one query per enrolled vendor (each looks at
+    // that vendor's full order history to find their free-sale cutoff date),
+    // so a free-promo order's commission below can be floored at its real
+    // Stripe cost instead of showing as $0, matching the per-vendor
+    // Transactions view and the real payout math.
+    const foundingCutoffs = {};
+    await Promise.all(allVendorDocs
+      .filter(v => v.foundingSeller?.enrolled)
+      .map(async v => {
+        foundingCutoffs[String(v._id)] = await getFoundingSellerStatus(v);
+      }));
+
+    function getItemCommissionRate(vid, order) {
+      const orderCreatedAt = order.createdAt;
+
+      const founding = foundingCutoffs[vid];
+      if (founding && isWithinFoundingCutoff(orderCreatedAt, founding.cutoff)) {
+        return Math.max(founding.rate, stripeFeeRateForOrder(order));
+      }
+
       const v = vendorDataMap[vid];
       const type = v?.type;
       const { override, overrideSetAt } = v || {};
@@ -813,7 +841,7 @@ router.get('/financials', async (req, res) => {
           commission = storedCommission[vid];
           delete storedCommission[vid]; // consume — only count once per vendor per order
         } else {
-          const rate = getItemCommissionRate(vid, order.createdAt);
+          const rate = getItemCommissionRate(vid, order);
           commission = Math.round(gross * rate * 100) / 100;
         }
 

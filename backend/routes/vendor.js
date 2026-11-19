@@ -43,7 +43,7 @@ import stripe from '../config/stripe.js';
 // Shipping cost providers (registers CJ at import time)
 import { getProvider, listProviders, encryptCredential, decryptCredential } from '../utils/shippingProviders/registry.js';
 import { getProductImages as cjGetProductImages } from '../utils/shippingProviders/cjdropshipping.js';
-import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff } from '../utils/vendorBalance.js';
+import { computeVendorBalance, MIN_PAYOUT, resolveReserveRate, STRIPE_PCT, STRIPE_FIXED, getFoundingSellerStatus, isWithinFoundingCutoff, stripeFeeRateForOrder } from '../utils/vendorBalance.js';
 import { resolvePayoutCurrency, convertGbpToPayout } from '../utils/payoutCurrency.js';
 import { escapeRegex } from '../utils/searchRegex.js';
 import { resolveCommissionRateForOrder, resolveReserveRateAtTime, getFeeConfig } from '../utils/feeConfig.js';
@@ -413,7 +413,7 @@ router.get('/transactions', authMiddleware, requireApprovedVendor, requireTier('
     for (const order of ordersRaw) {
       const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
       const COMMISSION_RATE = isFreeFoundingSale
-        ? foundingStatus.rate
+        ? Math.max(foundingStatus.rate, stripeFeeRateForOrder(order))
         : await resolveCommissionRateForOrder(vendor, order.createdAt);
       const RESERVE_RATE    = resolveReserveRateAtTime(vendor, feeCfg, order.createdAt);
       const vendorOrder = order.vendorOrders.find(
@@ -756,7 +756,7 @@ router.get('/payouts', authMiddleware, requireApprovedVendor, async (req, res) =
           if (!isPaid) continue;
           const isFreeFoundingSale = isWithinFoundingCutoff(order.createdAt, foundingStatus.cutoff);
           const COMMISSION_RATE = isFreeFoundingSale
-            ? foundingStatus.rate
+            ? Math.max(foundingStatus.rate, stripeFeeRateForOrder(order))
             : await resolveCommissionRateForOrder(vendor, order.createdAt);
           const vendorItems = (order.items || []).filter(i => String(i.vendorId) === String(vendorId));
 
