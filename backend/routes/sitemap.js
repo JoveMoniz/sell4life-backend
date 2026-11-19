@@ -25,6 +25,7 @@ const STATIC_URLS = [
   { loc: `${SITE}/about/`, changefreq: 'monthly', priority: '0.5' },
   { loc: `${SITE}/contact/`, changefreq: 'monthly', priority: '0.5' },
   { loc: `${SITE}/sell/`, changefreq: 'monthly', priority: '0.6' },
+  { loc: `${SITE}/sell/features/`, changefreq: 'monthly', priority: '0.5' },
   // Clean URLs — these pages moved from /legal/*.html and /help/faq.html;
   // the old paths now 301-redirect here (see frontend/.htaccess).
   { loc: `${SITE}/faq/`, changefreq: 'monthly', priority: '0.5' },
