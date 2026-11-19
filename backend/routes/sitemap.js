@@ -31,6 +31,7 @@ const STATIC_URLS = [
   { loc: `${SITE}/terms/`, changefreq: 'yearly', priority: '0.3' },
   { loc: `${SITE}/privacy/`, changefreq: 'yearly', priority: '0.3' },
   { loc: `${SITE}/returns/`, changefreq: 'yearly', priority: '0.3' },
+  { loc: `${SITE}/buyer-protection/`, changefreq: 'yearly', priority: '0.3' },
   { loc: `${SITE}/vendor-tax-guide/`, changefreq: 'yearly', priority: '0.3' },
 ];
 
